@@ -1,0 +1,293 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply bg-surface text-primary-900 antialiased dark:bg-surface-dark dark:text-white;
+    font-family: 'Poppins', ui-sans-serif, system-ui, sans-serif;
+  }
+
+  ::selection {
+    @apply bg-accent/30;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-accent ring-offset-2 ring-offset-surface dark:ring-offset-surface-dark;
+  }
+}
+
+@layer components {
+  .container-app {
+    @apply mx-auto w-full max-w-[1440px] px-4 sm:px-6 lg:px-8;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-medium transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn bg-primary text-white hover:bg-primary-800 active:scale-[0.98];
+  }
+
+  .btn-accent {
+    @apply btn bg-accent text-primary-900 shadow-soft hover:bg-accent-400 active:scale-[0.98];
+  }
+
+  .btn-outline {
+    @apply btn border border-primary-200 bg-transparent text-primary-900 hover:bg-primary-50 dark:border-primary-600 dark:text-white dark:hover:bg-primary-800;
+  }
+
+  .btn-ghost {
+    @apply btn bg-transparent text-primary-900 hover:bg-primary-100 dark:text-white dark:hover:bg-primary-800;
+  }
+
+  /* Orange primary button for the customer account section redesign. */
+  .btn-account {
+    @apply btn bg-acc-primary text-white shadow-[0_8px_20px_-8px_rgba(255,107,0,0.6)] hover:bg-acc-primary-dark active:scale-[0.98];
+  }
+
+  .card-surface {
+    @apply rounded-2xl bg-card shadow-soft transition-shadow duration-200 hover:shadow-card dark:bg-card-dark;
+  }
+
+  .input-field {
+    @apply w-full rounded-xl border border-primary-200 bg-white px-4 py-2.5 text-sm text-primary-900 placeholder:text-primary-300 transition-colors focus:border-accent dark:border-primary-600 dark:bg-primary-800 dark:text-white dark:placeholder:text-primary-400;
+  }
+
+  .skeleton {
+    @apply relative overflow-hidden bg-primary-100 dark:bg-primary-700;
+  }
+
+  .skeleton::after {
+    content: '';
+    @apply absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent dark:via-white/10;
+    animation: shimmer 1.5s infinite;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold;
+  }
+
+  .badge-accent {
+    @apply badge bg-accent-100 text-accent-700 dark:bg-accent-900/40 dark:text-accent-300;
+  }
+
+  .badge-success {
+    @apply badge bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300;
+  }
+
+  .badge-danger {
+    @apply badge bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300;
+  }
+}
+
+/* thin scrollbars for carousels/filters */
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+.scrollbar-thin::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  @apply rounded-full bg-primary-200 dark:bg-primary-600;
+}
+
+/* ============================================================================
+ * Admin panel premium redesign — scoped entirely under `.admin-panel` (the root
+ * wrapper on AdminLayout/StaffLayout) so none of this leaks into the customer
+ * storefront, which renders the exact same shared classes (.card-surface, .btn,
+ * .input-field, .badge-*) completely unaffected. The admin panel has its own
+ * dedicated `admin-*` color tokens (tailwind.config.js) and its own light-only
+ * theme (see useForceLightMode) — this block is the only place those tokens
+ * apply to these shared class names.
+ * ============================================================================ */
+@layer components {
+  .admin-panel {
+    @apply bg-admin-bg;
+  }
+
+  /* Content cards — Products/Orders/Customers/Categories/Inventory/Reports/Coupons/Settings/Staff */
+  .admin-panel .card-surface {
+    @apply rounded-[18px] border border-admin-border bg-white shadow-[0_6px_20px_rgba(0,0,0,0.06)] transition-all duration-[250ms];
+  }
+  .admin-panel .card-surface:hover {
+    @apply -translate-y-0.5 shadow-[0_10px_28px_rgba(0,0,0,0.09)];
+  }
+
+  /* Dashboard statistic tiles — the one place the orange gradient covers the whole card. */
+  .admin-stat-card {
+    @apply rounded-[20px] bg-gradient-to-br from-admin-orange-light to-admin-orange p-5 text-white shadow-[0_20px_45px_rgba(255,107,0,0.25)] transition-transform duration-[250ms];
+  }
+  .admin-stat-card:hover {
+    @apply -translate-y-1;
+  }
+
+  .admin-table-wrap {
+    @apply rounded-[18px] border border-admin-border bg-white shadow-[0_6px_20px_rgba(0,0,0,0.06)] transition-shadow duration-[250ms];
+  }
+  .admin-table-wrap:hover {
+    @apply shadow-[0_10px_28px_rgba(0,0,0,0.09)];
+  }
+  .admin-table-wrap table thead {
+    @apply bg-admin-table-header;
+  }
+  .admin-table-wrap table thead th {
+    @apply px-4 py-3.5 text-admin-text;
+  }
+  .admin-table-wrap table tbody td {
+    @apply border-b border-admin-row-border px-4 py-3;
+  }
+  .admin-table-wrap table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+  .admin-table-wrap table tbody tr {
+    @apply bg-white transition-colors duration-150;
+  }
+  .admin-table-wrap table tbody tr:hover {
+    @apply bg-admin-table-hover;
+  }
+
+  .admin-panel .btn {
+    @apply rounded-xl shadow-sm transition-all duration-200;
+  }
+  .admin-panel .btn:hover {
+    @apply -translate-y-0.5 shadow-md;
+  }
+  .admin-panel .btn:active {
+    @apply translate-y-0 scale-[0.97] shadow-sm;
+  }
+
+  /* Primary action — orange gradient, white text (was solid `accent` #FF9900 + dark text). */
+  .admin-panel .btn-accent {
+    @apply border-none bg-gradient-to-br from-admin-orange-light to-admin-orange text-white shadow-[0_10px_25px_rgba(255,107,0,0.25)] hover:from-admin-orange-hover hover:to-admin-orange-hover hover:shadow-[0_14px_30px_rgba(255,107,0,0.32)];
+  }
+  /* Secondary action — white, orange border + text (was neutral gray border/text). */
+  .admin-panel .btn-outline {
+    @apply border-admin-orange bg-white text-admin-orange hover:bg-admin-orange/5;
+  }
+
+  .admin-panel .input-field {
+    @apply h-11 rounded-xl border-admin-input-border bg-white text-admin-text placeholder:text-admin-placeholder transition-all duration-200 focus:border-admin-orange;
+  }
+  .admin-panel textarea.input-field {
+    @apply h-auto;
+  }
+  .admin-panel .input-field:focus {
+    @apply shadow-[0_0_0_4px_rgba(255,107,0,0.12)];
+  }
+
+  .admin-panel .badge-accent,
+  .admin-panel .badge-success,
+  .admin-panel .badge-danger,
+  .admin-badge-warning,
+  .admin-badge-info {
+    @apply rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide shadow-sm transition-transform duration-200;
+  }
+  /* "Shipped" reuses badge-accent, recolored to the new admin orange family. */
+  .admin-panel .badge-accent {
+    @apply bg-admin-orange/10 text-admin-orange;
+  }
+  .admin-badge-warning {
+    @apply inline-flex items-center bg-amber-100 text-amber-700;
+  }
+  .admin-badge-info {
+    @apply inline-flex items-center bg-blue-100 text-blue-700;
+  }
+
+  .admin-panel nav a,
+  .admin-panel nav button {
+    @apply transition-all duration-200;
+  }
+}
+
+/* ============================================================================
+ * Staff Portal dark theme. AdminLayout still calls useForceLightMode() (which
+ * strips `.dark` off <html> while it's mounted) so none of these `.dark
+ * .admin-panel ...` rules ever match for Admin — StaffLayout no longer calls
+ * that hook, so `.dark` reflects the real, user-selected theme there. This is
+ * plain CSS (not @layer) so its higher-specificity compound selectors reliably
+ * beat the plain utility classes (`.text-admin-text`, `.bg-admin-bg`, etc.)
+ * used throughout the Staff pages, without needing `!important` anywhere.
+ * ============================================================================ */
+.dark .admin-panel {
+  background-color: #0f172a;
+}
+
+.dark .admin-panel .card-surface {
+  background-color: #1e293b;
+  border-color: #475569;
+}
+
+.dark .admin-table-wrap {
+  background-color: #1e293b;
+  border-color: #475569;
+}
+.dark .admin-table-wrap table thead {
+  background-color: #334155;
+}
+.dark .admin-table-wrap table thead th {
+  color: #f8fafc;
+}
+.dark .admin-table-wrap table tbody tr {
+  background-color: #1e293b;
+}
+.dark .admin-table-wrap table tbody tr:hover {
+  background-color: #334155;
+}
+.dark .admin-table-wrap table tbody td {
+  border-color: #475569;
+}
+
+.dark .admin-panel .btn-outline {
+  background-color: #1e293b;
+}
+
+.dark .admin-panel .input-field {
+  background-color: #334155;
+  border-color: #475569;
+  color: #f8fafc;
+}
+.dark .admin-panel .input-field::placeholder {
+  color: #94a3b8;
+}
+
+.dark .admin-badge-warning {
+  background-color: rgba(120, 53, 15, 0.4);
+  color: #fcd34d;
+}
+.dark .admin-badge-info {
+  background-color: rgba(30, 58, 138, 0.4);
+  color: #93c5fd;
+}
+
+/* The `admin-text`/`admin-text-secondary`/`admin-bg`/`admin-border` custom color tokens
+ * (tailwind.config.js) are static — they carry no dark: variant of their own, so every one of
+ * their utility classes (used throughout the Staff pages) is re-pointed to the dark palette here,
+ * in one place, rather than hand-editing every className that happens to use them. Matched via
+ * `[class~="..."]` (exact class-token match) rather than plain `.text-admin-text`-style selectors
+ * — those class names are also used via `@apply` elsewhere in this file, and Tailwind's `@apply`
+ * expansion flags a plain-selector rule with the identical name as a circular dependency. */
+.dark .admin-panel [class~='text-admin-text'] {
+  color: #f8fafc;
+}
+.dark .admin-panel [class~='text-admin-text-secondary'] {
+  color: #cbd5e1;
+}
+.dark .admin-panel [class~='bg-admin-bg'] {
+  background-color: #0f172a;
+}
+.dark .admin-panel [class~='bg-admin-border'] {
+  background-color: #475569;
+}
+.dark .admin-panel [class~='border-admin-border'] {
+  border-color: #475569;
+}
+.dark .admin-panel [class~='ring-admin-border'] {
+  --tw-ring-color: #475569;
+}

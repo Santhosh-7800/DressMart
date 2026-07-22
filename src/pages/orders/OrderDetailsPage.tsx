@@ -1,0 +1,161 @@
+import { useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { Download, XCircle, RotateCcw } from 'lucide-react';
+import { Seo } from '@/components/common/Seo';
+import { useOrder, useCancelOrder, useSimulateOrderProgress } from '@/hooks/useOrders';
+import { useRequestReturn } from '@/hooks/useReturns';
+import { Button } from '@/components/ui/Button';
+import { Modal } from '@/components/ui/Modal';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { OrderTrackingTimeline } from '@/components/orders/OrderTrackingTimeline';
+import { formatCurrency, formatDateTime } from '@/lib/utils';
+import { downloadInvoice } from '@/lib/invoice';
+import { RETURN_REASONS } from '@/lib/returnStatus';
+
+export function OrderDetailsPage() {
+  const { orderId } = useParams<{ orderId: string }>();
+  const { data: order, isLoading } = useOrder(orderId);
+  const cancelOrder = useCancelOrder();
+  const simulateProgress = useSimulateOrderProgress();
+  const requestReturn = useRequestReturn();
+
+  const [isCancelOpen, setIsCancelOpen] = useState(false);
+  const [isReturnOpen, setIsReturnOpen] = useState(false);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [returnReason, setReturnReason] = useState(RETURN_REASONS[0]);
+  const [returnComment, setReturnComment] = useState('');
+
+  if (isLoading || !order) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-1/3" />
+        <Skeleton className="h-40 w-full" />
+      </div>
+    );
+  }
+
+  const canCancel = !['delivered', 'cancelled', 'returned'].includes(order.status);
+  const isDeliveredForReturn = order.status === 'delivered';
+
+  return (
+    <div>
+      <Seo title={`Order ${order.order_number}`} />
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold">Order #{order.order_number}</h1>
+          <p className="text-sm text-primary-400">Placed on {formatDateTime(order.placed_at)}</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => downloadInvoice(order)}>
+            <Download size={14} /> Invoice
+          </Button>
+          {canCancel && (
+            <Button variant="danger" size="sm" onClick={() => setIsCancelOpen(true)}>
+              <XCircle size={14} /> Cancel Order
+            </Button>
+          )}
+          {order.status !== 'cancelled' && order.status !== 'delivered' && (
+            <Button variant="outline" size="sm" onClick={() => simulateProgress.mutate(order.id)}>
+              Simulate Next Step
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <div className="card-surface mb-6 p-5">
+        <h2 className="mb-4 font-semibold">Order Tracking</h2>
+        <OrderTrackingTimeline order={order} />
+      </div>
+
+      <div className="card-surface mb-6 p-5">
+        <h2 className="mb-4 font-semibold">Items</h2>
+        <div className="space-y-4">
+          {order.items.map((item) => (
+            <div key={item.id} className="flex items-center gap-4">
+              <img src={item.product_image} alt="" className="h-20 w-16 rounded-lg object-cover" />
+              <div className="flex-1">
+                <p className="text-sm font-medium">{item.product_name}</p>
+                <p className="text-xs text-primary-400">
+                  Size: {item.size} · Color: {item.color} · Qty: {item.quantity}
+                </p>
+                {item.return_status !== 'none' && <p className="text-xs font-medium text-accent-600">Return status: {item.return_status}</p>}
+              </div>
+              <p className="font-semibold">{formatCurrency(item.total_price)}</p>
+              {isDeliveredForReturn && item.return_status === 'none' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedItemId(item.id);
+                    setIsReturnOpen(true);
+                  }}
+                >
+                  <RotateCcw size={13} /> Return
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="card-surface p-5">
+        <h2 className="mb-3 font-semibold">Delivery Address</h2>
+        <p className="text-sm text-primary-500">
+          {order.address.full_name} · {order.address.phone}
+          <br />
+          {order.address.line1}, {order.address.city}, {order.address.state} - {order.address.pincode}
+        </p>
+      </div>
+
+      <Modal isOpen={isCancelOpen} onClose={() => setIsCancelOpen(false)} title="Cancel this order?">
+        <p className="mb-4 text-sm text-primary-500">This action cannot be undone. Your refund (if applicable) will be processed within 5-7 business days.</p>
+        <div className="flex gap-3">
+          <Button variant="outline" fullWidth onClick={() => setIsCancelOpen(false)}>
+            Keep Order
+          </Button>
+          <Button
+            variant="danger"
+            fullWidth
+            onClick={async () => {
+              await cancelOrder.mutateAsync({ orderId: order.id, reason: 'Cancelled by customer' });
+              setIsCancelOpen(false);
+            }}
+          >
+            Yes, Cancel
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal isOpen={isReturnOpen} onClose={() => setIsReturnOpen(false)} title="Request a Return">
+        <div className="space-y-3">
+          <div>
+            <p className="mb-1.5 text-sm font-medium">Reason for return</p>
+            <select value={returnReason} onChange={(e) => setReturnReason(e.target.value)} className="input-field">
+              {RETURN_REASONS.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <p className="mb-1.5 text-sm font-medium">Additional comments (optional)</p>
+            <textarea value={returnComment} onChange={(e) => setReturnComment(e.target.value)} className="input-field" rows={3} />
+          </div>
+          <Button
+            variant="accent"
+            fullWidth
+            onClick={async () => {
+              if (!selectedItemId) return;
+              await requestReturn.mutateAsync({ order, orderItemId: selectedItemId, reason: returnReason, comment: returnComment });
+              setIsReturnOpen(false);
+              setReturnComment('');
+            }}
+          >
+            Submit Return Request
+          </Button>
+        </div>
+      </Modal>
+    </div>
+  );
+}

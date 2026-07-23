@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
 import type { Coupon } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
+import { clearBuyNowItem } from '@/lib/buyNowSession';
 
 const FREE_SHIPPING_THRESHOLD = 999;
 const SHIPPING_FEE = 79;
@@ -34,6 +35,8 @@ export function CartPage() {
 
   const handleCheckout = () => {
     if (hasOutOfStockItems) return;
+    // A leftover Buy Now session (started, then abandoned) must never hijack a normal cart checkout.
+    clearBuyNowItem();
     sessionStorage.setItem('dressmart:checkout-coupon', JSON.stringify(coupon));
     navigate(isAuthenticated ? '/checkout' : '/login', { state: { from: '/checkout' } });
   };

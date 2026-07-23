@@ -1,13 +1,14 @@
 /**
- * Domain types mirroring the Firestore schema (see firestore.rules and README's "Data Model" section).
- * Firestore is schemaless — these are the app-layer contracts every service module reads/writes against.
+ * Server-side mirror of `src/types/database.ts` (the client-side ground truth). `functions/` is a
+ * separately deployed TypeScript package, so it can't import across the project boundary — keep
+ * this file in sync by hand whenever the client-side schema changes.
+ *
+ * All timestamp-ish fields are ISO date strings (not Firestore Timestamps), matching the client
+ * contracts exactly, so documents written here read back with the same shape client-side expects.
  */
 
 export type Gender = 'men' | 'kids';
-
-/** Head Seller is a single, designated seller account with extra platform-management powers — see lib/roles.ts. */
 export type UserRole = 'buyer' | 'seller' | 'head_seller';
-
 export type SellerStatus = 'pending' | 'approved' | 'rejected' | 'suspended';
 
 export interface Profile {
@@ -19,15 +20,12 @@ export interface Profile {
   role: UserRole;
   created_at: string;
   updated_at: string;
-  /** Present only when role is 'seller' or 'head_seller'. */
   store_name?: string;
   gst_number?: string;
   seller_status?: SellerStatus;
   seller_applied_at?: string;
   seller_approved_at?: string | null;
-  /** Set when seller_status is 'suspended' or 'rejected' — shown back to the seller. */
   seller_status_reason?: string | null;
-  /** Web Push (FCM) registration tokens for this user's browsers — appended via arrayUnion by useFcmToken, one entry per opted-in browser/device. */
   fcm_tokens?: string[];
 }
 
@@ -40,19 +38,8 @@ export interface Brand {
   is_featured: boolean;
 }
 
-export interface Category {
-  id: string;
-  name: string;
-  slug: string;
-  gender: Gender;
-  parent_id: string | null;
-  image_url: string | null;
-  sort_order: number;
-}
-
 export type SizeLabel = 'XS' | 'S' | 'M' | 'L' | 'XL' | 'XXL' | 'XXXL' | string;
 
-/** A sellable size/color combination. Stock lives separately in Inventory, not here. */
 export interface ProductVariant {
   id: string;
   size: SizeLabel;
@@ -71,72 +58,44 @@ export interface ProductImage {
 }
 
 export interface ProductSpecifications {
-  fabric: string;
+  material: string;
   fit: string;
-  wash_care?: string;
+  wash_care: string;
   pattern?: string;
   sleeve?: string;
-  collar?: string;
+  neck?: string;
   occasion?: string;
   country_of_origin: string;
 }
 
-/**
- * Merchandising status a seller/Head Seller sets explicitly. `is_active` (below) is derived from
- * this — 'active' and 'out_of_stock' are both buyer-visible (an out-of-stock listing still shows,
- * just marked unavailable, same as any real storefront), 'draft' and 'hidden' are not — so every
- * existing `where('is_active', ...)` catalog query keeps working unchanged.
- */
-export type ProductStatus = 'draft' | 'active' | 'out_of_stock' | 'hidden';
-
-export function isActiveStatus(status: ProductStatus): boolean {
-  return status === 'active' || status === 'out_of_stock';
-}
-
 export interface Product {
   id: string;
-  /** Owning seller — every product belongs to exactly one seller. Immutable after creation. */
   seller_id: string;
-  /** Snapshotted store name, so listings/order history read fine even if the seller renames their store later. */
   seller_name: string;
   name: string;
   slug: string;
   brand_id: string;
-  brand?: Brand;
   category_id: string;
-  category?: Category;
-  /** Free-text sub-category (e.g. "Polo Shirts" under "Shirts") — no dedicated taxonomy collection. */
-  subcategory: string | null;
   gender: Gender;
   description: string;
   sku: string;
   mrp: number;
   price: number;
   discount_percent: number;
-  /** GST rate applied at checkout, as a percentage (e.g. 5 for 5%). */
   gst_percent: number;
-  /** Per-product Cash-on-Delivery availability toggle. */
-  cod_available: boolean;
   rating: number;
   rating_count: number;
-  status: ProductStatus;
-  /** Derived from `status` (see isActiveStatus) — the field every buyer-facing catalog query filters on. */
   is_active: boolean;
   is_bestseller: boolean;
   is_new_arrival: boolean;
   is_trending: boolean;
-  /** Head-Seller-only "Feature this product" toggle — surfaces it in featured placements. */
-  is_featured: boolean;
   is_deal_of_day: boolean;
   deal_ends_at: string | null;
-  /** Gates the Return/Exchange actions on an order item — some categories (e.g. innerwear) are never eligible. */
   is_return_eligible: boolean;
   is_exchange_eligible: boolean;
   specifications: ProductSpecifications;
   tags: string[];
   video_url: string | null;
-  /** First image overall — denormalized for fast list rendering without needing the full `images` array. */
-  coverImage: string;
   imageUrl?: string;
   thumbnailUrl?: string;
   created_at: string;
@@ -145,70 +104,13 @@ export interface Product {
   variants: ProductVariant[];
 }
 
-/**
- * Stock lives in its own `inventory/{productId}` doc, separate from the product document, so
- * high-frequency stock writes (every purchase/cancellation) never rewrite the much larger,
- * rarely-changing product document. The product page merges the two by product id on read.
- */
 export interface Inventory {
   product_id: string;
   seller_id: string;
-  /** Rollup convenience field — sum of all variant stocks, kept in sync by Cloud Functions. */
   total_stock: number;
-  /** Per-variant stock, keyed by ProductVariant.id. */
   variant_stock: Record<string, number>;
   low_stock_threshold: number;
   updated_at: string;
-}
-
-export interface Review {
-  id: string;
-  product_id: string;
-  user_id: string;
-  order_id: string | null;
-  order_item_id: string;
-  user_name: string;
-  user_avatar: string | null;
-  rating: number;
-  review_title: string | null;
-  review_text: string | null;
-  images: string[];
-  is_verified_purchase: boolean;
-  helpful_count: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface RatingSummary {
-  product_id: string;
-  average_rating: number;
-  total_reviews: number;
-  rating_5: number;
-  rating_4: number;
-  rating_3: number;
-  rating_2: number;
-  rating_1: number;
-}
-
-export interface ReviewableOrderItem {
-  order_item_id: string;
-  order_id: string;
-  order_number: string;
-  product_id: string;
-  size: string;
-  color: string;
-  delivered_at: string;
-}
-
-export interface SubmitReviewInput {
-  product_id: string;
-  user_id: string;
-  order_id: string;
-  order_item_id: string;
-  rating: number;
-  review_title?: string;
-  review_text?: string;
-  images?: string[];
 }
 
 export interface Address {
@@ -226,39 +128,6 @@ export interface Address {
   is_default: boolean;
 }
 
-/**
- * Lives at `users/{uid}/cart/{cartItemId}` (a subcollection, not top-level — cart only ever exists
- * for a signed-in user, so scoping it under their own user doc is both the natural model and makes
- * firestore.rules trivial: `uid() == userId`). Deliberately camelCase, unlike the rest of this file's
- * snake_case — matches the schema this collection was explicitly specified against. `price`/`image`
- * are snapshotted at add-time (what the buyer saw when they added it); `variantId` isn't in that
- * original field list but is kept alongside `size`/`color` since it's what stock/order-placement
- * checks actually key off — re-deriving it from size+color on every read would be strictly worse.
- */
-export interface CartItem {
-  id: string;
-  productId: string;
-  variantId: string;
-  sellerId: string;
-  size: string;
-  color: string;
-  quantity: number;
-  price: number;
-  image: string;
-  addedAt: string;
-  savedForLater: boolean;
-  product?: Product;
-  variant?: ProductVariant;
-}
-
-export interface WishlistItem {
-  id: string;
-  user_id: string;
-  product_id: string;
-  created_at: string;
-  product?: Product;
-}
-
 export type OrderStatus =
   | 'placed'
   | 'confirmed'
@@ -270,7 +139,6 @@ export type OrderStatus =
   | 'returned';
 
 export type PaymentMethod = 'razorpay' | 'cod';
-
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
 
 export interface OrderTimelineEvent {
@@ -301,13 +169,6 @@ export interface OrderItem {
   exchange_status: 'none' | 'requested' | 'approved' | 'rejected' | 'exchanged';
 }
 
-/**
- * One shipment scoped to a single seller. A buyer's cart spanning multiple sellers splits into
- * multiple Order docs at checkout, all sharing the same `group_id` and `order_number` (and the
- * same `razorpay_order_id`, since payment happens once for the whole cart) — this is what lets
- * "seller cannot view another seller's orders" hold as a plain Firestore query (`where seller_id == me`)
- * instead of filtering inside an array. Buyer-facing pages group by `order_number` for display.
- */
 export interface Order {
   id: string;
   order_number: string;
@@ -419,7 +280,6 @@ export interface Notification {
   created_at: string;
 }
 
-/** A prospective seller's application — reviewed by the Head Seller (approve/suspend). */
 export interface SellerRequest {
   id: string;
   user_id: string;
@@ -435,7 +295,7 @@ export interface SellerRequest {
   rejection_reason: string | null;
 }
 
-/** Singleton doc (`platform_settings/config`) — Head Seller's Platform Settings page. */
+/** Singleton doc (`platform_settings/config`). */
 export interface PlatformSettings {
   id: string;
   store_name: string;

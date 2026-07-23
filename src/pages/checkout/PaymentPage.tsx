@@ -1,16 +1,15 @@
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { CreditCard, Banknote } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { OrderSummary } from '@/components/cart/OrderSummary';
 import { Button } from '@/components/ui/Button';
-import { useCart } from '@/hooks/useCart';
+import { useCheckoutItems } from '@/hooks/useCheckoutItems';
 import { useAuth } from '@/contexts/AuthContext';
 import { paymentService, loadRazorpayScript, type CartLineForOrder } from '@/services/paymentService';
 import { env } from '@/lib/env';
-import { queryKeys } from '@/lib/queryClient';
+import { clearBuyNowItem } from '@/lib/buyNowSession';
 import type { Coupon, PaymentMethod } from '@/types';
 
 const FREE_SHIPPING_THRESHOLD = 999;
@@ -45,8 +44,7 @@ export function PaymentPage() {
   const state = location.state as { addressId?: string; paymentMethod?: PaymentMethod } | null;
   const addressId = state?.addressId;
   const { user } = useAuth();
-  const { items, subtotal, totalItems } = useCart();
-  const queryClient = useQueryClient();
+  const { items, subtotal, totalItems, isBuyNow } = useCheckoutItems();
 
   const [method, setMethod] = useState<PaymentMethod>(state?.paymentMethod ?? 'razorpay');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -81,12 +79,14 @@ export function PaymentPage() {
     );
   }
 
-  const cartPayload: CartLineForOrder[] = items.map((item) => ({ productId: item.product_id, variantId: item.variant_id, quantity: item.quantity }));
+  const cartPayload: CartLineForOrder[] = items.map((item) => ({ productId: item.productId, variantId: item.variantId, quantity: item.quantity }));
 
   const goToSuccess = (result: { orderNumber: string; groupId: string }) => {
     sessionStorage.removeItem('dressmart:checkout-coupon');
-    queryClient.invalidateQueries({ queryKey: queryKeys.cart.all });
-    queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+    // Cart items: the Cloud Function already deleted the purchased docs server-side, and the cart's
+    // realtime listener (useCart) reflects that on its own — nothing to invalidate client-side.
+    // Buy Now never touched the cart at all; its temporary checkout session just needs clearing.
+    if (isBuyNow) clearBuyNowItem();
     navigate(`/order-success/${result.groupId}`, { state: result });
   };
 

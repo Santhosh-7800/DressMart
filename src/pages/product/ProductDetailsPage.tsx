@@ -23,9 +23,11 @@ import { useInventoryRealtime } from '@/hooks/useInventory';
 import { useRecentlyViewed } from '@/hooks/useRecentlyViewed';
 import { useCart } from '@/hooks/useCart';
 import { useWishlist } from '@/hooks/useWishlist';
+import { useAuth } from '@/contexts/AuthContext';
 import { formatDate, estimatedDeliveryFor } from '@/lib/utils';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { productViewService } from '@/services/productViewService';
+import { setBuyNowItem } from '@/lib/buyNowSession';
 
 function Accordion({ title, children, defaultOpen = false }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
@@ -58,6 +60,7 @@ export function ProductDetailsPage() {
   const { recordView, recentlyViewed, isLoading: isLoadingRecentlyViewed } = useRecentlyViewed();
   const { addItem } = useCart();
   const { isWishlisted, toggle } = useWishlist();
+  const { isAuthenticated } = useAuth();
   const [pincode, setPincode] = useLocalStorage('dressmart:pincode', '400001');
 
   const [activeColor, setActiveColor] = useState<string | null>(null);
@@ -135,37 +138,49 @@ export function ProductDetailsPage() {
   const isActiveVariantLowStock = activeVariantStock > 0 && activeVariantStock <= lowStockThreshold;
   const canTransact = !productUnavailable && (!activeVariant || activeVariantStock > 0);
 
-  const handleAddToCart = async () => {
+  /** Shared validation for both Add to Cart and Buy Now — login, then color, then size, then stock,
+   *  in that order, matching the spec exactly. Returns the variant to transact with, or null (after
+   *  showing the relevant toast/redirect) if something failed. */
+  const validateForPurchase = (): boolean => {
+    if (!isAuthenticated) {
+      toast.error('Please sign in to continue');
+      navigate('/login', { state: { from: `/product/${product.slug}` } });
+      return false;
+    }
     if (productUnavailable) {
       toast.error('This product is currently out of stock');
-      return;
+      return false;
+    }
+    if (!activeColor) {
+      toast.error('Please select a color');
+      return false;
     }
     if (!activeSize) {
       toast.error('Please select a size');
-      return;
+      return false;
     }
     if (!activeVariant || activeVariantStock <= 0) {
       toast.error('This size is out of stock');
-      return;
+      return false;
     }
+    return true;
+  };
+
+  const handleAddToCart = async () => {
+    if (!validateForPurchase() || !activeVariant) return;
     await addItem({ productId: product.id, variantId: activeVariant.id });
   };
 
-  const handleBuyNow = async () => {
-    if (productUnavailable) {
-      toast.error('This product is currently out of stock');
-      return;
-    }
-    if (!activeSize) {
-      toast.error('Please select a size');
-      return;
-    }
-    if (!activeVariant || activeVariantStock <= 0) {
-      toast.error('This size is out of stock');
-      return;
-    }
-    await addItem({ productId: product.id, variantId: activeVariant.id });
-    navigate('/cart');
+  /**
+   * Buy Now bypasses the persistent cart entirely — a temporary, session-scoped checkout for
+   * exactly this one item (see lib/buyNowSession.ts), so it never mixes with whatever else is
+   * already in the cart. Checkout/Payment read it via useCheckoutItems() and clear it once the
+   * order is placed.
+   */
+  const handleBuyNow = () => {
+    if (!validateForPurchase() || !activeVariant) return;
+    setBuyNowItem({ productId: product.id, variantId: activeVariant.id, quantity: 1 });
+    navigate('/checkout');
   };
 
   const handleShare = async () => {

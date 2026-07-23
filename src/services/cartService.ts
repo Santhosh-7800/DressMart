@@ -1,44 +1,35 @@
-import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, updateDoc, where, type Unsubscribe } from 'firebase/firestore';
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  onSnapshot,
+  query,
+  updateDoc,
+  where,
+  type Unsubscribe,
+} from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { getGuestId } from '@/lib/guestId';
 import type { CartItem, Inventory, Product } from '@/types';
 
-const CART_COLLECTION = 'cart';
+/** `users/{uid}/cart` — cart is signed-in-only (see Issue 2 requirements); there is no guest/localStorage cart. */
+function cartCollection(userId: string) {
+  return collection(db, 'users', userId, 'cart');
+}
 
 /** A cart line item with the owning product/variant hydrated, plus live stock merged in from the
- *  separate `inventory/{productId}` doc (see types/database.ts — stock is never on the product itself). */
+ *  separate `inventory/{productId}` doc (see types/database.ts — stock is never on the product itself).
+ *  `price`/`image`/`size`/`color` on the raw doc are the add-time snapshot; `product`/`variant` here
+ *  are live, used for display accuracy (current price/name/thumbnail) and for stock validation. */
 export interface CartLineItem extends CartItem {
   /** Units currently in stock for this exact variant. 0 if the product/variant/inventory doc is missing. */
   availableStock: number;
 }
 
-function guestStorageKey(): string {
-  return `dressmart:guest-cart:${getGuestId()}`;
-}
-
-function readGuestItems(): CartItem[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = window.localStorage.getItem(guestStorageKey());
-    return raw ? (JSON.parse(raw) as CartItem[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeGuestItems(items: CartItem[]): void {
-  if (typeof window === 'undefined') return;
-  window.localStorage.setItem(guestStorageKey(), JSON.stringify(items));
-}
-
-function newGuestId(): string {
-  return `guest-cart-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-/** Merges live product + inventory data onto raw cart rows. Both `products` and `inventory` are
- *  publicly readable (see firestore.rules), so this works for guests too. */
 async function hydrate(rawItems: CartItem[]): Promise<CartLineItem[]> {
-  const productIds = [...new Set(rawItems.map((i) => i.product_id))];
+  const productIds = [...new Set(rawItems.map((i) => i.productId))];
   if (productIds.length === 0) return [];
 
   const [productSnaps, inventorySnaps] = await Promise.all([
@@ -57,24 +48,27 @@ async function hydrate(rawItems: CartItem[]): Promise<CartLineItem[]> {
   });
 
   return rawItems.map((item) => {
-    const product = productMap.get(item.product_id);
-    const variant = product?.variants.find((v) => v.id === item.variant_id);
-    const inventory = inventoryMap.get(item.product_id);
-    const availableStock = inventory?.variant_stock?.[item.variant_id] ?? 0;
+    const product = productMap.get(item.productId);
+    const variant = product?.variants.find((v) => v.id === item.variantId);
+    const inventory = inventoryMap.get(item.productId);
+    const availableStock = inventory?.variant_stock?.[item.variantId] ?? 0;
     return { ...item, product, variant, availableStock };
   });
 }
 
 async function fetchRaw(userId: string, savedForLater: boolean): Promise<CartItem[]> {
-  const snap = await getDocs(
-    query(collection(db, CART_COLLECTION), where('user_id', '==', userId), where('saved_for_later', '==', savedForLater)),
-  );
+  const snap = await getDocs(query(cartCollection(userId), where('savedForLater', '==', savedForLater)));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as CartItem);
 }
 
-export const cartService = {
-  // ---- Signed-in (Firestore) ----
+async function findExisting(userId: string, productId: string, variantId: string, savedForLater: boolean) {
+  const snap = await getDocs(
+    query(cartCollection(userId), where('productId', '==', productId), where('variantId', '==', variantId), where('savedForLater', '==', savedForLater)),
+  );
+  return snap.empty ? null : snap.docs[0];
+}
 
+export const cartService = {
   async list(userId: string): Promise<CartLineItem[]> {
     return hydrate(await fetchRaw(userId, false));
   },
@@ -83,148 +77,83 @@ export const cartService = {
     return hydrate(await fetchRaw(userId, true));
   },
 
-  /**
-   * Realtime subscription on the signed-in user's cart rows — fires on any add/remove/quantity
-   * change from this tab, another tab, or another device, and re-hydrates (product + live stock)
-   * on every change. Guest carts have no Firestore listener to attach to (they're plain
-   * localStorage) — callers should fall back to the one-shot listGuest()/savedForLaterGuest() there.
-   */
+  /** Realtime subscription — fires on any add/remove/quantity change from this tab, another tab, or
+   *  another device, and re-hydrates (product + live stock) on every change. */
   subscribeToCart(userId: string, savedForLater: boolean, callback: (items: CartLineItem[]) => void): Unsubscribe {
-    const q = query(collection(db, CART_COLLECTION), where('user_id', '==', userId), where('saved_for_later', '==', savedForLater));
+    const q = query(cartCollection(userId), where('savedForLater', '==', savedForLater));
     return onSnapshot(q, (snap) => {
       const raw = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as CartItem);
       hydrate(raw).then(callback);
     });
   },
 
+  /**
+   * Validates and adds one variant to the cart, or increments quantity if it's already there.
+   * Fetches the product fresh (needed anyway to snapshot seller/price/image/size/color at add-time,
+   * and to validate the variant/color actually exists and has stock — never trust a stale caller).
+   */
   async addItem(userId: string, productId: string, variantId: string, quantity = 1): Promise<CartLineItem[]> {
-    const existing = await getDocs(
-      query(
-        collection(db, CART_COLLECTION),
-        where('user_id', '==', userId),
-        where('product_id', '==', productId),
-        where('variant_id', '==', variantId),
-        where('saved_for_later', '==', false),
-      ),
-    );
-    if (!existing.empty) {
-      const existingDoc = existing.docs[0];
-      const currentQty = (existingDoc.data().quantity as number) ?? 0;
-      await updateDoc(existingDoc.ref, { quantity: currentQty + quantity });
+    const [productSnap, inventorySnap] = await Promise.all([getDoc(doc(db, 'products', productId)), getDoc(doc(db, 'inventory', productId))]);
+    if (!productSnap.exists()) throw new Error('This product is no longer available.');
+    const product = { id: productSnap.id, ...productSnap.data() } as Product;
+
+    const variant = product.variants.find((v) => v.id === variantId);
+    if (!variant) throw new Error('Please select a color and size.');
+    if (!variant.color) throw new Error('Please select a color.');
+    if (!variant.size) throw new Error('Please select a size.');
+
+    const stock = inventorySnap.exists() ? ((inventorySnap.data() as Inventory).variant_stock?.[variantId] ?? 0) : 0;
+    if (stock <= 0) throw new Error('This size is out of stock.');
+
+    const existing = await findExisting(userId, productId, variantId, false);
+    if (existing) {
+      const currentQty = (existing.data().quantity as number) ?? 0;
+      const nextQty = currentQty + quantity;
+      if (nextQty > stock) throw new Error(`Only ${stock} left in stock.`);
+      await updateDoc(existing.ref, { quantity: nextQty });
     } else {
-      await addDoc(collection(db, CART_COLLECTION), {
-        user_id: userId,
-        product_id: productId,
-        variant_id: variantId,
+      if (quantity > stock) throw new Error(`Only ${stock} left in stock.`);
+      const image = product.images.find((img) => img.color === variant.color)?.url ?? product.coverImage ?? product.imageUrl ?? '';
+      await addDoc(cartCollection(userId), {
+        productId,
+        variantId,
+        sellerId: product.seller_id,
+        size: variant.size,
+        color: variant.color,
         quantity,
-        saved_for_later: false,
-        created_at: new Date().toISOString(),
+        price: variant.price_override ?? product.price,
+        image,
+        addedAt: new Date().toISOString(),
+        savedForLater: false,
       });
     }
     return this.list(userId);
   },
 
   async updateQuantity(userId: string, cartItemId: string, quantity: number): Promise<CartLineItem[]> {
-    await updateDoc(doc(db, CART_COLLECTION, cartItemId), { quantity });
+    await updateDoc(doc(db, 'users', userId, 'cart', cartItemId), { quantity });
     return this.list(userId);
   },
 
   async removeItem(userId: string, cartItemId: string): Promise<CartLineItem[]> {
-    await deleteDoc(doc(db, CART_COLLECTION, cartItemId));
+    await deleteDoc(doc(db, 'users', userId, 'cart', cartItemId));
     return this.list(userId);
   },
 
   async saveForLater(userId: string, cartItemId: string, saved: boolean): Promise<CartLineItem[]> {
-    await updateDoc(doc(db, CART_COLLECTION, cartItemId), { saved_for_later: saved });
+    await updateDoc(doc(db, 'users', userId, 'cart', cartItemId), { savedForLater: saved });
     return this.list(userId);
   },
 
   /** Clears only the active cart (not saved-for-later items) — called after a successful checkout. */
   async clear(userId: string): Promise<void> {
     const raw = await fetchRaw(userId, false);
-    await Promise.all(raw.map((item) => deleteDoc(doc(db, CART_COLLECTION, item.id))));
+    await Promise.all(raw.map((item) => deleteDoc(doc(db, 'users', userId, 'cart', item.id))));
   },
 
-  // ---- Guest (localStorage) ----
-
-  async listGuest(): Promise<CartLineItem[]> {
-    return hydrate(readGuestItems().filter((i) => !i.saved_for_later));
-  },
-
-  async savedForLaterGuest(): Promise<CartLineItem[]> {
-    return hydrate(readGuestItems().filter((i) => i.saved_for_later));
-  },
-
-  async addItemGuest(productId: string, variantId: string, quantity = 1): Promise<CartLineItem[]> {
-    const items = readGuestItems();
-    const existing = items.find((i) => i.product_id === productId && i.variant_id === variantId && !i.saved_for_later);
-    if (existing) {
-      existing.quantity += quantity;
-    } else {
-      items.push({
-        id: newGuestId(),
-        user_id: getGuestId(),
-        product_id: productId,
-        variant_id: variantId,
-        quantity,
-        saved_for_later: false,
-        created_at: new Date().toISOString(),
-      });
-    }
-    writeGuestItems(items);
-    return this.listGuest();
-  },
-
-  async updateQuantityGuest(cartItemId: string, quantity: number): Promise<CartLineItem[]> {
-    writeGuestItems(readGuestItems().map((i) => (i.id === cartItemId ? { ...i, quantity } : i)));
-    return this.listGuest();
-  },
-
-  async removeItemGuest(cartItemId: string): Promise<CartLineItem[]> {
-    writeGuestItems(readGuestItems().filter((i) => i.id !== cartItemId));
-    return this.listGuest();
-  },
-
-  async saveForLaterGuest(cartItemId: string, saved: boolean): Promise<CartLineItem[]> {
-    writeGuestItems(readGuestItems().map((i) => (i.id === cartItemId ? { ...i, saved_for_later: saved } : i)));
-    return this.listGuest();
-  },
-
-  async clearGuest(): Promise<void> {
-    writeGuestItems(readGuestItems().filter((i) => i.saved_for_later));
-  },
-
-  /**
-   * One-time merge of the guest (localStorage) cart into the signed-in user's Firestore cart —
-   * called right after login/signup. Matching product+variant+saved_for_later rows have their
-   * quantities summed; everything else is inserted as a new doc. Returns true if anything was merged.
-   */
-  async mergeGuestCartIntoAccount(userId: string): Promise<boolean> {
-    const guestItems = readGuestItems();
-    if (guestItems.length === 0) return false;
-
-    const existingSnap = await getDocs(query(collection(db, CART_COLLECTION), where('user_id', '==', userId)));
-    const existingByKey = new Map(existingSnap.docs.map((d) => [`${d.data().product_id}:${d.data().variant_id}:${d.data().saved_for_later}`, d]));
-
-    for (const item of guestItems) {
-      const key = `${item.product_id}:${item.variant_id}:${item.saved_for_later}`;
-      const match = existingByKey.get(key);
-      if (match) {
-        const currentQty = (match.data().quantity as number) ?? 0;
-        await updateDoc(match.ref, { quantity: currentQty + item.quantity });
-      } else {
-        await addDoc(collection(db, CART_COLLECTION), {
-          user_id: userId,
-          product_id: item.product_id,
-          variant_id: item.variant_id,
-          quantity: item.quantity,
-          saved_for_later: item.saved_for_later,
-          created_at: item.created_at ?? new Date().toISOString(),
-        });
-      }
-    }
-
-    writeGuestItems([]);
-    return true;
+  /** Removes exactly the purchased lines from the cart post-checkout (a partial buy — e.g. Buy Now
+   *  on one item while other unrelated items remain in the cart — must not wipe the whole cart). */
+  async removeItems(userId: string, cartItemIds: string[]): Promise<void> {
+    await Promise.all(cartItemIds.map((id) => deleteDoc(doc(db, 'users', userId, 'cart', id))));
   },
 };

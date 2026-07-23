@@ -182,8 +182,12 @@ export async function main() {
       const discountPercent = rng.bool(0.7) ? rng.int(10, 45) : 0;
       const price = Math.max(Math.round((mrp * (1 - discountPercent / 100)) / 10) * 10 - 1, 149);
 
-      const colorCount = def.sizeSet === 'onesize' || def.sizeSet === 'belt' ? rng.int(2, 3) : rng.int(2, 4);
-      const colors = rng.pickMany(COLOR_PALETTE, colorCount);
+      // Exactly one declared color per generated product — every product here only ever has ONE
+      // real (or placeholder) photo set, never distinct photography per color. Randomly assigning
+      // several fake color names to a single photo set was the root cause of "select Mustard
+      // Yellow, see a Black shirt": switching color could never show a matching photo because no
+      // color-specific photo existed. One color, one photo set, zero possibility of a mismatch.
+      const colors = rng.pickMany(COLOR_PALETTE, 1);
 
       const variants: GeneratedVariant[] = [];
       const variantStock: Record<string, number> = {};
@@ -210,16 +214,18 @@ export async function main() {
 
       // Real photos (if this category folder has any) round-robin assigned by product index —
       // still genuine on-disk photography, just not hand-bound to one specific generated product.
+      // Tagged with this product's one declared color — safe since there's only one color, so this
+      // can never be mistaken for (or leak into) a different color's gallery.
       const photoSet = photoSets.length > 0 ? photoSets[i % photoSets.length] : null;
       const images = photoSet
         ? photoSet.map((filename, idx) => ({
             id: `${ref.id}-img-${idx}`,
             url: `/images/products/${def.gender}/${getImageFolder(def.slug)}/${filename}`,
             alt: `${name} — photo ${idx + 1}`,
-            color: null,
+            color: colors[0].name,
             sort_order: idx,
           }))
-        : [{ id: `${ref.id}-img-0`, url: PLACEHOLDER_IMAGE_PATH, alt: `${name} — photo 1`, color: null, sort_order: 0 }];
+        : [{ id: `${ref.id}-img-0`, url: PLACEHOLDER_IMAGE_PATH, alt: `${name} — photo 1`, color: colors[0].name, sort_order: 0 }];
 
       const now = new Date();
       const createdAt = new Date(now.getTime() - rng.int(0, 200) * 24 * 60 * 60 * 1000).toISOString();

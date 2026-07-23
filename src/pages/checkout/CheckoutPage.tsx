@@ -5,7 +5,7 @@ import { addDoc, collection, getDocs, query, updateDoc, where } from 'firebase/f
 import toast from 'react-hot-toast';
 import { MapPin, Plus, CheckCircle2, CreditCard, Banknote } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
-import { useCart } from '@/hooks/useCart';
+import { useCheckoutItems } from '@/hooks/useCheckoutItems';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAvatar } from '@/hooks/useAvatar';
 import { OrderSummary } from '@/components/cart/OrderSummary';
@@ -51,7 +51,7 @@ async function fetchAddresses(userId: string): Promise<Address[]> {
 export function CheckoutPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { items, subtotal, totalDiscount, totalItems } = useCart();
+  const { items, subtotal, totalDiscount, totalItems, isLoading: isLoadingItems } = useCheckoutItems();
   const { avatarUrl } = useAvatar();
   const queryClient = useQueryClient();
   const userId = user?.id ?? '';
@@ -121,7 +121,7 @@ export function CheckoutPage() {
     navigate('/checkout/payment', { state: { addressId: effectiveAddressId, paymentMethod } });
   };
 
-  if (items.length === 0) {
+  if (items.length === 0 && !isLoadingItems) {
     return (
       <div className="container-app py-12">
         <EmptyState icon={MapPin} title="Your cart is empty" description="Add items to your cart before checking out." actionLabel="Start Shopping" actionHref="/" />
@@ -216,14 +216,14 @@ export function CheckoutPage() {
             <div className="space-y-3">
               {items.map((item) => (
                 <div key={item.id} className="flex items-center gap-3 text-sm">
-                  <ProductImage src={item.product?.imageUrl ?? item.product?.images[0]?.url} alt="" className="h-14 w-12 rounded-md" priority />
+                  <ProductImage src={item.image || item.product?.coverImage || item.product?.imageUrl} alt="" className="h-14 w-12 rounded-md" priority />
                   <div className="flex-1">
                     <p className="line-clamp-1 font-medium">{item.product?.name}</p>
                     <p className="text-xs text-primary-400">
-                      Size: {item.variant?.size} · Qty: {item.quantity}
+                      {item.color} · Size: {item.size} · Qty: {item.quantity}
                     </p>
                   </div>
-                  <p className="font-medium">{formatCurrency((item.variant?.price_override ?? item.product?.price ?? 0) * item.quantity)}</p>
+                  <p className="font-medium">{formatCurrency((item.variant?.price_override ?? item.product?.price ?? item.price) * item.quantity)}</p>
                 </div>
               ))}
             </div>

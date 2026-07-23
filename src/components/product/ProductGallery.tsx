@@ -18,10 +18,17 @@ interface ProductGalleryProps {
 }
 
 export function ProductGallery({ images, videoUrl, spinFrames, activeColor, productName }: ProductGalleryProps) {
+  /**
+   * Strictly scoped to the active color — a color's gallery must NEVER show another color's
+   * photos. If the active color has no images of its own, fall back only to the shared/uncolored
+   * pool (`color: null` — a single-color product's photos, or genuinely color-agnostic shots),
+   * never to another color's specifically-tagged images.
+   */
   const filteredImages = useMemo(() => {
     if (!activeColor) return images;
-    const matching = images.filter((img) => img.color === activeColor);
-    return matching.length > 0 ? matching : images;
+    const ownImages = images.filter((img) => img.color === activeColor);
+    if (ownImages.length > 0) return ownImages;
+    return images.filter((img) => !img.color);
   }, [images, activeColor]);
 
   const items: GalleryItem[] = useMemo(() => {

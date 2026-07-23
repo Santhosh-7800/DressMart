@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, getDoc, getDocs, orderBy, query, updateDoc, where } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, updateDoc, where, type Unsubscribe } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { ExchangeRequest, ExchangeStatus, Order, OrderItem } from '@/types';
 import { EXCHANGE_STATUS_LABELS } from '@/lib/exchangeStatus';
@@ -57,6 +57,20 @@ export const exchangeService = {
       : query(collection(db, EXCHANGES_COLLECTION), where('seller_id', '==', sellerId), orderBy('created_at', 'desc'));
     const snap = await getDocs(q);
     return snap.docs.map(toExchange);
+  },
+
+  /** Realtime — buyer's own exchange requests update live as a seller approves/rejects/advances them. */
+  subscribeForBuyer(buyerId: string, callback: (exchanges: ExchangeRequest[]) => void): Unsubscribe {
+    const q = query(collection(db, EXCHANGES_COLLECTION), where('buyer_id', '==', buyerId), orderBy('created_at', 'desc'));
+    return onSnapshot(q, (snap) => callback(snap.docs.map(toExchange)));
+  },
+
+  /** Realtime — seller's own exchange queue (or, for Head Seller, every exchange) updates live as buyers submit requests. */
+  subscribeForSeller(sellerId: string, isHeadSeller: boolean, callback: (exchanges: ExchangeRequest[]) => void): Unsubscribe {
+    const q = isHeadSeller
+      ? query(collection(db, EXCHANGES_COLLECTION), orderBy('created_at', 'desc'))
+      : query(collection(db, EXCHANGES_COLLECTION), where('seller_id', '==', sellerId), orderBy('created_at', 'desc'));
+    return onSnapshot(q, (snap) => callback(snap.docs.map(toExchange)));
   },
 
   async request(buyerId: string, input: RequestExchangeInput): Promise<ExchangeRequest> {

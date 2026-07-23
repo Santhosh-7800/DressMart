@@ -9,6 +9,7 @@ import { Seo } from '@/components/common/Seo';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { authService } from '@/services/authService';
+import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 
 const schema = z.object({ email: z.string().email('Enter a valid email address') });
 type FormValues = z.infer<typeof schema>;
@@ -30,7 +31,7 @@ export function ForgotPasswordPage() {
       setSubmittedEmail(values.email);
       setIsSent(true);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Something went wrong');
+      toast.error(getFriendlyErrorMessage(error));
     }
   };
 

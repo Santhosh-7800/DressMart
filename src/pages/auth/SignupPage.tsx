@@ -8,6 +8,7 @@ import { Seo } from '@/components/common/Seo';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/contexts/AuthContext';
+import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 
 const schema = z
   .object({
@@ -44,7 +45,7 @@ export function SignupPage() {
       });
       navigate('/', { replace: true });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Sign up failed');
+      toast.error(getFriendlyErrorMessage(error, 'Sign up failed'));
     }
   };
 

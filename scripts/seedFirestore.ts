@@ -21,10 +21,14 @@
  * Usage:
  *   1. Either run against the local emulators (recommended for a first try):
  *        firebase emulators:start   (in one terminal)
- *        FIRESTORE_EMULATOR_HOST=localhost:8080 npm run seed   (in another)
+ *        FIRESTORE_EMULATOR_HOST=localhost:8081 npm run seed   (in another)
  *      firebase-admin auto-detects FIRESTORE_EMULATOR_HOST and skips real credentials entirely.
  *   2. Or against a real project: set GOOGLE_APPLICATION_CREDENTIALS to a service-account JSON key
  *      path, set VITE_FIREBASE_PROJECT_ID in .env, then `npm run seed`.
+ *
+ * You normally don't need to run this by hand at all in dev — scripts/ensureSeeded.ts runs it
+ * automatically (only when the `products` collection is empty) as part of `npm run dev`'s predev
+ * hook. This file's own `main()` is exported so that script can call it directly.
  */
 import 'dotenv/config';
 import { initializeApp } from 'firebase-admin/app';
@@ -124,7 +128,7 @@ function buildCategoryDoc(def: CategoryDef, parentId: string, sortOrder: number)
   };
 }
 
-async function main() {
+export async function main() {
   console.log(`DressMart — seeding Firestore project "${PROJECT_ID}"\n`);
   const rng = new SeededRng(SEED);
   const bulkWriter = db.bulkWriter();

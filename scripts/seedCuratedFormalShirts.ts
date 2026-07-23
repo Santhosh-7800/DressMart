@@ -127,7 +127,7 @@ function buildCuratedProducts(): { products: CuratedProduct[]; skipped: { entryK
   return { products, skipped };
 }
 
-async function main() {
+export async function main() {
   console.log('DressMart — seeding curated Formal Shirt products (FS031–FS073)\n');
 
   const { products, skipped } = buildCuratedProducts();

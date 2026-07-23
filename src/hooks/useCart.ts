@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { cartService } from '@/services/cartService';
+import { cartService, type CartLineItem } from '@/services/cartService';
 import { queryKeys } from '@/lib/queryClient';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -27,14 +27,41 @@ export function useCart() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, user?.id]);
 
-  const cartQuery = useQuery({
+  // Signed-in cart is realtime (Firestore listener) — reflects this tab's own writes, another
+  // tab/device, or a stock change, with no manual refetch. Guests have no Firestore doc to listen
+  // to (localStorage only), so they keep the one-shot query below.
+  const [liveActive, setLiveActive] = useState<CartLineItem[] | null>(null);
+  const [liveSaved, setLiveSaved] = useState<CartLineItem[] | null>(null);
+  const [isLiveLoading, setIsLiveLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isAuthenticated || !user) {
+      setLiveActive(null);
+      setLiveSaved(null);
+      return;
+    }
+    setIsLiveLoading(true);
+    const unsubActive = cartService.subscribeToCart(user.id, false, (items) => {
+      setLiveActive(items);
+      setIsLiveLoading(false);
+    });
+    const unsubSaved = cartService.subscribeToCart(user.id, true, setLiveSaved);
+    return () => {
+      unsubActive();
+      unsubSaved();
+    };
+  }, [isAuthenticated, user?.id]);
+
+  const guestCartQuery = useQuery({
     queryKey: [...queryKeys.cart.all, scopeKey, 'active'],
-    queryFn: () => (isAuthenticated && user ? cartService.list(user.id) : cartService.listGuest()),
+    queryFn: () => cartService.listGuest(),
+    enabled: !isAuthenticated,
   });
 
-  const savedForLaterQuery = useQuery({
+  const guestSavedQuery = useQuery({
     queryKey: [...queryKeys.cart.all, scopeKey, 'saved'],
-    queryFn: () => (isAuthenticated && user ? cartService.savedForLater(user.id) : cartService.savedForLaterGuest()),
+    queryFn: () => cartService.savedForLaterGuest(),
+    enabled: !isAuthenticated,
   });
 
   const addItem = useMutation({
@@ -72,7 +99,7 @@ export function useCart() {
     onSuccess: invalidate,
   });
 
-  const items = cartQuery.data ?? [];
+  const items = (isAuthenticated ? liveActive : guestCartQuery.data) ?? [];
   const subtotal = items.reduce((sum, item) => sum + (item.variant?.price_override ?? item.product?.price ?? 0) * item.quantity, 0);
   const totalMrp = items.reduce((sum, item) => sum + (item.product?.mrp ?? 0) * item.quantity, 0);
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -80,8 +107,8 @@ export function useCart() {
 
   return {
     items,
-    savedForLater: savedForLaterQuery.data ?? [],
-    isLoading: cartQuery.isLoading,
+    savedForLater: (isAuthenticated ? liveSaved : guestSavedQuery.data) ?? [],
+    isLoading: isAuthenticated ? isLiveLoading : guestCartQuery.isLoading,
     subtotal,
     totalMrp,
     totalDiscount: Math.max(totalMrp - subtotal, 0),

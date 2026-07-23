@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/contexts/AuthContext';
 import { getPostLoginRedirect } from '@/lib/roles';
+import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 
 const schema = z.object({
   email: z.string().email('Enter a valid email address'),
@@ -36,7 +37,7 @@ export function LoginPage() {
       const profile = await signIn(values.email, values.password);
       navigate(getPostLoginRedirect(profile.role, from), { replace: true });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Login failed');
+      toast.error(getFriendlyErrorMessage(error, 'Login failed'));
     }
   };
 
@@ -46,7 +47,7 @@ export function LoginPage() {
       const profile = await signInWithGoogle();
       navigate(getPostLoginRedirect(profile?.role, from), { replace: true });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Google login failed');
+      toast.error(getFriendlyErrorMessage(error, 'Google login failed'));
     } finally {
       setIsGoogleLoading(false);
     }

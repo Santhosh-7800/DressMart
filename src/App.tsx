@@ -6,6 +6,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { ScrollToTop } from '@/components/common/ScrollToTop';
+import { CatalogHealthGate } from '@/components/common/CatalogHealthGate';
 import { AppRoutes } from '@/routes/AppRoutes';
 
 export function App() {
@@ -16,7 +17,9 @@ export function App() {
           <AuthProvider>
             <BrowserRouter>
               <ScrollToTop />
-              <AppRoutes />
+              <CatalogHealthGate>
+                <AppRoutes />
+              </CatalogHealthGate>
               <Toaster
                 position="top-center"
                 toastOptions={{

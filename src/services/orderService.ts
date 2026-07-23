@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, getDocs, orderBy, query, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, updateDoc, where, type Unsubscribe } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '@/lib/firebase';
 import type { Order, OrderStatus, OrderTimelineEvent } from '@/types';
@@ -55,6 +55,23 @@ export const orderService = {
     return snap.docs.map(toOrder);
   },
 
+  /** Realtime — buyer's own orders list updates live as a seller advances status, no polling. */
+  subscribeForBuyer(buyerId: string, callback: (orders: Order[]) => void): Unsubscribe {
+    const q = query(collection(db, ORDERS_COLLECTION), where('buyer_id', '==', buyerId), orderBy('placed_at', 'desc'));
+    return onSnapshot(q, (snap) => callback(snap.docs.map(toOrder)));
+  },
+
+  /** Realtime — single order detail/tracking page. */
+  subscribeToOrder(orderId: string, callback: (order: Order | null) => void): Unsubscribe {
+    return onSnapshot(doc(db, ORDERS_COLLECTION, orderId), (snap) => callback(snap.exists() ? toOrder(snap) : null));
+  },
+
+  /** Realtime — every seller-scoped shipment sharing one checkout (order success/tracking pages). */
+  subscribeToOrderGroup(buyerId: string, groupId: string, callback: (orders: Order[]) => void): Unsubscribe {
+    const q = query(collection(db, ORDERS_COLLECTION), where('buyer_id', '==', buyerId), where('group_id', '==', groupId));
+    return onSnapshot(q, (snap) => callback(snap.docs.map(toOrder)));
+  },
+
   /** Buyer-only, pre-shipping cancellation — runs through the Cloud Function so inventory restock happens atomically. */
   async cancel(orderId: string): Promise<{ success: true }> {
     const call = httpsCallable<{ orderId: string }, { success: true }>(functions, 'cancelOrder');
@@ -71,6 +88,14 @@ export const orderService = {
       : query(collection(db, ORDERS_COLLECTION), where('seller_id', '==', sellerId), orderBy('placed_at', 'desc'));
     const snap = await getDocs(q);
     return snap.docs.map(toOrder);
+  },
+
+  /** Realtime — seller's own order queue (or, for Head Seller, every order) updates live as buyers place/cancel orders. */
+  subscribeForSeller(sellerId: string, isHeadSeller: boolean, callback: (orders: Order[]) => void): Unsubscribe {
+    const q = isHeadSeller
+      ? query(collection(db, ORDERS_COLLECTION), orderBy('placed_at', 'desc'))
+      : query(collection(db, ORDERS_COLLECTION), where('seller_id', '==', sellerId), orderBy('placed_at', 'desc'));
+    return onSnapshot(q, (snap) => callback(snap.docs.map(toOrder)));
   },
 
   /** Plain Firestore update — firestore.rules already allow the owning seller_id (or head_seller) to

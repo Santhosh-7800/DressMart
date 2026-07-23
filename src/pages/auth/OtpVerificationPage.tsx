@@ -6,6 +6,7 @@ import { Seo } from '@/components/common/Seo';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { authService, type ConfirmationResult } from '@/services/authService';
+import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 
 const OTP_LENGTH = 6;
 const RESEND_SECONDS = 30;
@@ -43,7 +44,7 @@ export function OtpVerificationPage() {
       setCountdown(RESEND_SECONDS);
       toast.success('OTP sent to your phone');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Could not send OTP');
+      toast.error(getFriendlyErrorMessage(error, 'Could not send OTP'));
     } finally {
       setIsSending(false);
     }

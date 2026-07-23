@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, getDoc, getDocs, orderBy, query, updateDoc, where } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, updateDoc, where, type Unsubscribe } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Order, OrderItem, ReturnRequest, ReturnStatus } from '@/types';
 import { RETURN_STATUS_LABELS } from '@/lib/returnStatus';
@@ -51,6 +51,20 @@ export const returnService = {
       : query(collection(db, RETURNS_COLLECTION), where('seller_id', '==', sellerId), orderBy('created_at', 'desc'));
     const snap = await getDocs(q);
     return snap.docs.map(toReturn);
+  },
+
+  /** Realtime — buyer's own return requests update live as a seller approves/rejects/advances them. */
+  subscribeForBuyer(buyerId: string, callback: (returns: ReturnRequest[]) => void): Unsubscribe {
+    const q = query(collection(db, RETURNS_COLLECTION), where('buyer_id', '==', buyerId), orderBy('created_at', 'desc'));
+    return onSnapshot(q, (snap) => callback(snap.docs.map(toReturn)));
+  },
+
+  /** Realtime — seller's own return queue (or, for Head Seller, every return) updates live as buyers submit requests. */
+  subscribeForSeller(sellerId: string, isHeadSeller: boolean, callback: (returns: ReturnRequest[]) => void): Unsubscribe {
+    const q = isHeadSeller
+      ? query(collection(db, RETURNS_COLLECTION), orderBy('created_at', 'desc'))
+      : query(collection(db, RETURNS_COLLECTION), where('seller_id', '==', sellerId), orderBy('created_at', 'desc'));
+    return onSnapshot(q, (snap) => callback(snap.docs.map(toReturn)));
   },
 
   async request(buyerId: string, order: Order, orderItemId: string, reason: string, comment: string): Promise<ReturnRequest> {

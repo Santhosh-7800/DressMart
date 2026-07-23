@@ -5,7 +5,7 @@
   "type": "module",
   "description": "DressMart - Premium online shopping for Men's & Kids' wear",
   "scripts": {
-    "predev": "tsx scripts/generateImageManifest.ts",
+    "predev": "tsx scripts/generateImageManifest.ts && tsx scripts/ensureSeeded.ts",
     "dev": "vite",
     "prebuild": "tsx scripts/generateImageManifest.ts",
     "build": "tsc -b && vite build",

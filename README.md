@@ -48,9 +48,8 @@ By default (`VITE_USE_FIREBASE_EMULATOR=true` in `.env`, or simply no real Fireb
 ### Running against the emulators
 
 1. Install the Firebase CLI if you don't have it: `npm install -g firebase-tools`, then `firebase login`.
-2. In one terminal: `npm run emulators` (starts Auth on 9099, Firestore on 8081, Storage on 9199, Functions on 5001, and the Emulator UI at `http://localhost:4000`; data is imported/exported from `.emulator-data/` on start/stop, so a graceful restart doesn't wipe your seeded catalog — a forceful kill will).
-3. Seed some data: `FIRESTORE_EMULATOR_HOST=localhost:8081 npm run seed` — writes brands/categories/products/inventory across a handful of fictional sellers into the Firestore emulator (`firebase-admin` auto-detects that env var and talks to the emulator instead of a real project). The emulator suite persists its data across restarts (see `npm run emulators` below), so you don't need to re-seed every time — only after wiping `.emulator-data/` or seeding a fresh project.
-4. In another terminal: `npm run dev`.
+2. In one terminal: `npm run emulators` (starts Auth on 9099, Firestore on 8081, Storage on 9199, Functions on 5001, and the Emulator UI at `http://localhost:4000`; data is imported/exported from `.emulator-data/` on start/stop, so a graceful restart doesn't wipe your seeded catalog — a forceful kill, e.g. the machine/container restarting, will).
+3. In another terminal: `npm run dev`. You don't need to seed anything by hand — `predev` automatically checks whether `products` is empty and, if so, seeds the full catalog for you (see "Reliability" below). This is what makes the app recover on its own after an emulator restart wipes its data.
 
 ### Connecting a real Firebase project
 
@@ -90,6 +89,16 @@ Under `functions/` (separate TypeScript project, deployed independently — see 
 
 ---
 
+## Reliability
+
+- **Auto-seed on empty catalog (dev only)** — `scripts/ensureSeeded.ts` runs automatically before `npm run dev` (`predev`). It checks whether `products` has any docs; if not (e.g. the emulator restarted and lost its in-memory data before exporting), it re-runs the full seed pipeline automatically — no manual `npm run seed` needed. It only ever targets the local emulator and fails soft (a warning, not a crash) if the emulator isn't reachable yet. It deliberately does **not** run against a real project or as part of `npm run build`/`preview` — an empty catalog on a live marketplace just means no seller has listed anything yet, which is a legitimate state the UI should show honestly (see `CatalogHealthGate` below), not paper over with fake demo products.
+- **`CatalogHealthGate`** (`src/components/common/CatalogHealthGate.tsx`, wraps the router in `App.tsx`) — a one-time, app-boot check (not a per-page concern) that distinguishes "genuinely offline/unreachable" from "connected but empty", showing a `Preparing product catalog...` state, a distinct empty-catalog message (with a dev-mode hint pointing at `npm run emulators`), or an offline message — each with a Retry button — instead of every page silently rendering blank grids.
+- **Offline persistence** — Firestore is initialized with `persistentLocalCache`/`persistentMultipleTabManager` (`src/lib/firebase.ts`), so previously-loaded products/cart/orders stay browsable offline and queued writes sync automatically once connectivity returns.
+- **Realtime everywhere it matters** — Products, Inventory, Cart, Orders, Returns, and Exchanges all use Firestore `onSnapshot` listeners (see `subscribeTo*`/`subscribeFor*` in the respective `services/*.ts`), not polling or manual refresh. A seller updating stock, price, or an order/return/exchange status is reflected on the buyer's screen live.
+- **Friendly error messages** — `src/lib/firebaseErrors.ts` maps common Firebase error codes (auth failures, `permission-denied`, `unavailable`, offline) to plain-language messages instead of raw SDK output; wired into every auth page so far. Extending it to more call sites is a good, low-risk follow-up (see "Known limitations" below).
+
+---
+
 ## Project Structure
 
 ```
@@ -124,6 +133,9 @@ firestore.rules / firestore.indexes.json / storage.rules / firebase.json
 - **Order pricing is server-recomputed** for the actual charge (`placeCodOrder`/`verifyAndPlaceOrder` read live product/inventory docs), but the Checkout page's on-screen estimate is still client-computed for responsiveness — they should agree, but the server total is always the source of truth.
 - **`product.rating`/`rating_count`** are plain fields, not yet kept in sync with the `reviews` collection via a Cloud Function trigger — reviews are computed live instead; fine for correctness, a bit more reads than a denormalized counter.
 - **One Head Seller, bootstrapped manually** — there's no UI to create the first Head Seller account; promote it by hand in Firestore after your first sign-up.
+- **Friendly error messages** currently cover the auth pages (`src/lib/firebaseErrors.ts`) — a full sweep of every `toast.error(...)` call site to use it is a reasonable, separate follow-up rather than a blind mass-edit.
+- **Performance**: no virtualized lists or list-level code-splitting beyond route-level lazy loading yet — fine at this catalog's scale (hundreds of products), worth revisiting as a dedicated pass if the catalog grows substantially.
+- **No automated dead-code sweep** has been run — "remove unused code" is safest as its own reviewed pass (with a real usage-analysis tool) rather than a speculative delete alongside unrelated changes.
 
 ---
 
@@ -138,7 +150,9 @@ firestore.rules / firestore.indexes.json / storage.rules / firebase.json
 | `npm run typecheck` | Type-check without emitting |
 | `npm run seed` | Seed Firestore (emulator or real project) with a generated catalog |
 | `npm run seed:curated-formal-shirts` | Seed/update the hand-verified Formal Shirt products from `src/lib/productImages.ts`'s `REAL_PRODUCT_PHOTOGRAPHY` map — additive/idempotent, never touches the rest of the catalog (see `scripts/seedCuratedFormalShirts.ts`'s own docstring for the pattern to follow when curating another category/batch this way) |
-| `npm run emulators` | Start the local Firebase Emulator Suite |
+| `npm run emulators` | Start the local Firebase Emulator Suite (with data persistence) |
+
+`scripts/ensureSeeded.ts` isn't run directly — it's wired into `predev` and auto-seeds only when `products` is empty (see "Reliability" above).
 
 ---
 

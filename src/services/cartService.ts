@@ -1,4 +1,4 @@
-import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, query, updateDoc, where } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, updateDoc, where, type Unsubscribe } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { getGuestId } from '@/lib/guestId';
 import type { CartItem, Inventory, Product } from '@/types';
@@ -81,6 +81,20 @@ export const cartService = {
 
   async savedForLater(userId: string): Promise<CartLineItem[]> {
     return hydrate(await fetchRaw(userId, true));
+  },
+
+  /**
+   * Realtime subscription on the signed-in user's cart rows — fires on any add/remove/quantity
+   * change from this tab, another tab, or another device, and re-hydrates (product + live stock)
+   * on every change. Guest carts have no Firestore listener to attach to (they're plain
+   * localStorage) — callers should fall back to the one-shot listGuest()/savedForLaterGuest() there.
+   */
+  subscribeToCart(userId: string, savedForLater: boolean, callback: (items: CartLineItem[]) => void): Unsubscribe {
+    const q = query(collection(db, CART_COLLECTION), where('user_id', '==', userId), where('saved_for_later', '==', savedForLater));
+    return onSnapshot(q, (snap) => {
+      const raw = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as CartItem);
+      hydrate(raw).then(callback);
+    });
   },
 
   async addItem(userId: string, productId: string, variantId: string, quantity = 1): Promise<CartLineItem[]> {

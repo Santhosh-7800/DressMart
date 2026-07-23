@@ -6,6 +6,7 @@ import { Seo } from '@/components/common/Seo';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { authService } from '@/services/authService';
+import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 
 export function ResetPasswordPage() {
   const navigate = useNavigate();
@@ -36,7 +37,7 @@ export function ResetPasswordPage() {
       toast.success('Password reset successfully. Please login.');
       navigate('/login');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Reset failed');
+      toast.error(getFriendlyErrorMessage(error, 'Reset failed'));
     } finally {
       setIsSubmitting(false);
     }

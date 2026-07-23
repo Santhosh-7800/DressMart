@@ -1,21 +1,17 @@
 import { motion } from 'framer-motion';
-import { BadgeCheck, Gift, Wallet, Package, Heart } from 'lucide-react';
+import { BadgeCheck, Package, Heart } from 'lucide-react';
 import type { Profile } from '@/types';
-import { formatDate, formatCurrency } from '@/lib/utils';
+import { formatDate } from '@/lib/utils';
 
 interface ProfileHeroCardProps {
   user: Profile;
-  pointsBalance: number;
-  walletValue: number;
   orderCount: number;
   wishlistCount: number;
 }
 
-/** Premium gradient profile header: avatar, verified badge, member-since, and the four key account stats. */
-export function ProfileHeroCard({ user, pointsBalance, walletValue, orderCount, wishlistCount }: ProfileHeroCardProps) {
+/** Premium gradient profile header: avatar, verified badge, member-since, and the key account stats. */
+export function ProfileHeroCard({ user, orderCount, wishlistCount }: ProfileHeroCardProps) {
   const stats = [
-    { icon: Gift, label: 'Reward Points', value: pointsBalance.toLocaleString('en-IN') },
-    { icon: Wallet, label: 'Wallet Balance', value: formatCurrency(walletValue) },
     { icon: Package, label: 'Orders', value: orderCount.toLocaleString('en-IN') },
     { icon: Heart, label: 'Wishlist', value: wishlistCount.toLocaleString('en-IN') },
   ];
@@ -41,7 +37,7 @@ export function ProfileHeroCard({ user, pointsBalance, walletValue, orderCount, 
         </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mt-6 grid grid-cols-2 gap-3">
         {stats.map(({ icon: Icon, label, value }) => (
           <div key={label} className="rounded-2xl bg-white/15 p-3 backdrop-blur-sm">
             <Icon size={16} className="mb-1.5 opacity-80" />

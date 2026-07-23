@@ -1,0 +1,142 @@
+rules_version = '2';
+
+// Security model summary:
+// - buyer: owns their own cart/wishlist/addresses/orders/returns/exchanges/notifications/reviews.
+// - seller / head_seller: owns products/inventory where seller_id == their uid; can read/update
+//   only orders/returns/exchanges scoped to their own seller_id.
+// - head_seller: everything a seller can do, plus full read on all sellers/products/orders, and
+//   is the only role allowed to flip seller_status to 'approved'/'suspended' or write coupons /
+//   platform_settings. Cross-document transitions (approving a seller_request AND flipping the
+//   applicant's profile in the same operation) are done by Cloud Functions running with admin
+//   privileges, not by these rules — see functions/src for reviewSellerRequest/suspendSeller.
+//
+// NOTE: this is a solid starting point, not a substitute for a security review before going to
+// production — in particular, order/coupon totals here are trusted from the client on write;
+// harden by moving order creation entirely into the placeOrder/verifyAndPlaceOrder Cloud Functions
+// (which can run with the Admin SDK and bypass these rules) once that's wired up.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function uid() {
+      return request.auth.uid;
+    }
+    function userData() {
+      return get(/databases/$(database)/documents/users/$(uid())).data;
+    }
+    function role() {
+      return isSignedIn() ? userData().role : null;
+    }
+    function isSeller() {
+      return isSignedIn() && (role() == 'seller' || role() == 'head_seller');
+    }
+    function isApprovedSeller() {
+      return isSeller() && userData().seller_status == 'approved';
+    }
+    function isHeadSeller() {
+      return isSignedIn() && role() == 'head_seller';
+    }
+    function isOwner(userId) {
+      return isSignedIn() && uid() == userId;
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isHeadSeller();
+      allow create: if isOwner(userId);
+      // Self-service profile edits (name/phone/avatar/fcm tokens) plus the one-time buyer -> pending
+      // seller application transition. Any other role/status change is Head-Seller or Function only.
+      allow update: if isOwner(userId) && (
+        request.resource.data.role == resource.data.role ||
+        (resource.data.role == 'buyer' && request.resource.data.role == 'seller' && request.resource.data.seller_status == 'pending')
+      );
+      allow update: if isHeadSeller();
+    }
+
+    match /brands/{brandId} {
+      allow read: if true;
+      allow write: if isHeadSeller();
+    }
+
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if isHeadSeller();
+    }
+
+    match /products/{productId} {
+      allow read: if true;
+      allow create: if isApprovedSeller() && request.resource.data.seller_id == uid();
+      allow update, delete: if isHeadSeller() || (isApprovedSeller() && resource.data.seller_id == uid());
+    }
+
+    match /inventory/{productId} {
+      allow read: if true;
+      allow write: if isHeadSeller() || (isApprovedSeller() && resource.data.seller_id == uid());
+      allow create: if isApprovedSeller() && request.resource.data.seller_id == uid();
+    }
+
+    match /orders/{orderId} {
+      allow read: if isSignedIn() && (resource.data.buyer_id == uid() || resource.data.seller_id == uid() || isHeadSeller());
+      allow create: if isSignedIn() && request.resource.data.buyer_id == uid();
+      // Buyers may only move their own order to 'cancelled'; sellers/head-seller can advance any
+      // other status field on orders they own / all orders respectively.
+      allow update: if isHeadSeller() ||
+        (isSeller() && resource.data.seller_id == uid()) ||
+        (resource.data.buyer_id == uid() && request.resource.data.status == 'cancelled');
+    }
+
+    match /returns/{returnId} {
+      allow read: if isSignedIn() && (resource.data.buyer_id == uid() || resource.data.seller_id == uid() || isHeadSeller());
+      allow create: if isSignedIn() && request.resource.data.buyer_id == uid();
+      allow update: if isHeadSeller() || (isSeller() && resource.data.seller_id == uid());
+    }
+
+    match /exchanges/{exchangeId} {
+      allow read: if isSignedIn() && (resource.data.buyer_id == uid() || resource.data.seller_id == uid() || isHeadSeller());
+      allow create: if isSignedIn() && request.resource.data.buyer_id == uid();
+      allow update: if isHeadSeller() || (isSeller() && resource.data.seller_id == uid());
+    }
+
+    match /wishlist/{itemId} {
+      allow read, delete: if isSignedIn() && resource.data.user_id == uid();
+      allow create: if isSignedIn() && request.resource.data.user_id == uid();
+    }
+
+    match /cart/{itemId} {
+      allow read, update, delete: if isSignedIn() && resource.data.user_id == uid();
+      allow create: if isSignedIn() && request.resource.data.user_id == uid();
+    }
+
+    match /addresses/{addressId} {
+      allow read, update, delete: if isSignedIn() && resource.data.user_id == uid();
+      allow create: if isSignedIn() && request.resource.data.user_id == uid();
+    }
+
+    match /notifications/{notificationId} {
+      allow read, update, delete: if isSignedIn() && resource.data.user_id == uid();
+      allow create: if isSignedIn();
+    }
+
+    match /seller_requests/{requestId} {
+      allow read: if isSignedIn() && (resource.data.user_id == uid() || isHeadSeller());
+      allow create: if isSignedIn() && request.resource.data.user_id == uid();
+      allow update: if isHeadSeller();
+    }
+
+    match /coupons/{couponId} {
+      allow read: if true;
+      allow write: if isHeadSeller();
+    }
+
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isSignedIn() && request.resource.data.user_id == uid();
+      allow update, delete: if isSignedIn() && resource.data.user_id == uid();
+    }
+
+    match /platform_settings/{docId} {
+      allow read: if true;
+      allow write: if isHeadSeller();
+    }
+  }
+}

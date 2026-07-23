@@ -1,3 +1,3 @@
 export * from './database';
 export * from './filters';
-export * from './admin';
+export * from './seller';

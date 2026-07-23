@@ -21,6 +21,10 @@ export const queryKeys = {
     detail: (slug: string) => ['products', 'detail', slug] as const,
     related: (productId: string) => ['products', 'related', productId] as const,
     facets: (gender?: string, categorySlug?: string) => ['products', 'facets', gender, categorySlug] as const,
+    bySeller: (sellerId: string) => ['products', 'seller', sellerId] as const,
+  },
+  inventory: {
+    detail: (productId: string) => ['inventory', 'detail', productId] as const,
   },
   categories: {
     all: ['categories'] as const,
@@ -39,6 +43,14 @@ export const queryKeys = {
   orders: {
     all: ['orders'] as const,
     detail: (id: string) => ['orders', 'detail', id] as const,
+    bySeller: (sellerId: string) => ['orders', 'seller', sellerId] as const,
+  },
+  exchanges: {
+    all: ['exchanges'] as const,
+    bySeller: (sellerId: string) => ['exchanges', 'seller', sellerId] as const,
+  },
+  sellerRequests: {
+    all: ['seller-requests'] as const,
   },
   addresses: {
     all: ['addresses'] as const,
@@ -57,13 +69,15 @@ export const queryKeys = {
   notifications: {
     all: ['notifications'] as const,
   },
-  banners: {
-    all: ['banners'] as const,
-  },
-  savedPayments: {
-    all: ['saved-payments'] as const,
-  },
   returns: {
     all: ['returns'] as const,
+    bySeller: (sellerId: string) => ['returns', 'seller', sellerId] as const,
+  },
+  seller: {
+    overview: (sellerId: string) => ['seller', 'overview', sellerId] as const,
+    platformOverview: ['seller', 'platform-overview'] as const,
+    sellers: ['seller', 'roster'] as const,
+    recentOrders: (maxDocs: number) => ['seller', 'recent-orders', maxDocs] as const,
+    platformSettings: ['seller', 'platform-settings'] as const,
   },
 } as const;

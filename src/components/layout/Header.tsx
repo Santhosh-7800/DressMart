@@ -112,18 +112,18 @@ export function Header() {
                     <Link to="/coupons" onClick={() => setIsAccountOpen(false)} className="block rounded-lg px-3 py-2 text-sm hover:bg-primary-50 dark:hover:bg-primary-800">
                       Coupons
                     </Link>
-                    <Link to="/rewards" onClick={() => setIsAccountOpen(false)} className="block rounded-lg px-3 py-2 text-sm hover:bg-primary-50 dark:hover:bg-primary-800">
-                      Rewards
-                    </Link>
-                    <Link to="/referrals" onClick={() => setIsAccountOpen(false)} className="block rounded-lg px-3 py-2 text-sm hover:bg-primary-50 dark:hover:bg-primary-800">
-                      Refer a Friend
-                    </Link>
-                    <Link to="/style-quiz" onClick={() => setIsAccountOpen(false)} className="block rounded-lg px-3 py-2 text-sm hover:bg-primary-50 dark:hover:bg-primary-800">
-                      Style Quiz
-                    </Link>
                     <Link to="/settings" onClick={() => setIsAccountOpen(false)} className="block rounded-lg px-3 py-2 text-sm hover:bg-primary-50 dark:hover:bg-primary-800">
                       Settings
                     </Link>
+                    {user?.role === 'seller' || user?.role === 'head_seller' ? (
+                      <Link to="/seller/dashboard" onClick={() => setIsAccountOpen(false)} className="block rounded-lg px-3 py-2 text-sm font-medium text-accent hover:bg-primary-50 dark:hover:bg-primary-800">
+                        Seller Dashboard
+                      </Link>
+                    ) : (
+                      <Link to="/sell" onClick={() => setIsAccountOpen(false)} className="block rounded-lg px-3 py-2 text-sm font-medium text-accent hover:bg-primary-50 dark:hover:bg-primary-800">
+                        Sell on DressMart
+                      </Link>
+                    )}
                     <button
                       onClick={() => {
                         signOut();

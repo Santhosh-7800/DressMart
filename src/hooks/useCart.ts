@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { cartService } from '@/services/cartService';
@@ -5,26 +6,40 @@ import { queryKeys } from '@/lib/queryClient';
 import { useAuth } from '@/contexts/AuthContext';
 
 export function useCart() {
-  const { identityId } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
+  const scopeKey = user?.id ?? 'guest';
+  const hasMergedRef = useRef(false);
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: [...queryKeys.cart.all, scopeKey] });
+  };
+
+  // Merge any localStorage guest-cart items into the account's Firestore cart, once per login.
+  useEffect(() => {
+    if (isAuthenticated && user && !hasMergedRef.current) {
+      hasMergedRef.current = true;
+      cartService.mergeGuestCartIntoAccount(user.id).then((merged) => {
+        if (merged) invalidate();
+      });
+    }
+    if (!isAuthenticated) hasMergedRef.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, user?.id]);
 
   const cartQuery = useQuery({
-    queryKey: [...queryKeys.cart.all, identityId],
-    queryFn: () => cartService.list(identityId),
+    queryKey: [...queryKeys.cart.all, scopeKey, 'active'],
+    queryFn: () => (isAuthenticated && user ? cartService.list(user.id) : cartService.listGuest()),
   });
 
   const savedForLaterQuery = useQuery({
-    queryKey: [...queryKeys.cart.all, identityId, 'saved'],
-    queryFn: () => cartService.savedForLater(identityId),
+    queryKey: [...queryKeys.cart.all, scopeKey, 'saved'],
+    queryFn: () => (isAuthenticated && user ? cartService.savedForLater(user.id) : cartService.savedForLaterGuest()),
   });
-
-  const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: [...queryKeys.cart.all, identityId] });
-  };
 
   const addItem = useMutation({
     mutationFn: ({ productId, variantId, quantity }: { productId: string; variantId: string; quantity?: number }) =>
-      cartService.addItem(identityId, productId, variantId, quantity),
+      isAuthenticated && user ? cartService.addItem(user.id, productId, variantId, quantity) : cartService.addItemGuest(productId, variantId, quantity),
     onSuccess: () => {
       invalidate();
       toast.success('Added to cart');
@@ -33,12 +48,13 @@ export function useCart() {
   });
 
   const updateQuantity = useMutation({
-    mutationFn: ({ cartItemId, quantity }: { cartItemId: string; quantity: number }) => cartService.updateQuantity(identityId, cartItemId, quantity),
+    mutationFn: ({ cartItemId, quantity }: { cartItemId: string; quantity: number }) =>
+      isAuthenticated && user ? cartService.updateQuantity(user.id, cartItemId, quantity) : cartService.updateQuantityGuest(cartItemId, quantity),
     onSuccess: invalidate,
   });
 
   const removeItem = useMutation({
-    mutationFn: (cartItemId: string) => cartService.removeItem(identityId, cartItemId),
+    mutationFn: (cartItemId: string) => (isAuthenticated && user ? cartService.removeItem(user.id, cartItemId) : cartService.removeItemGuest(cartItemId)),
     onSuccess: () => {
       invalidate();
       toast('Item removed from cart', { icon: '🗑️' });
@@ -46,12 +62,13 @@ export function useCart() {
   });
 
   const saveForLater = useMutation({
-    mutationFn: ({ cartItemId, saved }: { cartItemId: string; saved: boolean }) => cartService.saveForLater(identityId, cartItemId, saved),
+    mutationFn: ({ cartItemId, saved }: { cartItemId: string; saved: boolean }) =>
+      isAuthenticated && user ? cartService.saveForLater(user.id, cartItemId, saved) : cartService.saveForLaterGuest(cartItemId, saved),
     onSuccess: invalidate,
   });
 
   const clearCart = useMutation({
-    mutationFn: () => cartService.clear(identityId),
+    mutationFn: () => (isAuthenticated && user ? cartService.clear(user.id) : cartService.clearGuest()),
     onSuccess: invalidate,
   });
 
@@ -59,6 +76,7 @@ export function useCart() {
   const subtotal = items.reduce((sum, item) => sum + (item.variant?.price_override ?? item.product?.price ?? 0) * item.quantity, 0);
   const totalMrp = items.reduce((sum, item) => sum + (item.product?.mrp ?? 0) * item.quantity, 0);
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
+  const hasOutOfStockItems = items.some((item) => item.quantity > item.availableStock);
 
   return {
     items,
@@ -68,6 +86,7 @@ export function useCart() {
     totalMrp,
     totalDiscount: Math.max(totalMrp - subtotal, 0),
     totalItems,
+    hasOutOfStockItems,
     addItem: addItem.mutateAsync,
     updateQuantity: updateQuantity.mutateAsync,
     removeItem: removeItem.mutateAsync,

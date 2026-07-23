@@ -1,11 +1,23 @@
-import { Bell, Package, Tag, RotateCcw, Info } from 'lucide-react';
+import { Bell, Package, CreditCard, Truck, RotateCcw, Repeat, XCircle, AlertTriangle, Store, Megaphone, type LucideIcon } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { useNotifications } from '@/hooks/useNotifications';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { formatDateTime, cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
+import type { NotificationType } from '@/types';
 
-const ICONS = { order: Package, offer: Tag, return: RotateCcw, system: Info, product: Package };
+const ICONS: Record<NotificationType, LucideIcon> = {
+  order: Package,
+  payment: CreditCard,
+  delivery: Truck,
+  return: RotateCcw,
+  exchange: Repeat,
+  new_order: Package,
+  cancelled_order: XCircle,
+  low_stock: AlertTriangle,
+  seller_registration: Store,
+  platform: Megaphone,
+};
 
 export function NotificationsPage() {
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications();

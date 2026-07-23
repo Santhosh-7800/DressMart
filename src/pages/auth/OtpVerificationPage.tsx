@@ -5,10 +5,11 @@ import { Phone } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
-import { authService } from '@/services/authService';
+import { authService, type ConfirmationResult } from '@/services/authService';
 
 const OTP_LENGTH = 6;
 const RESEND_SECONDS = 30;
+const RECAPTCHA_CONTAINER_ID = 'recaptcha-container';
 
 export function OtpVerificationPage() {
   const location = useLocation();
@@ -20,7 +21,8 @@ export function OtpVerificationPage() {
   const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(''));
   const [countdown, setCountdown] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [devOtp, setDevOtp] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
+  const confirmationRef = useRef<ConfirmationResult | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
@@ -34,11 +36,17 @@ export function OtpVerificationPage() {
       toast.error('Enter a valid 10-digit phone number');
       return;
     }
-    const result = await authService.sendOtp(phone);
-    if (typeof result === 'string') setDevOtp(result);
-    setIsOtpSent(true);
-    setCountdown(RESEND_SECONDS);
-    toast.success('OTP sent to your phone');
+    setIsSending(true);
+    try {
+      confirmationRef.current = await authService.sendPhoneOtp(`+91${phone}`, RECAPTCHA_CONTAINER_ID);
+      setIsOtpSent(true);
+      setCountdown(RESEND_SECONDS);
+      toast.success('OTP sent to your phone');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not send OTP');
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleDigitChange = (index: number, value: string) => {
@@ -61,15 +69,17 @@ export function OtpVerificationPage() {
       toast.error('Enter the complete 6-digit code');
       return;
     }
+    if (!confirmationRef.current) {
+      toast.error('Please request a new OTP');
+      return;
+    }
     setIsSubmitting(true);
     try {
-      const isValid = await authService.verifyOtp(phone, code);
-      if (isValid) {
-        toast.success('Phone number verified!');
-        navigate('/profile');
-      } else {
-        toast.error('Invalid or expired OTP');
-      }
+      await authService.confirmPhoneOtp(confirmationRef.current, code);
+      toast.success('Phone number verified!');
+      navigate('/profile');
+    } catch {
+      toast.error('Invalid or expired OTP');
     } finally {
       setIsSubmitting(false);
     }
@@ -81,10 +91,13 @@ export function OtpVerificationPage() {
       <h1 className="text-2xl font-bold">Verify your phone</h1>
       <p className="mt-1 text-sm text-primary-400">{isOtpSent ? `Enter the 6-digit code sent to ${phone}` : 'Enter your phone number to receive a verification code'}</p>
 
+      {/* Invisible reCAPTCHA anchor required by Firebase phone auth — renders nothing visible. */}
+      <div id={RECAPTCHA_CONTAINER_ID} />
+
       {!isOtpSent ? (
         <div className="mt-6 space-y-4">
           <Input label="Phone Number" placeholder="9876543210" leftIcon={<Phone size={16} />} value={phone} onChange={(e) => setPhone(e.target.value)} />
-          <Button variant="accent" fullWidth size="lg" onClick={sendOtp}>
+          <Button variant="accent" fullWidth size="lg" onClick={sendOtp} isLoading={isSending}>
             Send OTP
           </Button>
         </div>
@@ -107,15 +120,13 @@ export function OtpVerificationPage() {
             ))}
           </div>
 
-          {devOtp && <p className="mt-3 text-center text-xs text-primary-400">Demo mode — your OTP is {devOtp}</p>}
-
           <Button variant="accent" fullWidth size="lg" className="mt-6" onClick={handleVerify} isLoading={isSubmitting}>
             Verify &amp; Continue
           </Button>
 
           <button
             onClick={sendOtp}
-            disabled={countdown > 0}
+            disabled={countdown > 0 || isSending}
             className="mt-4 w-full text-center text-sm text-accent-600 hover:underline disabled:cursor-not-allowed disabled:text-primary-300"
           >
             {countdown > 0 ? `Resend OTP in ${countdown}s` : 'Resend OTP'}

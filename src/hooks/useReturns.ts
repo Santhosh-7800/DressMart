@@ -3,41 +3,56 @@ import toast from 'react-hot-toast';
 import { returnService } from '@/services/returnService';
 import { queryKeys } from '@/lib/queryClient';
 import { useAuth } from '@/contexts/AuthContext';
-import type { Order } from '@/types';
+import { isHeadSeller } from '@/lib/roles';
+import type { Order, ReturnRequest, ReturnStatus } from '@/types';
 
 export function useReturns() {
-  const { identityId } = useAuth();
+  const { user } = useAuth();
   return useQuery({
-    queryKey: [...queryKeys.returns.all, identityId],
-    queryFn: () => returnService.list(identityId),
+    queryKey: [...queryKeys.returns.all, user?.id],
+    queryFn: () => returnService.listForBuyer(user!.id),
+    enabled: Boolean(user),
+  });
+}
+
+/** Seller / Head Seller's own return requests (or, for Head Seller, every request platform-wide). */
+export function useSellerReturns() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: queryKeys.returns.bySeller(user?.id ?? ''),
+    queryFn: () => returnService.listForSeller(user!.id, isHeadSeller(user?.role)),
+    enabled: Boolean(user),
   });
 }
 
 export function useRequestReturn() {
-  const { identityId } = useAuth();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({ order, orderItemId, reason, comment }: { order: Order; orderItemId: string; reason: string; comment: string }) =>
-      returnService.request(identityId, order, orderItemId, reason, comment),
+      returnService.request(user!.id, order, orderItemId, reason, comment),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [...queryKeys.returns.all, identityId] });
-      queryClient.invalidateQueries({ queryKey: [...queryKeys.orders.all, identityId] });
+      queryClient.invalidateQueries({ queryKey: [...queryKeys.returns.all, user?.id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
       toast.success('Return request submitted');
     },
     onError: (error: Error) => toast.error(error.message),
   });
 }
 
-export function useSimulateReturnProgress() {
-  const { identityId } = useAuth();
+export function useAdvanceReturnStatus() {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (returnId: string) => returnService.simulateProgress(identityId, returnId),
+    mutationFn: ({ returnRequest, nextStatus }: { returnRequest: ReturnRequest; nextStatus: ReturnStatus }) =>
+      returnService.advanceStatus(returnRequest, nextStatus),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [...queryKeys.returns.all, identityId] });
-      queryClient.invalidateQueries({ queryKey: [...queryKeys.orders.all, identityId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.returns.bySeller(user?.id ?? '') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+      toast.success('Return updated');
     },
+    onError: (error: Error) => toast.error(error.message),
   });
 }

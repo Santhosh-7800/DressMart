@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { Moon, Sun, Lock, AlertTriangle } from 'lucide-react';
+import { Moon, Sun, Lock, AlertTriangle, Bell, BellOff, BellRing } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
@@ -8,13 +8,16 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useFcmToken } from '@/hooks/useFcmToken';
 import { authService } from '@/services/authService';
 import { cn } from '@/lib/utils';
 
 export function SettingsPage() {
   const { user } = useAuth();
   const { theme, setTheme } = useTheme();
+  const { permission, enablePush, isRegistering, isSupported } = useFcmToken();
 
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSavingPassword, setIsSavingPassword] = useState(false);
@@ -23,6 +26,10 @@ export function SettingsPage() {
   if (!user) return null;
 
   const handleChangePassword = async () => {
+    if (!currentPassword) {
+      toast.error('Enter your current password');
+      return;
+    }
     if (newPassword.length < 8) {
       toast.error('Password must be at least 8 characters');
       return;
@@ -33,8 +40,9 @@ export function SettingsPage() {
     }
     setIsSavingPassword(true);
     try {
-      await authService.resetPassword(user.email, newPassword);
+      await authService.changeOwnPassword(currentPassword, newPassword);
       toast.success('Password updated');
+      setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (error) {
@@ -79,12 +87,40 @@ export function SettingsPage() {
           <h2 className="text-base font-bold text-acc-text dark:text-white">Change Password</h2>
         </div>
         <div className="space-y-4">
+          <Input floating label="Current Password" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
           <Input floating label="New Password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
           <Input floating label="Confirm New Password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
           <Button variant="account" onClick={handleChangePassword} isLoading={isSavingPassword}>
             Update Password
           </Button>
         </div>
+      </Card>
+
+      <Card hover={false}>
+        <div className="mb-4 flex items-center gap-2">
+          <BellRing size={17} className="text-acc-primary" />
+          <h2 className="text-base font-bold text-acc-text dark:text-white">Push Notifications</h2>
+        </div>
+        {!isSupported ? (
+          <p className="flex items-center gap-2 text-sm text-acc-text-secondary">
+            <BellOff size={15} /> Push notifications aren't supported in this browser.
+          </p>
+        ) : permission === 'granted' ? (
+          <p className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400">
+            <Bell size={15} /> Push notifications are enabled on this device.
+          </p>
+        ) : (
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-acc-text-secondary">
+              {permission === 'denied'
+                ? 'Notifications are blocked for this site in your browser settings — allow them there, then try again.'
+                : 'Get notified about order updates, offers, and more — even when DressMart isn\'t open.'}
+            </p>
+            <Button variant="outline" size="sm" onClick={enablePush} isLoading={isRegistering} className="shrink-0">
+              Enable
+            </Button>
+          </div>
+        )}
       </Card>
 
       <Card hover={false} className="border-red-200 dark:border-red-900/40">

@@ -1,107 +1,86 @@
-import type { PaymentMethod } from '@/types';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '@/lib/firebase';
 
-/**
- * Payment gateway abstraction. Each method implements the same interface so a
- * real provider (Razorpay, Stripe, PayU, etc.) can be dropped in later by
- * replacing the `process()` body — nothing in checkout/order code needs to change.
- */
-export interface PaymentChargeInput {
+const RAZORPAY_SCRIPT_SRC = 'https://checkout.razorpay.com/v1/checkout.js';
+
+export interface CartLineForOrder {
+  productId: string;
+  variantId: string;
+  quantity: number;
+}
+
+export interface CreateRazorpayOrderResult {
+  razorpayOrderId: string;
+  /** Paise, per Razorpay's API — a display-only boundary concern, not used for any app-level totals. */
   amount: number;
   currency: 'INR';
+  keyId: string;
+}
+
+export interface PlaceOrderResult {
   orderNumber: string;
-  method: PaymentMethod;
-  details?: {
-    upiId?: string;
-    cardNumber?: string;
-    cardExpiry?: string;
-    cardCvv?: string;
-    cardHolderName?: string;
-    bankCode?: string;
-    walletProvider?: string;
-  };
+  groupId: string;
 }
 
-export interface PaymentChargeResult {
-  success: boolean;
-  transactionId: string;
-  method: PaymentMethod;
-  message: string;
+export interface VerifyAndPlaceOrderInput {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+  addressId: string;
+  couponCode?: string;
+  cart: CartLineForOrder[];
 }
 
-interface PaymentGateway {
-  process(input: PaymentChargeInput): Promise<PaymentChargeResult>;
+export interface PlaceCodOrderInput {
+  addressId: string;
+  couponCode?: string;
+  cart: CartLineForOrder[];
 }
 
-function simulateLatency(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 900 + Math.random() * 600));
-}
+let razorpayScriptPromise: Promise<void> | null = null;
 
-function fakeTransactionId(prefix: string): string {
-  return `${prefix}_${Date.now()}${Math.floor(Math.random() * 1000)}`;
-}
+/** Injects the Razorpay Checkout script tag once and resolves once it has loaded (no-op if already present). */
+export function loadRazorpayScript(): Promise<void> {
+  if (typeof window === 'undefined') return Promise.resolve();
+  if ((window as unknown as { Razorpay?: unknown }).Razorpay) return Promise.resolve();
+  if (razorpayScriptPromise) return razorpayScriptPromise;
 
-class UpiGateway implements PaymentGateway {
-  async process(input: PaymentChargeInput): Promise<PaymentChargeResult> {
-    await simulateLatency();
-    if (!input.details?.upiId?.includes('@')) {
-      return { success: false, transactionId: '', method: 'upi', message: 'Enter a valid UPI ID (e.g. name@bank).' };
+  razorpayScriptPromise = new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${RAZORPAY_SCRIPT_SRC}"]`);
+    if (existing) {
+      existing.addEventListener('load', () => resolve());
+      return;
     }
-    return { success: true, transactionId: fakeTransactionId('UPI'), method: 'upi', message: 'Payment approved via UPI.' };
-  }
+    const script = document.createElement('script');
+    script.src = RAZORPAY_SCRIPT_SRC;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Failed to load Razorpay checkout script.'));
+    document.body.appendChild(script);
+  });
+
+  return razorpayScriptPromise;
 }
-
-class CardGateway implements PaymentGateway {
-  constructor(private method: 'credit_card' | 'debit_card') {}
-
-  async process(input: PaymentChargeInput): Promise<PaymentChargeResult> {
-    await simulateLatency();
-    const cardNumber = input.details?.cardNumber?.replace(/\s/g, '') ?? '';
-    if (cardNumber.length < 12) {
-      return { success: false, transactionId: '', method: this.method, message: 'Enter a valid card number.' };
-    }
-    return { success: true, transactionId: fakeTransactionId('CARD'), method: this.method, message: 'Payment approved.' };
-  }
-}
-
-class NetBankingGateway implements PaymentGateway {
-  async process(input: PaymentChargeInput): Promise<PaymentChargeResult> {
-    await simulateLatency();
-    if (!input.details?.bankCode) {
-      return { success: false, transactionId: '', method: 'net_banking', message: 'Select a bank to continue.' };
-    }
-    return { success: true, transactionId: fakeTransactionId('NB'), method: 'net_banking', message: 'Payment approved via net banking.' };
-  }
-}
-
-class WalletGateway implements PaymentGateway {
-  async process(input: PaymentChargeInput): Promise<PaymentChargeResult> {
-    await simulateLatency();
-    if (!input.details?.walletProvider) {
-      return { success: false, transactionId: '', method: 'wallet', message: 'Select a wallet provider.' };
-    }
-    return { success: true, transactionId: fakeTransactionId('WLT'), method: 'wallet', message: 'Payment approved via wallet.' };
-  }
-}
-
-class CodGateway implements PaymentGateway {
-  async process(): Promise<PaymentChargeResult> {
-    await simulateLatency();
-    return { success: true, transactionId: fakeTransactionId('COD'), method: 'cod', message: 'Order confirmed — pay on delivery.' };
-  }
-}
-
-const gateways: Record<PaymentMethod, PaymentGateway> = {
-  upi: new UpiGateway(),
-  credit_card: new CardGateway('credit_card'),
-  debit_card: new CardGateway('debit_card'),
-  net_banking: new NetBankingGateway(),
-  wallet: new WalletGateway(),
-  cod: new CodGateway(),
-};
 
 export const paymentService = {
-  async charge(input: PaymentChargeInput): Promise<PaymentChargeResult> {
-    const gateway = gateways[input.method];
-    return gateway.process(input);
+  /** Step 1 of the Razorpay flow — mints a Razorpay order server-side for the given rupee total. */
+  async createRazorpayOrder(input: { amount: number; receipt: string }): Promise<CreateRazorpayOrderResult> {
+    const call = httpsCallable<{ amount: number; receipt: string }, CreateRazorpayOrderResult>(functions, 'createRazorpayOrder');
+    const res = await call(input);
+    return res.data;
+  },
+
+  /** Step 2 — after the Razorpay Checkout modal succeeds, verifies the signature and actually places the order(s). */
+  async verifyAndPlaceOrder(input: VerifyAndPlaceOrderInput): Promise<PlaceOrderResult> {
+    const call = httpsCallable<VerifyAndPlaceOrderInput, PlaceOrderResult>(functions, 'verifyAndPlaceOrder');
+    const res = await call(input);
+    return res.data;
+  },
+
+  /** Cash on Delivery — places the order(s) directly, no payment gateway involved. */
+  async placeCodOrder(input: PlaceCodOrderInput): Promise<PlaceOrderResult> {
+    const call = httpsCallable<PlaceCodOrderInput, PlaceOrderResult>(functions, 'placeCodOrder');
+    const res = await call(input);
+    return res.data;
   },
 };

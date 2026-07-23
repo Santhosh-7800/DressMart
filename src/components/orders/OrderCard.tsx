@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Download, RefreshCcw, RotateCcw, Star } from 'lucide-react';
+import { Download, RefreshCcw, RotateCcw, Repeat, Star } from 'lucide-react';
 import type { Order, OrderItem } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { formatCurrency, formatDate } from '@/lib/utils';
@@ -20,9 +20,10 @@ interface OrderCardProps {
   order: Order;
   onBuyAgain: (order: Order) => void;
   onRequestReturn: (order: Order, item: OrderItem) => void;
+  onRequestExchange: (order: Order, item: OrderItem) => void;
 }
 
-export function OrderCard({ order, onBuyAgain, onRequestReturn }: OrderCardProps) {
+export function OrderCard({ order, onBuyAgain, onRequestReturn, onRequestExchange }: OrderCardProps) {
   const isDelivered = order.status === 'delivered';
 
   return (
@@ -50,6 +51,7 @@ export function OrderCard({ order, onBuyAgain, onRequestReturn }: OrderCardProps
                   Color: {item.color} · Size: {item.size} · Qty: {item.quantity}
                 </p>
                 {item.return_status !== 'none' && <p className="mt-0.5 text-xs font-medium text-accent-600">Return status: {item.return_status.replace(/_/g, ' ')}</p>}
+                {item.exchange_status !== 'none' && <p className="mt-0.5 text-xs font-medium text-accent-600">Exchange status: {item.exchange_status.replace(/_/g, ' ')}</p>}
               </div>
             </Link>
 
@@ -60,9 +62,14 @@ export function OrderCard({ order, onBuyAgain, onRequestReturn }: OrderCardProps
                     <Star size={13} /> Write Review
                   </Link>
                 )}
-                {item.return_status === 'none' && (
+                {item.is_return_eligible && item.return_status === 'none' && (
                   <Button variant="outline" size="sm" onClick={() => onRequestReturn(order, item)}>
-                    <RotateCcw size={13} /> Return / Replace
+                    <RotateCcw size={13} /> Return
+                  </Button>
+                )}
+                {item.is_exchange_eligible && item.exchange_status === 'none' && (
+                  <Button variant="outline" size="sm" onClick={() => onRequestExchange(order, item)}>
+                    <Repeat size={13} /> Exchange
                   </Button>
                 )}
               </div>

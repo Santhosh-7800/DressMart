@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { User, Package, MapPin, CreditCard, Bell, Ticket, Heart, Sparkles, Gift, Users, Settings, LogOut, Menu, X, type LucideIcon } from 'lucide-react';
+import { User, Package, MapPin, Bell, Ticket, Heart, Store, Settings, LogOut, Menu, X, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAvatar } from '@/hooks/useAvatar';
@@ -12,19 +12,16 @@ const NAV_ITEMS: { to: string; label: string; icon: LucideIcon; end?: boolean }[
   { to: '/profile', label: 'Profile', icon: User, end: true },
   { to: '/orders', label: 'My Orders', icon: Package },
   { to: '/wishlist', label: 'Wishlist', icon: Heart },
-  { to: '/rewards', label: 'Rewards', icon: Gift },
-  { to: '/referrals', label: 'Refer a Friend', icon: Users },
   { to: '/coupons', label: 'Coupons', icon: Ticket },
-  { to: '/saved-payments', label: 'Saved Payments', icon: CreditCard },
   { to: '/addresses', label: 'Addresses', icon: MapPin },
   { to: '/notifications', label: 'Notifications', icon: Bell },
-  { to: '/style-quiz', label: 'Style Quiz', icon: Sparkles },
+  { to: '/sell', label: 'Sell on DressMart', icon: Store },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
 function NavItems({ collapsed, onNavigate }: { collapsed?: boolean; onNavigate?: () => void }) {
   const navigate = useNavigate();
-  const { signOut } = useAuth();
+  const { user, signOut } = useAuth();
 
   const handleLogout = async () => {
     onNavigate?.();
@@ -32,9 +29,12 @@ function NavItems({ collapsed, onNavigate }: { collapsed?: boolean; onNavigate?:
     navigate('/');
   };
 
+  // Existing sellers manage their store from the Seller Dashboard, not this "apply to sell" link.
+  const items = NAV_ITEMS.filter((item) => item.to !== '/sell' || user?.role === 'buyer');
+
   return (
     <>
-      {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
+      {items.map(({ to, label, icon: Icon, end }) => (
         <NavLink
           key={to}
           to={to}

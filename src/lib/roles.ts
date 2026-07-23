@@ -1,18 +1,19 @@
 import type { UserRole } from '@/types';
 
-/** admin and shop_owner have identical backend powers throughout the admin panel. */
-export const BACKEND_ROLES: UserRole[] = ['admin', 'shop_owner'];
-/** The Staff Portal (/staff/*) is for role='staff' only — admin/shop_owner are deliberately
- *  excluded, they have their own separate panel and must never see the Staff Dashboard. */
-export const STAFF_ONLY_ROLE: UserRole[] = ['staff'];
+/** The Head Seller is also a Seller — every seller-facing route/query must admit both. */
+export const SELLER_ROLES: UserRole[] = ['seller', 'head_seller'];
+export const HEAD_SELLER_ROLE: UserRole = 'head_seller';
 
-export function isBackendRole(role: UserRole | undefined): boolean {
-  return Boolean(role) && BACKEND_ROLES.includes(role as UserRole);
+export function isSellerRole(role: UserRole | undefined): boolean {
+  return Boolean(role) && SELLER_ROLES.includes(role as UserRole);
+}
+
+export function isHeadSeller(role: UserRole | undefined): boolean {
+  return role === HEAD_SELLER_ROLE;
 }
 
 /** Where a signed-in user should land right after authenticating, based on role. */
 export function getPostLoginRedirect(role: UserRole | undefined, fallback: string): string {
-  if (isBackendRole(role)) return '/admin';
-  if (role === 'staff') return '/staff/dashboard';
+  if (isSellerRole(role)) return '/seller/dashboard';
   return fallback;
 }

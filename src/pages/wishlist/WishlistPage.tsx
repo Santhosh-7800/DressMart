@@ -1,5 +1,4 @@
-import { Heart, FolderHeart } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Heart } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { useWishlist } from '@/hooks/useWishlist';
 import { useAuth } from '@/contexts/AuthContext';
@@ -23,11 +22,6 @@ export function WishlistPage() {
           {user && <Avatar src={avatarUrl} name={user.full_name} size="sm" />}
           <h1 className="text-2xl font-bold">My Wishlist ({products.length})</h1>
         </div>
-        {!isLoading && products.length > 0 && (
-          <Link to="/wishlist/collections" className="flex items-center gap-1.5 text-sm font-medium text-accent-600 hover:underline">
-            <FolderHeart size={15} /> Organize into Collections
-          </Link>
-        )}
       </div>
       {!isLoading && products.length === 0 ? (
         <EmptyState icon={Heart} title="Your wishlist is empty" description="Save items you love and find them here anytime." actionLabel="Start Shopping" actionHref="/" />

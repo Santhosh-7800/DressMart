@@ -16,7 +16,7 @@ export function FlashSalesPage() {
   }, [data]);
 
   const visibleProducts = (data ?? []).filter((product) => !dismissedIds.has(product.id));
-  const soonestEndsAt = visibleProducts[0]?.flash_sale_ends_at ?? null;
+  const soonestEndsAt = visibleProducts[0]?.deal_ends_at ?? null;
 
   const handleExpire = (productId: string) => {
     setDismissedIds((prev) => new Set(prev).add(productId));

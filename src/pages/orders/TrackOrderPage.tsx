@@ -11,7 +11,7 @@ export function TrackOrderPage() {
   const [query, setQuery] = useState('');
   const [searched, setSearched] = useState(false);
 
-  const match = orders?.find((o) => o.order_number.toLowerCase() === query.trim().toLowerCase());
+  const matches = (orders ?? []).filter((o) => o.order_number.toLowerCase() === query.trim().toLowerCase());
 
   return (
     <div className="container-app py-8">
@@ -37,23 +37,26 @@ export function TrackOrderPage() {
         </div>
       </div>
 
-      {searched && !match && (
+      {searched && matches.length === 0 && (
         <div className="mt-8">
           <EmptyState icon={PackageSearch} title="Order not found" description="Please check the order number and try again, or view all your orders." actionLabel="View My Orders" actionHref="/orders" />
         </div>
       )}
 
-      {match && (
-        <div className="card-surface mx-auto mt-8 max-w-3xl p-5">
+      {matches.map((match) => (
+        <div key={match.id} className="card-surface mx-auto mt-8 max-w-3xl p-5">
           <div className="mb-4 flex items-center justify-between">
-            <p className="font-semibold">Order #{match.order_number}</p>
+            <div>
+              <p className="font-semibold">Order #{match.order_number}</p>
+              {matches.length > 1 && <p className="text-xs text-primary-400">Shipment from {match.items[0]?.brand_name || 'this seller'}</p>}
+            </div>
             <Link to={`/orders/${match.id}`} className="text-sm text-accent-600 hover:underline">
               View full details
             </Link>
           </div>
           <OrderTrackingTimeline order={match} />
         </div>
-      )}
+      ))}
     </div>
   );
 }

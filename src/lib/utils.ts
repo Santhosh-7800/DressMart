@@ -59,6 +59,13 @@ export function estimateDeliveryDate(daysFromNow = 4): string {
   return date.toISOString();
 }
 
+/** Rough pincode-based delivery estimate for the PDP's delivery-by line. Metro (1xxxxx) pincodes get
+ *  express 2-day delivery, everything else 4 days — not a real courier API integration. */
+export function estimatedDeliveryFor(pincode: string): string {
+  const days = pincode && pincode.startsWith('1') ? 2 : 4;
+  return estimateDeliveryDate(days);
+}
+
 /** Generates a human-friendly order number, e.g. DM-2026-834910 */
 export function generateOrderNumber(): string {
   const year = new Date().getFullYear();

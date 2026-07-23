@@ -1,9 +1,9 @@
 import { useState } from 'react';
+import { doc, getDoc } from 'firebase/firestore';
 import { Tag, X, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Coupon } from '@/types';
-import { couponService } from '@/services/couponService';
-import { useAuth } from '@/contexts/AuthContext';
+import { db } from '@/lib/firebase';
 
 interface CouponInputProps {
   appliedCoupon: Coupon | null;
@@ -12,8 +12,31 @@ interface CouponInputProps {
   orderValue: number;
 }
 
+/**
+ * Coupon docs are keyed by their code (`coupons/{code}`) — validated entirely client-side here
+ * for the cart/checkout estimate. The authoritative discount is recomputed server-side inside
+ * verifyAndPlaceOrder/placeCodOrder, so a stale/tampered client read can never affect the real charge.
+ */
+async function fetchAndValidateCoupon(code: string, orderValue: number): Promise<Coupon> {
+  const snap = await getDoc(doc(db, 'coupons', code.toUpperCase()));
+  if (!snap.exists()) throw new Error('Invalid coupon code.');
+  const coupon = { id: snap.id, ...snap.data() } as Coupon;
+
+  if (!coupon.is_active) throw new Error('This coupon is no longer active.');
+  const now = new Date();
+  if (now < new Date(coupon.valid_from) || now > new Date(coupon.valid_until)) {
+    throw new Error('This coupon has expired.');
+  }
+  if (orderValue < coupon.min_order_value) {
+    throw new Error(`Add items worth ₹${coupon.min_order_value - orderValue} more to use this coupon.`);
+  }
+  if (coupon.usage_limit != null && coupon.used_count >= coupon.usage_limit) {
+    throw new Error('This coupon has reached its usage limit.');
+  }
+  return coupon;
+}
+
 export function CouponInput({ appliedCoupon, onApply, onRemove, orderValue }: CouponInputProps) {
-  const { identityId } = useAuth();
   const [code, setCode] = useState('');
   const [isValidating, setIsValidating] = useState(false);
 
@@ -21,7 +44,7 @@ export function CouponInput({ appliedCoupon, onApply, onRemove, orderValue }: Co
     if (!code.trim()) return;
     setIsValidating(true);
     try {
-      const coupon = await couponService.validate(code.trim(), orderValue, identityId);
+      const coupon = await fetchAndValidateCoupon(code.trim(), orderValue);
       onApply(coupon);
       toast.success(`Coupon "${coupon.code}" applied!`);
       setCode('');

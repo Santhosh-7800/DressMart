@@ -1,0 +1,33 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Product photos — publicly readable, writable only by the owning seller (path-scoped by uid).
+    match /products/{sellerId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isSignedIn() && request.auth.uid == sellerId
+        && request.resource.size < 8 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // Profile avatars — publicly readable, writable only by that user.
+    match /avatars/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isSignedIn() && request.auth.uid == userId
+        && request.resource.size < 4 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // Seller verification documents (GST certificate, etc.) — private, readable by the owner and
+    // the Head Seller only (Head Seller read is enforced via a Cloud Function / Admin SDK signed
+    // URL rather than this ruleset, since Storage rules can't call out to Firestore for role checks
+    // the same way — keep uploads here scoped to the owner).
+    match /seller_documents/{userId}/{allPaths=**} {
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+    }
+  }
+}

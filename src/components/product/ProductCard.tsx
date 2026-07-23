@@ -6,8 +6,7 @@ import { PriceTag } from '@/components/ui/PriceTag';
 import { Rating } from '@/components/ui/Rating';
 import { ProductImage } from '@/components/ui/ProductImage';
 import { useWishlist } from '@/hooks/useWishlist';
-import { useRatingSummary } from '@/hooks/useProducts';
-import { CompareToggle } from './CompareToggle';
+import { useInventory } from '@/hooks/useInventory';
 import { cn } from '@/lib/utils';
 
 interface ProductCardProps {
@@ -18,9 +17,11 @@ interface ProductCardProps {
 export function ProductCard({ product, className }: ProductCardProps) {
   const { isWishlisted, toggle } = useWishlist();
   const wishlisted = isWishlisted(product.id);
-  const { data: ratingSummary } = useRatingSummary(product.id);
+  // Stock lives in its own inventory doc, not on Product — see types/database.ts. Loading/missing
+  // inventory is treated as "in stock" rather than blocking the card on an extra round-trip.
+  const { data: inventory } = useInventory(product.id);
   const primaryImage = product.thumbnailUrl ?? product.imageUrl ?? product.images[0]?.url;
-  const isOutOfStock = product.total_stock <= 0;
+  const isOutOfStock = inventory !== undefined && inventory !== null && inventory.total_stock <= 0;
 
   return (
     <motion.div
@@ -55,10 +56,9 @@ export function ProductCard({ product, className }: ProductCardProps) {
         <div className="space-y-1 p-3">
           <p className="truncate text-xs font-medium text-primary-400">{product.brand?.name}</p>
           <h3 className="line-clamp-2 min-h-[2.5rem] text-sm font-medium text-primary-900 dark:text-white">{product.name}</h3>
-          <Rating value={ratingSummary?.average_rating ?? 0} count={ratingSummary?.total_reviews ?? 0} showValue />
+          <Rating value={product.rating} count={product.rating_count} showValue />
           <PriceTag price={product.price} mrp={product.mrp} size="sm" />
           {isOutOfStock && <p className="text-xs font-semibold text-red-500">Out of stock</p>}
-          <CompareToggle productId={product.id} className="mt-1" />
         </div>
       </Link>
     </motion.div>

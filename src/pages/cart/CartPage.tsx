@@ -19,7 +19,7 @@ const TAX_RATE = 0.05;
 export function CartPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
-  const { items, savedForLater, subtotal, totalDiscount, totalItems, updateQuantity, removeItem, saveForLater } = useCart();
+  const { items, savedForLater, subtotal, totalDiscount, totalItems, hasOutOfStockItems, updateQuantity, removeItem, saveForLater } = useCart();
   const [coupon, setCoupon] = useState<Coupon | null>(null);
 
   const shippingFee = subtotal >= FREE_SHIPPING_THRESHOLD || subtotal === 0 ? 0 : SHIPPING_FEE;
@@ -33,6 +33,7 @@ export function CartPage() {
   const total = Math.round(taxableAmount + tax + shippingFee);
 
   const handleCheckout = () => {
+    if (hasOutOfStockItems) return;
     sessionStorage.setItem('dressmart:checkout-coupon', JSON.stringify(coupon));
     navigate(isAuthenticated ? '/checkout' : '/login', { state: { from: '/checkout' } });
   };
@@ -94,7 +95,12 @@ export function CartPage() {
               <CouponInput appliedCoupon={coupon} onApply={setCoupon} onRemove={() => setCoupon(null)} orderValue={subtotal} />
             </div>
             <OrderSummary itemCount={totalItems} subtotal={subtotal} discount={totalDiscount} couponDiscount={couponDiscount} shippingFee={shippingFee} tax={tax} total={total}>
-              <Button variant="accent" fullWidth size="lg" className="mt-4" onClick={handleCheckout}>
+              {hasOutOfStockItems && (
+                <p className="mt-3 rounded-lg bg-red-50 p-2.5 text-xs font-medium text-red-600 dark:bg-red-900/20 dark:text-red-400">
+                  Some items in your cart exceed available stock. Adjust quantities to continue.
+                </p>
+              )}
+              <Button variant="accent" fullWidth size="lg" className="mt-4" onClick={handleCheckout} disabled={hasOutOfStockItems}>
                 Proceed to Checkout
               </Button>
               <Link to="/" className="mt-2 block text-center text-sm text-accent-600 hover:underline">

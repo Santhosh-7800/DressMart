@@ -1,9 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { couponService } from '@/services/couponService';
+import { listActiveCoupons } from '@/services/couponService';
 import { queryKeys } from '@/lib/queryClient';
-import { useAuth } from '@/contexts/AuthContext';
 
+/** Public, currently-usable coupons — same list for every visitor, signed in or not. */
 export function useCoupons() {
-  const { identityId } = useAuth();
-  return useQuery({ queryKey: [...queryKeys.coupons.all, identityId], queryFn: () => couponService.list(identityId) });
+  return useQuery({ queryKey: queryKeys.coupons.all, queryFn: () => listActiveCoupons() });
 }

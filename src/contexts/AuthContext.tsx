@@ -1,12 +1,11 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, useCallback, type ReactNode } from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
+import { doc, onSnapshot } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import type { Profile } from '@/types';
 import { authService, type SignUpInput } from '@/services/authService';
-import { referralService } from '@/services/referralService';
-import { supabase } from '@/lib/supabase';
-import { env } from '@/lib/env';
+import { auth, db } from '@/lib/firebase';
 import { getGuestId } from '@/lib/guestId';
-import { mergeGuestDataIntoAccount } from '@/services/mock/mockUserData';
 
 interface AuthContextValue {
   user: Profile | null;
@@ -16,9 +15,8 @@ interface AuthContextValue {
   identityId: string;
   signUp: (input: SignUpInput) => Promise<Profile>;
   signIn: (email: string, password: string) => Promise<Profile>;
-  signInWithGoogle: () => Promise<Profile | null>;
+  signInWithGoogle: () => Promise<Profile>;
   signOut: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -27,55 +25,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const loadSession = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const profile = await authService.getSession();
-      setUser(profile);
-    } finally {
-      setIsLoading(false);
-    }
+  useEffect(() => {
+    let unsubscribeProfile: (() => void) | undefined;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (fbUser) => {
+      unsubscribeProfile?.();
+      if (!fbUser) {
+        setUser(null);
+        setIsLoading(false);
+        return;
+      }
+      // Realtime profile subscription — role/seller_status changes (e.g. Head Seller approving or
+      // suspending a seller) take effect immediately, without the affected user needing to re-login.
+      unsubscribeProfile = onSnapshot(doc(db, 'users', fbUser.uid), (snap) => {
+        setUser(snap.exists() ? ({ id: fbUser.uid, ...snap.data() } as Profile) : null);
+        setIsLoading(false);
+      });
+    });
+
+    return () => {
+      unsubscribeAuth();
+      unsubscribeProfile?.();
+    };
   }, []);
 
-  useEffect(() => {
-    loadSession();
-
-    if (!env.useMockData) {
-      const { data: subscription } = supabase.auth.onAuthStateChange(() => {
-        loadSession();
-      });
-      return () => subscription.subscription.unsubscribe();
-    }
-  }, [loadSession]);
-
   const signUp = useCallback(async (input: SignUpInput) => {
-    const guestId = getGuestId();
     const profile = await authService.signUp(input);
-    if (env.useMockData) mergeGuestDataIntoAccount(guestId, profile.id);
-    await referralService.applyReferralCode(profile);
-    setUser(profile);
     toast.success(`Welcome to DressMart, ${profile.full_name.split(' ')[0]}!`);
     return profile;
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    const guestId = getGuestId();
     const profile = await authService.signIn(email, password);
-    if (env.useMockData) mergeGuestDataIntoAccount(guestId, profile.id);
-    setUser(profile);
     toast.success(`Welcome back, ${profile.full_name.split(' ')[0]}!`);
     return profile;
   }, []);
 
   const signInWithGoogle = useCallback(async () => {
-    await authService.signInWithGoogle();
-    await loadSession();
-    return authService.getSession();
-  }, [loadSession]);
+    const profile = await authService.signInWithGoogle();
+    toast.success(`Welcome, ${profile.full_name.split(' ')[0]}!`);
+    return profile;
+  }, []);
 
   const signOut = useCallback(async () => {
     await authService.signOut();
-    setUser(null);
     toast('Signed out', { icon: '👋' });
   }, []);
 
@@ -89,9 +82,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       signInWithGoogle,
       signOut,
-      refreshProfile: loadSession,
     }),
-    [user, isLoading, signUp, signIn, signInWithGoogle, signOut, loadSession],
+    [user, isLoading, signUp, signIn, signInWithGoogle, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

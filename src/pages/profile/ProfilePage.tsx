@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
-import { User, Mail, Phone, Gift, Users, Ticket, MapPin, Sparkles, Package, Heart, Clock, Copy, Plus, Camera } from 'lucide-react';
+import { User, Mail, Phone, Ticket, MapPin, Sparkles, Package, Heart, Clock, Copy, Plus, Camera, Store, Clock3, ShieldAlert } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -15,14 +15,12 @@ import { DashboardSection } from '@/components/profile/DashboardSection';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useAvatar } from '@/hooks/useAvatar';
-import { useRewardsWallet } from '@/hooks/useRewards';
 import { useOrders } from '@/hooks/useOrders';
 import { useWishlist } from '@/hooks/useWishlist';
 import { useRecentlyViewed } from '@/hooks/useRecentlyViewed';
 import { useAddresses } from '@/hooks/useAddresses';
 import { useCoupons } from '@/hooks/useCoupons';
 import { usePersonalizedRecommendations } from '@/hooks/usePersonalizedRecommendations';
-import { calculateRedemptionValue } from '@/services/rewardsService';
 import { formatCurrency, formatDate } from '@/lib/utils';
 
 const ORDER_STATUS_STYLES: Record<string, string> = {
@@ -40,7 +38,6 @@ export function ProfilePage() {
   const { user } = useAuth();
   const { updateProfile, isUpdating } = useProfile();
   const { avatarUrl, uploadAvatar, isUploading } = useAvatar();
-  const { data: rewardsWallet } = useRewardsWallet();
   const { data: orders, isLoading: isLoadingOrders } = useOrders();
   const { items: wishlistItems, isLoading: isLoadingWishlist } = useWishlist();
   const { recentlyViewed, isLoading: isLoadingRecent } = useRecentlyViewed();
@@ -54,12 +51,10 @@ export function ProfilePage() {
 
   if (!user) return null;
 
-  const pointsBalance = rewardsWallet?.points_balance ?? 0;
-  const walletValue = calculateRedemptionValue(pointsBalance);
   const recentOrders = [...(orders ?? [])].sort((a, b) => +new Date(b.placed_at) - +new Date(a.placed_at)).slice(0, 3);
   const wishlistProducts = wishlistItems.map((i) => i.product).filter(Boolean).slice(0, 4);
   const defaultAddress = addresses.find((a) => a.is_default) ?? addresses[0];
-  const activeCoupons = (coupons ?? []).filter((c) => c.is_active).slice(0, 3);
+  const activeCoupons = (coupons ?? []).slice(0, 3);
 
   const handleSave = async () => {
     try {
@@ -88,13 +83,44 @@ export function ProfilePage() {
     <div className="space-y-6">
       <Seo title="My Account" />
 
-      <ProfileHeroCard
-        user={user}
-        pointsBalance={pointsBalance}
-        walletValue={walletValue}
-        orderCount={orders?.length ?? 0}
-        wishlistCount={wishlistItems.length}
-      />
+      <ProfileHeroCard user={user} orderCount={orders?.length ?? 0} wishlistCount={wishlistItems.length} />
+
+      {user.role === 'buyer' && (
+        <motion.div whileHover={{ y: -3 }} transition={{ duration: 0.2 }}>
+          <Link
+            to="/sell"
+            className="flex items-center gap-3 rounded-[20px] bg-gradient-to-br from-acc-primary to-acc-secondary p-4 text-white shadow-[0_12px_28px_-14px_rgba(255,107,0,0.6)] sm:p-5"
+          >
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/15">
+              <Store size={20} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-bold">Become a Seller</p>
+              <p className="text-sm text-white/85">Start selling on DressMart — apply in under a minute.</p>
+            </div>
+          </Link>
+        </motion.div>
+      )}
+
+      {(user.role === 'seller' || user.role === 'head_seller') && user.seller_status === 'pending' && (
+        <div className="flex items-center gap-3 rounded-[20px] border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/40 dark:bg-amber-900/10">
+          <Clock3 size={20} className="shrink-0 text-amber-600 dark:text-amber-400" />
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-amber-800 dark:text-amber-300">Your seller application is under review</p>
+            <p className="text-xs text-amber-700/80 dark:text-amber-400/80">We'll notify you once the Head Seller approves your store, {user.store_name ?? 'your store'}.</p>
+          </div>
+        </div>
+      )}
+
+      {user.seller_status === 'suspended' && (
+        <div className="flex items-center gap-3 rounded-[20px] border border-red-200 bg-red-50 p-4 dark:border-red-900/40 dark:bg-red-900/10">
+          <ShieldAlert size={20} className="shrink-0 text-red-600 dark:text-red-400" />
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-red-800 dark:text-red-300">Your seller account has been suspended</p>
+            {user.seller_status_reason && <p className="text-xs text-red-700/80 dark:text-red-400/80">{user.seller_status_reason}</p>}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
@@ -229,35 +255,6 @@ export function ProfilePage() {
               </Button>
             </div>
           </Card>
-
-          <motion.div whileHover={{ y: -3 }} transition={{ duration: 0.2 }}>
-            <Link
-              to="/rewards"
-              className="flex items-center gap-3 rounded-[20px] bg-gradient-to-br from-acc-primary to-acc-secondary p-4 text-white shadow-[0_12px_28px_-14px_rgba(255,107,0,0.6)]"
-            >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/15">
-                <Gift size={18} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs text-white/80">Reward Points</p>
-                <p className="font-bold">
-                  {pointsBalance.toLocaleString('en-IN')} pts <span className="font-normal text-white/75">· {formatCurrency(walletValue)}</span>
-                </p>
-              </div>
-            </Link>
-          </motion.div>
-
-          <motion.div whileHover={{ y: -3 }} transition={{ duration: 0.2 }}>
-            <Link to="/referrals" className="flex items-center gap-3 rounded-[20px] border border-acc-border bg-white p-4 dark:border-primary-700 dark:bg-card-dark">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-acc-primary/10">
-                <Users size={18} className="text-acc-primary" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs text-acc-text-secondary">Refer a friend</p>
-                <p className="font-bold text-acc-text dark:text-white">Give ₹150, get ₹200</p>
-              </div>
-            </Link>
-          </motion.div>
 
           <DashboardSection title="Coupons" icon={Ticket} viewAllHref="/coupons">
             {isLoadingCoupons ? (

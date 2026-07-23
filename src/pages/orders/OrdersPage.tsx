@@ -1,22 +1,23 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, RotateCcw } from 'lucide-react';
+import { Package, RotateCcw, Repeat } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { useOrders } from '@/hooks/useOrders';
-import { useReturns, useRequestReturn, useSimulateReturnProgress } from '@/hooks/useReturns';
+import { useReturns } from '@/hooks/useReturns';
+import { useExchanges } from '@/hooks/useExchanges';
 import { useCart } from '@/hooks/useCart';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { Button } from '@/components/ui/Button';
-import { Modal } from '@/components/ui/Modal';
 import { OrderCard } from '@/components/orders/OrderCard';
 import { ReturnCard, type EnrichedReturn } from '@/components/orders/ReturnCard';
+import { ExchangeCard, type EnrichedExchange } from '@/components/orders/ExchangeCard';
+import { ReturnRequestModal } from '@/components/orders/ReturnRequestModal';
+import { ExchangeRequestModal } from '@/components/orders/ExchangeRequestModal';
 import { OrdersToolbar, type DateFilter, type SortOrder } from '@/components/orders/OrdersToolbar';
-import { RETURN_REASONS } from '@/lib/returnStatus';
 import { cn } from '@/lib/utils';
 import type { Order, OrderItem, OrderStatus } from '@/types';
 
-type TabKey = 'all' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'returns';
+type TabKey = 'all' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'returns' | 'exchanges';
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'all', label: 'All Orders' },
@@ -25,6 +26,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'delivered', label: 'Delivered' },
   { key: 'cancelled', label: 'Cancelled' },
   { key: 'returns', label: 'Returns & Refunds' },
+  { key: 'exchanges', label: 'Exchanges' },
 ];
 
 const PROCESSING_STATUSES: OrderStatus[] = ['placed', 'confirmed', 'packed'];
@@ -44,7 +46,7 @@ function matchesTab(order: Order, tab: TabKey): boolean {
       return order.status === 'delivered';
     case 'cancelled':
       return order.status === 'cancelled';
-    case 'returns':
+    default:
       return false;
   }
 }
@@ -59,9 +61,8 @@ export function OrdersPage() {
   const navigate = useNavigate();
   const { data: orders, isLoading } = useOrders();
   const { data: returns, isLoading: isLoadingReturns } = useReturns();
+  const { data: exchanges, isLoading: isLoadingExchanges } = useExchanges();
   const { addItem } = useCart();
-  const requestReturn = useRequestReturn();
-  const simulateReturnProgress = useSimulateReturnProgress();
 
   const [activeTab, setActiveTab] = useState<TabKey>('all');
   const [search, setSearch] = useState('');
@@ -70,8 +71,7 @@ export function OrdersPage() {
   const [sortOrder, setSortOrder] = useState<SortOrder>('newest');
 
   const [returnTarget, setReturnTarget] = useState<{ order: Order; item: OrderItem } | null>(null);
-  const [returnReason, setReturnReason] = useState(RETURN_REASONS[0]);
-  const [returnComment, setReturnComment] = useState('');
+  const [exchangeTarget, setExchangeTarget] = useState<{ order: Order; item: OrderItem } | null>(null);
 
   const allOrders = useMemo(() => orders ?? [], [orders]);
   const searchLower = search.trim().toLowerCase();
@@ -104,6 +104,22 @@ export function OrdersPage() {
       });
   }, [returns, allOrders, searchLower, dateFilter, sortOrder]);
 
+  const enrichedExchanges = useMemo(() => {
+    const result: EnrichedExchange[] = [];
+    for (const ex of exchanges ?? []) {
+      const order = allOrders.find((o) => o.id === ex.order_id);
+      const item = order?.items.find((i) => i.id === ex.order_item_id);
+      if (order && item) result.push({ exchangeRequest: ex, order, item });
+    }
+    return result
+      .filter((e) => !searchLower || e.item.product_name.toLowerCase().includes(searchLower))
+      .filter((e) => withinDateFilter(e.exchangeRequest.created_at, dateFilter))
+      .sort((a, b) => {
+        const diff = new Date(b.exchangeRequest.created_at).getTime() - new Date(a.exchangeRequest.created_at).getTime();
+        return sortOrder === 'newest' ? diff : -diff;
+      });
+  }, [exchanges, allOrders, searchLower, dateFilter, sortOrder]);
+
   const handleBuyAgain = async (order: Order) => {
     for (const item of order.items) {
       await addItem({ productId: item.product_id, variantId: item.variant_id, quantity: item.quantity });
@@ -111,20 +127,7 @@ export function OrdersPage() {
     navigate('/cart');
   };
 
-  const handleOpenReturnModal = (order: Order, item: OrderItem) => {
-    setReturnTarget({ order, item });
-    setReturnReason(RETURN_REASONS[0]);
-    setReturnComment('');
-  };
-
-  const handleSubmitReturn = async () => {
-    if (!returnTarget) return;
-    await requestReturn.mutateAsync({ order: returnTarget.order, orderItemId: returnTarget.item.id, reason: returnReason, comment: returnComment });
-    setReturnTarget(null);
-    setActiveTab('returns');
-  };
-
-  const isLoadingActive = activeTab === 'returns' ? isLoadingReturns : isLoading;
+  const isLoadingActive = activeTab === 'returns' ? isLoadingReturns : activeTab === 'exchanges' ? isLoadingExchanges : isLoading;
 
   return (
     <div>
@@ -179,7 +182,24 @@ export function OrdersPage() {
           )}
           <div className="space-y-3">
             {enrichedReturns.map((e) => (
-              <ReturnCard key={e.returnRequest.id} enriched={e} onSimulateProgress={(id) => simulateReturnProgress.mutate(id)} />
+              <ReturnCard key={e.returnRequest.id} enriched={e} />
+            ))}
+          </div>
+        </>
+      ) : activeTab === 'exchanges' ? (
+        <>
+          {!isLoadingExchanges && enrichedExchanges.length === 0 && (
+            <EmptyState
+              icon={Repeat}
+              title="No exchange requests"
+              description="Exchanges you request from a delivered order will appear here."
+              actionLabel="View Delivered Orders"
+              actionHref="/orders"
+            />
+          )}
+          <div className="space-y-3">
+            {enrichedExchanges.map((e) => (
+              <ExchangeCard key={e.exchangeRequest.id} enriched={e} />
             ))}
           </div>
         </>
@@ -196,34 +216,34 @@ export function OrdersPage() {
           )}
           <div className="space-y-3">
             {visibleOrders.map((order) => (
-              <OrderCard key={order.id} order={order} onBuyAgain={handleBuyAgain} onRequestReturn={handleOpenReturnModal} />
+              <OrderCard
+                key={order.id}
+                order={order}
+                onBuyAgain={handleBuyAgain}
+                onRequestReturn={(o, item) => setReturnTarget({ order: o, item })}
+                onRequestExchange={(o, item) => setExchangeTarget({ order: o, item })}
+              />
             ))}
           </div>
         </>
       )}
 
-      <Modal isOpen={Boolean(returnTarget)} onClose={() => setReturnTarget(null)} title="Return / Replace Item">
-        <div className="space-y-3">
-          {returnTarget && <p className="text-sm text-primary-500">{returnTarget.item.product_name}</p>}
-          <div>
-            <p className="mb-1.5 text-sm font-medium">Reason</p>
-            <select value={returnReason} onChange={(e) => setReturnReason(e.target.value)} className="input-field">
-              {RETURN_REASONS.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <p className="mb-1.5 text-sm font-medium">Additional comments (optional)</p>
-            <textarea value={returnComment} onChange={(e) => setReturnComment(e.target.value)} className="input-field" rows={3} />
-          </div>
-          <Button variant="accent" fullWidth onClick={handleSubmitReturn} isLoading={requestReturn.isPending}>
-            Submit Return Request
-          </Button>
-        </div>
-      </Modal>
+      {returnTarget && (
+        <ReturnRequestModal
+          isOpen={Boolean(returnTarget)}
+          onClose={() => setReturnTarget(null)}
+          order={returnTarget.order}
+          item={returnTarget.item}
+        />
+      )}
+      {exchangeTarget && (
+        <ExchangeRequestModal
+          isOpen={Boolean(exchangeTarget)}
+          onClose={() => setExchangeTarget(null)}
+          order={exchangeTarget.order}
+          item={exchangeTarget.item}
+        />
+      )}
     </div>
   );
 }

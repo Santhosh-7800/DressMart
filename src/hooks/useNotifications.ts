@@ -4,23 +4,25 @@ import { queryKeys } from '@/lib/queryClient';
 import { useAuth } from '@/contexts/AuthContext';
 
 export function useNotifications() {
-  const { identityId } = useAuth();
+  const { user, isAuthenticated } = useAuth();
+  const userId = user?.id ?? '';
   const queryClient = useQueryClient();
 
   const query = useQuery({
-    queryKey: [...queryKeys.notifications.all, identityId],
-    queryFn: () => notificationService.list(identityId),
+    queryKey: [...queryKeys.notifications.all, userId],
+    queryFn: () => notificationService.list(userId),
+    enabled: isAuthenticated,
   });
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: [...queryKeys.notifications.all, identityId] });
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: [...queryKeys.notifications.all, userId] });
 
   const markRead = useMutation({
-    mutationFn: (notificationId: string) => notificationService.markRead(identityId, notificationId),
+    mutationFn: (notificationId: string) => notificationService.markRead(userId, notificationId),
     onSuccess: invalidate,
   });
 
   const markAllRead = useMutation({
-    mutationFn: () => notificationService.markAllRead(identityId),
+    mutationFn: () => notificationService.markAllRead(userId),
     onSuccess: invalidate,
   });
 

@@ -1,100 +1,111 @@
-import { supabase } from '@/lib/supabase';
-import { env } from '@/lib/env';
+import { collection, deleteDoc, doc, getDoc, getDocs, increment, orderBy, query, setDoc, updateDoc, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import type { Coupon } from '@/types';
-import { getCoupons, addCoupon, upsertCoupon, removeCoupon } from './mock/mockUserData';
 
-export const couponService = {
-  /** Every coupon (active or not, public or personally-granted) — the admin Coupons page manages all of them. */
-  async listAllForAdmin(): Promise<Coupon[]> {
-    if (env.useMockData) return getCoupons();
-    const { data, error } = await supabase.from('coupons').select('*').order('valid_from', { ascending: false });
-    if (error) throw new Error(error.message);
-    return data as Coupon[];
-  },
+const COUPONS_COLLECTION = 'coupons';
 
-  async save(coupon: Coupon): Promise<Coupon> {
-    if (env.useMockData) {
-      upsertCoupon(coupon);
-      return coupon;
-    }
-    const { error } = await supabase.from('coupons').upsert(coupon);
-    if (error) throw new Error(error.message);
-    return coupon;
-  },
+/**
+ * Coupon docs are keyed by their (uppercased) code — `coupons/{CODE}` — not an auto-generated id.
+ * This matches how the cart/checkout side already reads coupons (see CouponInput.tsx's
+ * `getDoc(doc(db, 'coupons', code.toUpperCase()))`): a coupon code lookup is a single point read
+ * by id instead of a `where('code','==',...)` query. Keep this convention if you touch this file.
+ */
+function couponRef(codeOrId: string) {
+  return doc(db, COUPONS_COLLECTION, codeOrId.trim().toUpperCase());
+}
 
-  async remove(couponId: string): Promise<void> {
-    if (env.useMockData) {
-      removeCoupon(couponId);
-      return;
-    }
-    const { error } = await supabase.from('coupons').delete().eq('id', couponId);
-    if (error) throw new Error(error.message);
-  },
+function isCurrentlyValid(coupon: Coupon, now = new Date()): boolean {
+  if (!coupon.is_active) return false;
+  if (now < new Date(coupon.valid_from) || now > new Date(coupon.valid_until)) return false;
+  if (coupon.usage_limit != null && coupon.used_count >= coupon.usage_limit) return false;
+  return true;
+}
 
-  /** Public catalog coupons, plus any privately-granted coupons owned by `userId` (e.g. referral rewards). */
-  async list(userId?: string): Promise<Coupon[]> {
-    if (env.useMockData) {
-      return getCoupons().filter((c) => c.is_active && (!c.granted_to_user_id || c.granted_to_user_id === userId));
-    }
-    const query = supabase.from('coupons').select('*').eq('is_active', true);
-    const { data, error } = userId
-      ? await query.or(`granted_to_user_id.is.null,granted_to_user_id.eq.${userId}`)
-      : await query.is('granted_to_user_id', null);
-    if (error) throw new Error(error.message);
-    return data as Coupon[];
-  },
+/** Public, currently-usable coupons — for the buyer-facing CouponsPage. `coupons` is a public-read
+ *  collection (see firestore.rules); is_active + date-range/usage-limit filtering happens here
+ *  since Firestore can't express "now between two fields" server-side. */
+export async function listActiveCoupons(): Promise<Coupon[]> {
+  const snap = await getDocs(query(collection(db, COUPONS_COLLECTION), where('is_active', '==', true)));
+  const coupons = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Coupon);
+  const now = new Date();
+  return coupons.filter((c) => isCurrentlyValid(c, now));
+}
 
-  async validate(code: string, orderValue: number, userId?: string): Promise<Coupon> {
-    const coupons = env.useMockData ? getCoupons() : await this.list(userId);
-    const coupon = coupons.find((c) => c.code.toLowerCase() === code.toLowerCase());
-    if (!coupon) throw new Error('Invalid coupon code.');
-    if (coupon.granted_to_user_id && coupon.granted_to_user_id !== userId) {
-      throw new Error('This coupon is not valid for your account.');
-    }
-    if (!coupon.is_active) throw new Error('This coupon is no longer active.');
-    const now = new Date();
-    if (now < new Date(coupon.valid_from) || now > new Date(coupon.valid_until)) {
-      throw new Error('This coupon has expired.');
-    }
-    if (orderValue < coupon.min_order_value) {
-      throw new Error(`Add items worth ₹${coupon.min_order_value - orderValue} more to use this coupon.`);
-    }
-    if (coupon.usage_limit && coupon.used_count >= coupon.usage_limit) {
-      throw new Error('This coupon has reached its usage limit.');
-    }
-    return coupon;
-  },
+/** Every coupon regardless of active/expired state — for the Head Seller's Coupon Management UI. */
+export async function listAllCoupons(): Promise<Coupon[]> {
+  const snap = await getDocs(query(collection(db, COUPONS_COLLECTION), orderBy('valid_from', 'desc')));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Coupon);
+}
 
-  /** Mints a single-use, privately-owned coupon for one user — used by the referral program (and reusable for any future "personal offer" flow). */
-  async grantToUser(
-    userId: string,
-    input: { code: string; description: string; discountType: Coupon['discount_type']; discountValue: number; minOrderValue: number; validDays: number },
-  ): Promise<Coupon> {
-    const now = new Date();
-    const coupon: Coupon = {
-      id: `coupon-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      code: input.code,
-      description: input.description,
-      discount_type: input.discountType,
-      discount_value: input.discountValue,
-      min_order_value: input.minOrderValue,
-      max_discount: null,
-      valid_from: now.toISOString(),
-      valid_until: new Date(now.getTime() + input.validDays * 24 * 60 * 60 * 1000).toISOString(),
-      is_active: true,
-      usage_limit: 1,
-      used_count: 0,
-      granted_to_user_id: userId,
-    };
+/**
+ * Validates a coupon code against an order subtotal and returns the discount to apply.
+ * Used by this app's CouponsPage AND the Checkout flow — keep this signature stable, other call
+ * sites depend on it exactly as-is. (Note: cart/checkout's own CouponInput.tsx currently re-implements
+ * this same validation inline rather than calling here — see this workstream's final report.)
+ */
+export async function validateCoupon(code: string, subtotal: number): Promise<{ coupon: Coupon; discountAmount: number } | { error: string }> {
+  const normalizedCode = code.trim().toUpperCase();
+  if (!normalizedCode) return { error: 'Enter a coupon code.' };
 
-    if (env.useMockData) {
-      addCoupon(coupon);
-      return coupon;
-    }
+  const snap = await getDoc(couponRef(normalizedCode));
+  if (!snap.exists()) return { error: 'Invalid coupon code.' };
 
-    const { id: _id, ...insertPayload } = coupon;
-    const { data, error } = await supabase.from('coupons').insert(insertPayload).select().single();
-    if (error) throw new Error(error.message);
-    return data as Coupon;
-  },
-};
+  const coupon = { id: snap.id, ...snap.data() } as Coupon;
+
+  if (!coupon.is_active) return { error: 'This coupon is no longer active.' };
+  const now = new Date();
+  if (now < new Date(coupon.valid_from)) return { error: 'This coupon is not active yet.' };
+  if (now > new Date(coupon.valid_until)) return { error: 'This coupon has expired.' };
+  if (subtotal < coupon.min_order_value) {
+    return { error: `Add items worth ₹${(coupon.min_order_value - subtotal).toFixed(0)} more to use this coupon.` };
+  }
+  if (coupon.usage_limit != null && coupon.used_count >= coupon.usage_limit) {
+    return { error: 'This coupon has reached its usage limit.' };
+  }
+
+  let discountAmount = coupon.discount_type === 'percent' ? (subtotal * coupon.discount_value) / 100 : coupon.discount_value;
+  if (coupon.max_discount != null) discountAmount = Math.min(discountAmount, coupon.max_discount);
+  discountAmount = Math.min(discountAmount, subtotal);
+
+  return { coupon, discountAmount: Math.round(discountAmount) };
+}
+
+/** Called once a coupon-discounted order is actually placed — keeps `used_count` (and therefore the
+ *  usage_limit check above) accurate. Atomic increment, safe under concurrent checkouts. */
+export async function incrementCouponUsage(codeOrId: string): Promise<void> {
+  await updateDoc(couponRef(codeOrId), { used_count: increment(1) });
+}
+
+// --- Head-seller-only writes (coupons rule: `allow write: if isHeadSeller()`) ---
+
+export async function createCoupon(input: Omit<Coupon, 'id' | 'used_count'>): Promise<Coupon> {
+  const normalizedCode = input.code.trim().toUpperCase();
+  const payload = { ...input, code: normalizedCode, used_count: 0 };
+  await setDoc(couponRef(normalizedCode), payload);
+  return { id: normalizedCode, ...payload };
+}
+
+/** `couponId` is the coupon's current code (== its doc id). If `updates.code` differs, the coupon
+ *  is moved to a new doc keyed by the new code (Firestore doc ids are immutable) — everything else
+ *  is a plain field update on the existing doc. */
+export async function updateCoupon(couponId: string, updates: Partial<Omit<Coupon, 'id'>>): Promise<void> {
+  const newCode = updates.code?.trim().toUpperCase();
+  if (newCode && newCode !== couponId.trim().toUpperCase()) {
+    const oldRef = couponRef(couponId);
+    const oldSnap = await getDoc(oldRef);
+    if (!oldSnap.exists()) throw new Error('Coupon not found.');
+    const merged = { ...(oldSnap.data() as Omit<Coupon, 'id'>), ...updates, code: newCode };
+    await setDoc(couponRef(newCode), merged);
+    await deleteDoc(oldRef);
+    return;
+  }
+  await updateDoc(couponRef(couponId), updates);
+}
+
+export async function setCouponActive(couponId: string, isActive: boolean): Promise<void> {
+  await updateDoc(couponRef(couponId), { is_active: isActive });
+}
+
+export async function deleteCoupon(couponId: string): Promise<void> {
+  await deleteDoc(couponRef(couponId));
+}

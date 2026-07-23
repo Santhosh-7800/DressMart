@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { addDoc, collection, getDocs, query, updateDoc, where } from 'firebase/firestore';
 import toast from 'react-hot-toast';
-import { MapPin, Plus, CheckCircle2 } from 'lucide-react';
+import { MapPin, Plus, CheckCircle2, CreditCard, Banknote } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
-import { useAddresses } from '@/hooks/useAddresses';
 import { useCart } from '@/hooks/useCart';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAvatar } from '@/hooks/useAvatar';
@@ -14,8 +15,9 @@ import { Input } from '@/components/ui/Input';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ProductImage } from '@/components/ui/ProductImage';
 import { Avatar } from '@/components/ui/Avatar';
+import { db } from '@/lib/firebase';
 import { cn, formatCurrency } from '@/lib/utils';
-import type { Coupon } from '@/types';
+import type { Address, Coupon, PaymentMethod } from '@/types';
 
 const FREE_SHIPPING_THRESHOLD = 999;
 const SHIPPING_FEE = 79;
@@ -35,15 +37,52 @@ interface AddressFormState {
 
 const EMPTY_ADDRESS: AddressFormState = { full_name: '', phone: '', line1: '', line2: '', city: '', state: '', pincode: '', landmark: '', type: 'home' };
 
+/**
+ * Address CRUD is read/written directly against Firestore here rather than through
+ * addressService/useAddresses — that module may be mid-migration by another workstream
+ * concurrently; per firestore.rules, any signed-in user may read/write their own `addresses/*`.
+ */
+async function fetchAddresses(userId: string): Promise<Address[]> {
+  const snap = await getDocs(query(collection(db, 'addresses'), where('user_id', '==', userId)));
+  const addresses = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Address);
+  return addresses.sort((a, b) => Number(b.is_default) - Number(a.is_default));
+}
+
 export function CheckoutPage() {
   const navigate = useNavigate();
-  const { addresses, addAddress, isLoading } = useAddresses();
-  const { items, subtotal, totalDiscount, totalItems } = useCart();
   const { user } = useAuth();
+  const { items, subtotal, totalDiscount, totalItems } = useCart();
   const { avatarUrl } = useAvatar();
+  const queryClient = useQueryClient();
+  const userId = user?.id ?? '';
+
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState<AddressFormState>(EMPTY_ADDRESS);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('razorpay');
+
+  const addressesQuery = useQuery({
+    queryKey: ['addresses', userId],
+    queryFn: () => fetchAddresses(userId),
+    enabled: Boolean(userId),
+  });
+  const addresses = addressesQuery.data ?? [];
+
+  const addAddressMutation = useMutation({
+    mutationFn: async (address: Omit<Address, 'id' | 'user_id'>) => {
+      if (address.is_default) {
+        const existing = await getDocs(query(collection(db, 'addresses'), where('user_id', '==', userId)));
+        await Promise.all(existing.docs.map((d) => updateDoc(d.ref, { is_default: false })));
+      }
+      const ref = await addDoc(collection(db, 'addresses'), { ...address, user_id: userId, is_default: address.is_default || addresses.length === 0 });
+      return ref.id;
+    },
+    onSuccess: (newId) => {
+      queryClient.invalidateQueries({ queryKey: ['addresses', userId] });
+      setSelectedAddressId(newId);
+      toast.success('Address saved');
+    },
+  });
 
   const coupon: Coupon | null = (() => {
     try {
@@ -69,9 +108,7 @@ export function CheckoutPage() {
       toast.error('Please fill in all required fields');
       return;
     }
-    const updated = await addAddress({ ...form, line2: form.line2 || null, landmark: form.landmark || null, is_default: addresses.length === 0 });
-    const newest = updated[updated.length - 1];
-    setSelectedAddressId(newest?.id ?? null);
+    await addAddressMutation.mutateAsync({ ...form, line2: form.line2 || null, landmark: form.landmark || null, is_default: addresses.length === 0 });
     setIsModalOpen(false);
     setForm(EMPTY_ADDRESS);
   };
@@ -81,7 +118,7 @@ export function CheckoutPage() {
       toast.error('Please select or add a delivery address');
       return;
     }
-    navigate('/checkout/payment', { state: { addressId: effectiveAddressId } });
+    navigate('/checkout/payment', { state: { addressId: effectiveAddressId, paymentMethod } });
   };
 
   if (items.length === 0) {
@@ -108,7 +145,7 @@ export function CheckoutPage() {
                 <Plus size={15} /> Add New
               </button>
             </div>
-            {isLoading ? (
+            {addressesQuery.isLoading ? (
               <p className="text-sm text-primary-400">Loading addresses…</p>
             ) : addresses.length === 0 ? (
               <p className="text-sm text-primary-400">No saved addresses. Add one to continue.</p>
@@ -151,7 +188,31 @@ export function CheckoutPage() {
           </div>
 
           <div className="card-surface p-5">
-            <h2 className="mb-4 font-semibold">3. Review Order ({totalItems} items)</h2>
+            <h2 className="mb-4 font-semibold">3. Payment Method</h2>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setPaymentMethod('razorpay')}
+                className={cn(
+                  'flex items-center gap-2 rounded-xl border p-4 text-sm font-medium',
+                  paymentMethod === 'razorpay' ? 'border-accent bg-accent-50 dark:bg-accent-900/10' : 'border-primary-200 dark:border-primary-600',
+                )}
+              >
+                <CreditCard size={18} /> Razorpay (UPI / Card / Netbanking)
+              </button>
+              <button
+                onClick={() => setPaymentMethod('cod')}
+                className={cn(
+                  'flex items-center gap-2 rounded-xl border p-4 text-sm font-medium',
+                  paymentMethod === 'cod' ? 'border-accent bg-accent-50 dark:bg-accent-900/10' : 'border-primary-200 dark:border-primary-600',
+                )}
+              >
+                <Banknote size={18} /> Cash on Delivery
+              </button>
+            </div>
+          </div>
+
+          <div className="card-surface p-5">
+            <h2 className="mb-4 font-semibold">4. Review Order ({totalItems} items)</h2>
             <div className="space-y-3">
               {items.map((item) => (
                 <div key={item.id} className="flex items-center gap-3 text-sm">
@@ -170,6 +231,11 @@ export function CheckoutPage() {
         </div>
 
         <div>
+          {coupon && (
+            <div className="card-surface mb-4 p-4 text-sm">
+              <p className="font-medium text-emerald-600">Coupon "{coupon.code}" applied</p>
+            </div>
+          )}
           <OrderSummary itemCount={totalItems} subtotal={subtotal} discount={totalDiscount} couponDiscount={couponDiscount} shippingFee={shippingFee} tax={tax} total={total}>
             <Button variant="accent" fullWidth size="lg" className="mt-4" onClick={handleContinue}>
               Continue to Payment
@@ -206,7 +272,7 @@ export function CheckoutPage() {
               ))}
             </div>
           </div>
-          <Button variant="accent" fullWidth onClick={handleAddAddress}>
+          <Button variant="accent" fullWidth onClick={handleAddAddress} isLoading={addAddressMutation.isPending}>
             Save Address
           </Button>
         </div>

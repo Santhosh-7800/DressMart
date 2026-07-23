@@ -1,18 +1,22 @@
 # DressMart
 
-Premium online shopping for **Men's** and **Kids' Wear** — a production-grade storefront built with React 19, TypeScript, Tailwind CSS, and Supabase.
+A lightweight, Amazon/Flipkart-style multi-vendor marketplace for **Men's** and **Kids' Wear** — built with React 19, TypeScript, Tailwind CSS, and **Firebase** end to end (Auth, Firestore, Storage, Cloud Functions, Cloud Messaging, Hosting), with **Razorpay** for payments.
 
-![DressMart](https://img.shields.io/badge/status-Phase%201%20%E2%80%94%20Storefront-orange)
+![DressMart](https://img.shields.io/badge/status-Buyer%20%2B%20Seller%20%2B%20Head%20Seller-orange)
 
 ---
 
-## What's in this phase
+## Roles
 
-This is the **storefront-first phase** of DressMart: the full customer-facing shopping experience, complete database schema, and a mock data layer so the app runs immediately without any backend setup.
+There are exactly three roles — no separate admin app.
 
-**Included:** Home, category browsing & filters, search, product details, cart, wishlist, full checkout (address → shipping → payment → confirmation), order tracking & history, returns, auth (email, Google, phone OTP), profile/addresses/saved payments/notifications/coupons, static pages, dark mode, and a generated catalog of **~1,700 products** across Men's and Kids' wear.
+| Role | What they do |
+|---|---|
+| **Buyer** | Browse/search/filter products, wishlist, cart, checkout (Razorpay or COD), track orders, cancel/return/exchange eligible items, coupons, addresses, profile, notifications. |
+| **Seller** | Manage their own products, inventory, orders, returns, and exchanges. Can never see another seller's data. Multiple sellers are supported. |
+| **Head Seller** | A single, designated Seller account with everything a Seller has, **plus**: approve/suspend seller accounts, platform analytics, revenue reports, coupon management, and platform settings. Uses the exact same Seller Dashboard — extra menu items simply appear when `role === 'head_seller'`. |
 
-**Not yet built (next phase):** the separate Admin Dashboard (analytics, inventory, banner/coupon management, user management). The database schema and RLS policies already support it — only the admin UI itself remains.
+A buyer becomes a seller by applying at `/sell` (`SellerApplyPage`); their account sits in `seller_status: 'pending'` until the Head Seller approves it from `/seller/sellers`.
 
 ---
 
@@ -27,8 +31,8 @@ This is the **storefront-first phase** of DressMart: the full customer-facing sh
 | Forms & validation | React Hook Form + Zod |
 | Animation | Framer Motion |
 | Icons | Lucide React |
-| Backend | Supabase (Postgres, Auth, Storage, Edge Functions, Realtime-ready) |
-| HTTP | Axios (used for the one non-Supabase external call — pincode lookup) |
+| Backend | Firebase — Authentication, Firestore, Storage, Cloud Functions, Cloud Messaging, Hosting |
+| Payments | Razorpay (UPI, cards, net banking, wallets, EMI) + Cash on Delivery |
 
 ---
 
@@ -39,28 +43,50 @@ npm install
 npm run dev
 ```
 
-That's it — the app runs immediately in **mock mode**: a full ~1,700-product catalog, auth, cart, orders, everything, backed by an in-memory/localStorage data layer instead of a live database. No `.env` file is required to try the app.
+By default (`VITE_USE_FIREBASE_EMULATOR=true` in `.env`, or simply no real Firebase project configured) the app talks to the **local Firebase Emulator Suite** instead of a live project — nothing to sign up for just to click around.
 
-Demo login: **demo@dressmart.com** / **password123**
-Demo admin account (for when the admin panel ships): **admin@dressmart.com** / **admin12345**
+### Running against the emulators
 
-### Connecting a real Supabase project
+1. Install the Firebase CLI if you don't have it: `npm install -g firebase-tools`, then `firebase login`.
+2. In one terminal: `npm run emulators` (starts Auth, Firestore, Storage, and Functions emulators + the Emulator UI at `http://localhost:4000`).
+3. Seed some data: `npm run seed` — writes brands/categories/products/inventory across a handful of fictional sellers into the Firestore emulator (uses `firebase-admin`, so it needs `FIRESTORE_EMULATOR_HOST=localhost:8080` set, which the script does for you when the emulator is running locally).
+4. In another terminal: `npm run dev`.
 
-1. Create a project at [supabase.com](https://supabase.com).
-2. Copy `.env.example` to `.env` and fill in:
-   ```
-   VITE_SUPABASE_URL=...
-   VITE_SUPABASE_ANON_KEY=...
-   SUPABASE_SERVICE_ROLE_KEY=...   # only used by the seed script, never shipped to the client
-   VITE_USE_MOCK_DATA=false
-   ```
-3. Run the SQL migrations in `supabase/migrations/` **in order** (`0001` → `0004`) via the Supabase SQL editor, or `supabase db push` if you have the CLI linked.
-4. Seed the database with the full generated catalog:
-   ```bash
-   npm run seed
-   ```
-   This uses the **same catalog generator** the mock mode uses (`src/lib/catalogGenerator.ts`), so what you see in mock mode is exactly what gets written to your database — brands, categories, ~1,700 products, variants, images, starter coupons, and banners.
-5. Restart the dev server. The app now reads and writes through Supabase instead of localStorage — no code changes needed, since every feature goes through `src/services/*`, which branches on `VITE_USE_MOCK_DATA` internally.
+### Connecting a real Firebase project
+
+1. Create a project at [console.firebase.google.com](https://console.firebase.google.com), then add a **Web app** to it.
+2. Enable **Authentication** providers: Email/Password, Google, Phone.
+3. Copy `.env.example` to `.env` and fill in the `VITE_FIREBASE_*` values from Project Settings, plus `VITE_FIREBASE_VAPID_KEY` (Project Settings → Cloud Messaging → Web Push certificates) and `VITE_RAZORPAY_KEY_ID`. Set `VITE_USE_FIREBASE_EMULATOR=false`.
+4. Link the CLI to your project: `firebase use --add`.
+5. Deploy security rules and indexes: `firebase deploy --only firestore:rules,firestore:indexes,storage`.
+6. Set the Razorpay Cloud Functions config (see `functions/README.md`), then deploy: `firebase deploy --only functions`.
+7. Deploy the frontend: `npm run build && firebase deploy --only hosting`.
+8. Manually promote your own account's `role` to `'head_seller'` in the Firestore console the first time — there's exactly one Head Seller, and it's bootstrapped by hand, not through the UI.
+
+---
+
+## Data Model (Firestore)
+
+| Collection | Notes |
+|---|---|
+| `users` | One profile doc per auth user (`role: buyer\|seller\|head_seller`, plus seller-only fields: `store_name`, `gst_number`, `seller_status`, `fcm_tokens`). |
+| `products` | One doc per listing, owned by exactly one `seller_id`. Stock is **not** stored here. |
+| `inventory` | One doc per product (same id as its product), `variant_stock` keyed by variant id — separated from `products` so high-frequency stock writes never touch the larger, rarely-changing product doc. Product pages merge the two on read; stock updates push live via `onSnapshot`. |
+| `orders` | One doc **per seller per checkout** — a cart spanning multiple sellers splits into multiple `Order` docs sharing the same `group_id`/`order_number`, which is what makes "a seller only sees their own orders" a plain `where seller_id == uid` query. |
+| `returns` / `exchanges` | Buyer-created requests, seller/Head-Seller-advanced status. |
+| `cart` / `wishlist` / `addresses` / `notifications` / `coupons` / `reviews` / `seller_requests` | As named. Guest cart/wishlist live in `localStorage` and merge into Firestore on login. |
+| `platform_settings/config` | Singleton doc — Head Seller's Platform Settings page (shipping charge, return/exchange windows, policy text, etc.). |
+
+Security is enforced by `firestore.rules` and `storage.rules` at the repo root — read those for the exact ownership model (buyer-owns-their-own-data, seller-owns-their-own-products/orders, Head-Seller-can-see-everything).
+
+---
+
+## Cloud Functions
+
+Under `functions/` (separate TypeScript project, deployed independently — see `functions/README.md` for local dev, config/secrets, and the full callable/trigger list). In short:
+
+- **Callables**: `createRazorpayOrder`, `placeCodOrder`, `verifyAndPlaceOrder`, `cancelOrder`, `reviewSellerRequest`, `suspendSellerAccount` — anything that needs server-trusted pricing/stock, an external API call, or an atomic multi-document write.
+- **Firestore triggers**: fire notifications (and push them via FCM) whenever an order/return/exchange status changes, a seller applies, or a notification doc is created — plain seller status-advance writes from the client are enough to drive the whole notification pipeline.
 
 ---
 
@@ -68,80 +94,36 @@ Demo admin account (for when the admin panel ships): **admin@dressmart.com** / *
 
 ```
 src/
-  assets/           static assets
-  components/
-    ui/             Button, Input, Modal, Rating, Skeleton, Pagination, ...
-    layout/         Header, Footer, CategoryNav, MobileMenu
-    product/        ProductCard, ProductGallery, Filters, ColorSwatches, ...
-    cart/           CartItemRow, OrderSummary, CouponInput
-    common/         SearchBar, Seo, ErrorBoundary
-  pages/            one folder per feature area (home, men, kids, product, cart,
-                    checkout, orders, auth, profile, wishlist, static, errors)
-  features/         reserved for feature-scoped logic as the app grows
-  hooks/            useCart, useWishlist, useOrders, useProducts, useSearch, ...
-  services/         the data layer — one file per domain, each branches
-                    mock vs. Supabase internally (see below)
-  lib/              supabase client, catalog generator, utils, query client
-  data/             static catalog source data (brands, category taxonomy, colors)
-  types/            shared TypeScript types mirroring the DB schema
-  contexts/         AuthContext, ThemeContext
-  layouts/          MainLayout, AuthLayout, AccountLayout
-  routes/           AppRoutes (lazy-loaded), ProtectedRoute
+  components/       ui/, layout/, product/, cart/, orders/, profile/, wishlist/, common/
+  pages/
+    home/ men/ kids/ category/ product/    storefront browsing
+    cart/ checkout/ orders/                cart → checkout → Razorpay/COD → tracking
+    wishlist/ profile/ auth/ static/ errors/
+    seller/                                Seller Dashboard + Head-Seller-only pages
+  layouts/          MainLayout, AuthLayout, AccountLayout, SellerLayout
+  routes/           AppRoutes, ProtectedRoute, RequireSeller, RequireHeadSeller
+  services/         one file per domain — all Firestore/Firebase now, no mock layer
+  hooks/            TanStack Query hooks wrapping the services
+  lib/              firebase.ts (SDK init), env.ts, roles.ts, queryClient.ts, utils
+  types/            database.ts (Firestore doc shapes), seller.ts
+  contexts/         AuthContext (Firebase Auth + realtime profile), ThemeContext
 
-supabase/
-  migrations/       0001_init (schema), 0002_rls_policies, 0003_functions,
-                    0004_storage — run in order against your project
-  functions/
-    place-order/    Edge Function: validates stock & places an order atomically
-                    server-side (an alternative to the client-side flow used
-                    by default)
-
+functions/          Firebase Cloud Functions (Razorpay, order placement, notifications)
 scripts/
-  seed.ts           seeds a real Supabase project with the generated catalog
+  seedFirestore.ts  seeds brands/categories/products/inventory into Firestore
+  generateImageManifest.ts
+
+firestore.rules / firestore.indexes.json / storage.rules / firebase.json
 ```
 
-### Why a "mock mode"?
-
-Every feature module (`services/productService.ts`, `services/cartService.ts`, etc.) exposes the same async API regardless of backend. Internally, each function checks `env.useMockData`:
-
-- **Mock mode** (default, no real Supabase project configured): reads/writes to an in-memory catalog (deterministically generated, same every run) plus `localStorage` for user-specific state (cart, wishlist, orders, addresses).
-- **Supabase mode**: the exact same functions call `supabase-js` against your real Postgres tables, respecting the RLS policies in `supabase/migrations/0002_rls_policies.sql`.
-
-Nothing in `hooks/` or `pages/` needs to change when you switch modes — the seed script and the mock catalog generator share the same source (`src/lib/catalogGenerator.ts`), so the data is identical either way.
-
-### Product imagery
-
-The catalog is synthetic — there's no licensed product photography to seed with. Every product image is a small, dependency-free SVG generated client-side (`src/lib/placeholderImage.ts`): a garment silhouette in the product's color with a fabric-detail variant per color. This keeps the app fully offline-capable and network-free in mock mode. For production, replace `product_images.url` with real photography uploaded to the `product-images` Supabase Storage bucket (already provisioned in `0004_storage.sql`).
-
 ---
 
-## Database Schema
+## Known limitations / next steps
 
-Full schema in `supabase/migrations/0001_init.sql`: `profiles`, `brands`, `categories` (self-referencing for Men/Kids → subcategory hierarchy), `products`, `product_variants`, `product_images`, `reviews`, `addresses`, `cart_items`, `wishlist_items`, `coupons`, `orders`, `order_items`, `order_timeline_events`, `returns`, `saved_payment_methods`, `notifications`, `banners`.
-
-Row Level Security (`0002_rls_policies.sql`) ensures:
-- Catalog tables (products, categories, brands, banners, coupons) are publicly readable, admin-writable.
-- Personal data (cart, wishlist, addresses, orders, notifications, saved payments) is scoped to `auth.uid()`.
-- An `is_admin()` helper function gates admin-only writes, based on `profiles.role`.
-
-`0003_functions.sql` adds a `get_product_facets()` Postgres function (brand/color/size/price-range aggregation for filters) and `decrement_variant_stock()` (atomic stock deduction on order placement).
-
----
-
-## Payment Integration
-
-Payments are behind a gateway-agnostic abstraction (`src/services/paymentService.ts`). Each method (UPI, Credit/Debit Card, Net Banking, Wallet, COD) implements the same `process()` interface and currently **simulates** a charge (validates input, waits, returns success/failure) — there is no real payment gateway wired up yet. To go live, replace the body of each gateway class with a real call to Razorpay/Stripe/PayU/etc.; nothing in checkout needs to change since it only talks to `paymentService.charge()`.
-
-`supabase/functions/place-order/` is an Edge Function alternative to the default client-side order placement — it validates stock and creates the order + order items atomically server-side, useful once a real payment gateway's webhook needs to trigger order creation.
-
----
-
-## Known limitations of this phase
-
-- **Guest checkout requires login.** Cart/wishlist work as a guest (a stable per-browser id), but placing an order requires signing in — guest cart items merge into the account automatically on login/signup.
-- **Guest cart in Supabase mode** isn't wired up — RLS requires `auth.uid()`, so a live backend needs Supabase Anonymous Auth (`signInAnonymously()`) to support the same guest-cart UX; not implemented in this phase.
-- **Phone OTP and password reset** work end-to-end in mock mode (the OTP is shown on-screen for the demo); in Supabase mode they call real `supabase.auth` methods, which require SMS/email providers to be configured in your Supabase project.
-- **Admin Dashboard** is not built yet (see "What's in this phase" above).
+- **Search** is a client-side substring filter over a bounded fetch of active products — fine at this scale, but a dedicated search service (Algolia/Typesense) would be the next step for a larger catalog.
+- **Order pricing is server-recomputed** for the actual charge (`placeCodOrder`/`verifyAndPlaceOrder` read live product/inventory docs), but the Checkout page's on-screen estimate is still client-computed for responsiveness — they should agree, but the server total is always the source of truth.
+- **`product.rating`/`rating_count`** are plain fields, not yet kept in sync with the `reviews` collection via a Cloud Function trigger — reviews are computed live instead; fine for correctness, a bit more reads than a denormalized counter.
+- **One Head Seller, bootstrapped manually** — there's no UI to create the first Head Seller account; promote it by hand in Firestore after your first sign-up.
 
 ---
 
@@ -154,26 +136,8 @@ Payments are behind a gateway-agnostic abstraction (`src/services/paymentService
 | `npm run preview` | Preview the production build locally |
 | `npm run lint` | Run ESLint |
 | `npm run typecheck` | Type-check without emitting |
-| `npm run seed` | Seed a connected Supabase project with the full catalog |
-
----
-
-## Deployment
-
-The app is a static Vite build — deploy the `dist/` folder to any static host.
-
-**Vercel / Netlify:**
-1. Connect the repo.
-2. Build command: `npm run build`. Output directory: `dist`.
-3. Set environment variables (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_SITE_URL`, `VITE_USE_MOCK_DATA=false`) in the host's dashboard.
-4. Update `VITE_SITE_URL` to your production domain — it's used for auth redirect links (password reset, email confirmation, OAuth).
-
-**Supabase project checklist before going live:**
-- Run all four migrations in order.
-- Run `npm run seed` (or seed manually) — or connect your real product catalog instead.
-- In Supabase Auth settings, enable the Google provider and add your production redirect URL if using Google login.
-- Deploy the edge function if you plan to use it: `supabase functions deploy place-order`.
-- Replace synthetic product images with real photography in the `product-images` storage bucket.
+| `npm run seed` | Seed Firestore (emulator or real project) with a generated catalog |
+| `npm run emulators` | Start the local Firebase Emulator Suite |
 
 ---
 

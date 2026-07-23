@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { brandService, categoryService, productService, reviewService } from '@/services/productService';
+import { brandService, categoryService, productService } from '@/services/productService';
+import { reviewService } from '@/services/reviewService';
 import { bannerService } from '@/services/bannerService';
 import { queryKeys } from '@/lib/queryClient';
 import { buildCompleteTheLook } from '@/lib/completeTheLookRecommender';
@@ -103,8 +104,9 @@ export function useFeaturedBrands() {
   return useQuery({ queryKey: queryKeys.brands.featured, queryFn: () => brandService.featured() });
 }
 
+/** Banners are now a small hardcoded array (see bannerService) — no backend call, so no query key/network round-trip needed. */
 export function useBanners() {
-  return useQuery({ queryKey: queryKeys.banners.all, queryFn: () => bannerService.list() });
+  return { data: bannerService.list(), isLoading: false };
 }
 
 export function useDealsOfTheDay() {

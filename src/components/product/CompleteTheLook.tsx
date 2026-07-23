@@ -7,6 +7,7 @@ import { ProductCardSkeleton } from '@/components/ui/Skeleton';
 import { Button } from '@/components/ui/Button';
 import { useCompleteTheLook } from '@/hooks/useProducts';
 import { useCart } from '@/hooks/useCart';
+import { inventoryService } from '@/services/inventoryService';
 
 interface CompleteTheLookProps {
   product: Product;
@@ -21,16 +22,20 @@ export function CompleteTheLook({ product }: CompleteTheLookProps) {
 
   const handleAddEntireOutfit = async () => {
     if (!items || items.length === 0) return;
-    const inStockItems = items.filter((item) => item.product.variants.some((v) => v.stock > 0));
-    if (inStockItems.length === 0) {
-      toast.error('These items are currently out of stock');
-      return;
-    }
     setIsAdding(true);
     try {
+      // Stock lives in a separate inventory doc per product (see types/database.ts) — checked here,
+      // at add-to-cart time, rather than while just rendering the outfit strip.
+      const inventories = await Promise.all(items.map((item) => inventoryService.getInventory(item.product.id)));
+      const inStockItems = items.filter((_, idx) => (inventories[idx]?.total_stock ?? 0) > 0);
+      if (inStockItems.length === 0) {
+        toast.error('These items are currently out of stock');
+        return;
+      }
       await Promise.all(
         inStockItems.map((item) => {
-          const variant = item.product.variants.find((v) => v.stock > 0) ?? item.product.variants[0];
+          const inventory = inventories[items.indexOf(item)];
+          const variant = item.product.variants.find((v) => (inventory?.variant_stock[v.id] ?? 0) > 0) ?? item.product.variants[0];
           return addItem({ productId: item.product.id, variantId: variant.id });
         }),
       );

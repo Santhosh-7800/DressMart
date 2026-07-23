@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Heart, Share2, Truck, RotateCcw, ShieldCheck, ChevronDown, Camera } from 'lucide-react';
+import { Heart, Share2, Truck, RotateCcw, ShieldCheck, ChevronDown } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { ProductGallery } from '@/components/product/ProductGallery';
 import { ColorSwatches } from '@/components/product/ColorSwatches';
@@ -19,11 +19,11 @@ import { WriteReviewForm } from '@/components/product/WriteReviewForm';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ProductImage } from '@/components/ui/ProductImage';
 import { useFrequentlyBoughtTogether, useProduct, useRatingSummary, useRelatedProducts, useReviews } from '@/hooks/useProducts';
+import { useInventoryRealtime } from '@/hooks/useInventory';
 import { useRecentlyViewed } from '@/hooks/useRecentlyViewed';
 import { useCart } from '@/hooks/useCart';
 import { useWishlist } from '@/hooks/useWishlist';
-import { formatDate } from '@/lib/utils';
-import { estimatedDeliveryFor } from '@/lib/catalogGenerator';
+import { formatDate, estimatedDeliveryFor } from '@/lib/utils';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { productViewService } from '@/services/productViewService';
 
@@ -48,6 +48,8 @@ export function ProductDetailsPage() {
   const fbtQuery = useFrequentlyBoughtTogether(product);
   const reviewsQuery = useReviews(product?.id);
   const ratingSummaryQuery = useRatingSummary(product?.id);
+  // Realtime — a shopper deciding to buy should see stock change immediately if someone else checks out first.
+  const { data: inventory } = useInventoryRealtime(product?.id);
   const { recordView, recentlyViewed, isLoading: isLoadingRecentlyViewed } = useRecentlyViewed();
   const { addItem } = useCart();
   const { isWishlisted, toggle } = useWishlist();
@@ -74,10 +76,12 @@ export function ProductDetailsPage() {
 
   const sizesForColor = useMemo(() => {
     if (!product || !activeColor) return [];
+    // While inventory is still loading, assume in-stock rather than flashing every size as
+    // sold-out for a frame — the realtime subscription corrects this the instant it resolves.
     return product.variants
       .filter((v) => v.color === activeColor)
-      .map((v) => ({ size: v.size, inStock: v.stock > 0 }));
-  }, [product, activeColor]);
+      .map((v) => ({ size: v.size, inStock: inventory === undefined ? true : (inventory?.variant_stock[v.id] ?? 0) > 0 }));
+  }, [product, activeColor, inventory]);
 
   const activeVariant = useMemo(
     () => product?.variants.find((v) => v.color === activeColor && v.size === activeSize),
@@ -100,12 +104,14 @@ export function ProductDetailsPage() {
     );
   }
 
+  const activeVariantStock = activeVariant ? (inventory?.variant_stock[activeVariant.id] ?? 0) : 0;
+
   const handleAddToCart = async () => {
     if (!activeSize) {
       toast.error('Please select a size');
       return;
     }
-    if (!activeVariant || activeVariant.stock <= 0) {
+    if (!activeVariant || activeVariantStock <= 0) {
       toast.error('This size is out of stock');
       return;
     }
@@ -117,7 +123,7 @@ export function ProductDetailsPage() {
       toast.error('Please select a size');
       return;
     }
-    if (!activeVariant || activeVariant.stock <= 0) {
+    if (!activeVariant || activeVariantStock <= 0) {
       toast.error('This size is out of stock');
       return;
     }
@@ -143,7 +149,6 @@ export function ProductDetailsPage() {
         <ProductGallery
           images={product.images}
           videoUrl={product.video_url}
-          spinFrames={product.spin_frames}
           activeColor={activeColor}
           productName={product.name}
         />
@@ -174,7 +179,7 @@ export function ProductDetailsPage() {
           </div>
 
           <div className="mt-6 flex gap-3">
-            {product.total_stock <= 0 ? (
+            {inventory !== undefined && inventory !== null && inventory.total_stock <= 0 ? (
               <div className="flex h-12 flex-1 items-center justify-center rounded-xl bg-primary-100 text-sm font-semibold text-red-500 dark:bg-primary-800">
                 Out of Stock
               </div>
@@ -196,10 +201,6 @@ export function ProductDetailsPage() {
               <Heart size={18} className={isWishlisted(product.id) ? 'fill-red-500 text-red-500' : ''} />
             </button>
           </div>
-
-          <Link to={`/try-on/${product.slug}`} className="btn-outline mt-3 w-full">
-            <Camera size={16} /> Try It On Virtually
-          </Link>
 
           <div className="mt-6 rounded-2xl bg-primary-50 p-4 dark:bg-primary-800">
             <div className="flex items-center gap-3 text-sm">

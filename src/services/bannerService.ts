@@ -1,40 +1,26 @@
-import { supabase } from '@/lib/supabase';
-import { env } from '@/lib/env';
-import type { Banner } from '@/types';
-import { getAllBanners, saveBanner, deleteBanner } from './mock/mockAdminBanners';
+/**
+ * The dynamic banner CMS (admin-managed offers, live in Supabase) is cut for simplicity per product
+ * decision — this is now a small hardcoded array, no backend call at all. If a Head Seller-managed
+ * banner editor is ever wanted again, re-introduce a `banners` collection + queryKeys entry then.
+ */
+export interface Banner {
+  id: string;
+  title: string;
+  subtitle: string | null;
+  link: string;
+  sort_order: number;
+  is_active: boolean;
+}
+
+const BANNERS: Banner[] = [
+  { id: 'banner-1', title: 'Season Launch', subtitle: 'Fresh Formal Shirts starting at ₹799', link: '/men/formal-shirts', sort_order: 0, is_active: true },
+  { id: 'banner-2', title: 'Denim Fest', subtitle: 'Flat 30% off on Jeans & Cargo Pants', link: '/men/slim-jeans', sort_order: 1, is_active: true },
+  { id: 'banner-3', title: 'Kids Wonderland', subtitle: 'Playful styles for your little ones', link: '/kids', sort_order: 2, is_active: true },
+  { id: 'banner-4', title: 'Winter Edit', subtitle: 'Hoodies & Jackets up to 45% off', link: '/men/jackets', sort_order: 3, is_active: true },
+];
 
 export const bannerService = {
-  async list(): Promise<Banner[]> {
-    if (env.useMockData) return getAllBanners().filter((b) => b.is_active);
-    const { data, error } = await supabase.from('banners').select('*').eq('is_active', true).order('sort_order');
-    if (error) throw new Error(error.message);
-    return data as Banner[];
-  },
-
-  /** All offers regardless of is_active — the admin Offers page manages both live and paused ones. */
-  async listAll(): Promise<Banner[]> {
-    if (env.useMockData) return getAllBanners();
-    const { data, error } = await supabase.from('banners').select('*').order('sort_order');
-    if (error) throw new Error(error.message);
-    return data as Banner[];
-  },
-
-  async save(banner: Banner): Promise<Banner> {
-    if (env.useMockData) {
-      saveBanner(banner);
-      return banner;
-    }
-    const { error } = await supabase.from('banners').upsert(banner);
-    if (error) throw new Error(error.message);
-    return banner;
-  },
-
-  async remove(bannerId: string): Promise<void> {
-    if (env.useMockData) {
-      deleteBanner(bannerId);
-      return;
-    }
-    const { error } = await supabase.from('banners').delete().eq('id', bannerId);
-    if (error) throw new Error(error.message);
+  list(): Banner[] {
+    return BANNERS.filter((b) => b.is_active).sort((a, b) => a.sort_order - b.sort_order);
   },
 };

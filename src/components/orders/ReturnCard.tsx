@@ -1,10 +1,10 @@
 import { Link } from 'react-router-dom';
-import { Download, HelpCircle, RefreshCcw } from 'lucide-react';
+import { Download, HelpCircle } from 'lucide-react';
 import type { Order, OrderItem, ReturnRequest } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils';
 import { downloadInvoice } from '@/lib/invoice';
-import { RETURN_STATUS_BADGE_CLASS, RETURN_STATUS_LABELS, nextReturnStatus, pickupStatusLabel, refundStatusLabel } from '@/lib/returnStatus';
+import { RETURN_STATUS_BADGE_CLASS, RETURN_STATUS_LABELS, pickupStatusLabel, refundStatusLabel } from '@/lib/returnStatus';
 
 export interface EnrichedReturn {
   returnRequest: ReturnRequest;
@@ -14,12 +14,10 @@ export interface EnrichedReturn {
 
 interface ReturnCardProps {
   enriched: EnrichedReturn;
-  onSimulateProgress: (returnId: string) => void;
 }
 
-export function ReturnCard({ enriched, onSimulateProgress }: ReturnCardProps) {
+export function ReturnCard({ enriched }: ReturnCardProps) {
   const { returnRequest: r, order, item } = enriched;
-  const canAdvance = nextReturnStatus(r.status) !== null;
 
   return (
     <div className="card-surface p-4">
@@ -84,11 +82,6 @@ export function ReturnCard({ enriched, onSimulateProgress }: ReturnCardProps) {
             <Link to="/help-center" className="btn-outline !px-3 !py-1.5 text-xs">
               <HelpCircle size={13} /> Contact Support
             </Link>
-            {canAdvance && (
-              <Button variant="ghost" size="sm" onClick={() => onSimulateProgress(r.id)}>
-                <RefreshCcw size={13} /> Simulate Next Step
-              </Button>
-            )}
           </div>
         </div>
       </div>

@@ -66,12 +66,11 @@ export function getImageFolder(categorySlug: string): string {
 
 /**
  * The public/images/products/<gender>/<folder>/ convention every product's photography follows —
- * this is also the exact <gender>/<folder>/ prefix used for the "product-images" Supabase Storage
- * bucket (see scripts/seed.ts and supabase/migrations/0004_storage.sql), so the same file can live
- * in either place under an identical path. This module is intentionally environment-agnostic (no
- * Supabase client, no import.meta.env) since it's imported by both the browser bundle and the
- * Node.js seed script — see productService.ts for where a live Supabase row's own image_url/
- * thumbnail_url/gallery_images columns (populated separately, e.g. by the seed script) take over.
+ * this is also the exact <gender>/<folder>/ prefix used by scripts/seedFirestore.ts when assigning
+ * on-disk photos to seeded products, so the same file can live in either place under an identical
+ * path. This module is intentionally environment-agnostic (no Firebase client, no import.meta.env)
+ * since it's imported by both the browser bundle and the Node.js seed script — see productService.ts
+ * for where a live product's own image_url/thumbnail_url/gallery_images fields take over.
  */
 export function getProductImageBasePath(gender: Gender, categorySlug: string): string {
   return `${gender}/${getImageFolder(categorySlug)}`;

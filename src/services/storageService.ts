@@ -1,55 +1,29 @@
-import { supabase } from '@/lib/supabase';
-import { env } from '@/lib/env';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '@/lib/firebase';
 
 /**
- * Product image upload. Live mode uploads to the `product-images` Supabase Storage bucket (public
- * read, admin/shop_owner write — see migration 0017) and returns its public URL. Mock mode has no
- * real backend to upload to, so it creates an object URL — which is a real, renderable image URL
- * for the lifetime of this tab/session (until the page fully reloads), enough to demonstrate
- * "upload a product image and see it live in the customer app" end to end.
+ * Product image upload — path is scoped by the owning seller's uid (`products/{sellerId}/...`)
+ * to match storage.rules, which only allows that seller to write under their own prefix.
  */
-export async function uploadProductImage(file: File): Promise<string> {
-  if (env.useMockData) {
-    return URL.createObjectURL(file);
-  }
-
+export async function uploadProductImage(file: File, sellerId: string): Promise<string> {
   const ext = file.name.split('.').pop() ?? 'jpg';
-  const path = `products/${crypto.randomUUID()}.${ext}`;
-  const { error } = await supabase.storage.from('product-images').upload(path, file, {
-    cacheControl: '3600',
-    upsert: false,
-  });
-  if (error) throw new Error(error.message);
-
-  const { data } = supabase.storage.from('product-images').getPublicUrl(path);
-  return data.publicUrl;
+  const path = `products/${sellerId}/${crypto.randomUUID()}.${ext}`;
+  const fileRef = ref(storage, path);
+  await uploadBytes(fileRef, file, { cacheControl: '3600' });
+  return getDownloadURL(fileRef);
 }
 
-export async function uploadProductImages(files: File[]): Promise<string[]> {
-  return Promise.all(files.map(uploadProductImage));
+export async function uploadProductImages(files: File[], sellerId: string): Promise<string[]> {
+  return Promise.all(files.map((file) => uploadProductImage(file, sellerId)));
 }
 
-/**
- * Profile photo upload — the `avatars` bucket (migration 0004) is public-read, and its
- * insert/update policies require the object's first path segment to equal `auth.uid()`, hence
- * `${userId}/...` below. `upsert: true` so re-uploading a new photo replaces the old file at the
- * same path instead of accumulating orphaned objects.
- */
+/** Profile photo upload — `avatars/{userId}/...`, matching storage.rules. Each upload gets a fresh path (no upsert-in-place) so a browser/CDN cache never serves a stale photo at the same URL. */
 export async function uploadAvatarImage(file: File, userId: string): Promise<string> {
-  if (env.useMockData) {
-    return URL.createObjectURL(file);
-  }
-
   const ext = file.name.split('.').pop() ?? 'jpg';
-  const path = `${userId}/avatar-${Date.now()}.${ext}`;
-  const { error } = await supabase.storage.from('avatars').upload(path, file, {
-    cacheControl: '3600',
-    upsert: true,
-  });
-  if (error) throw new Error(error.message);
-
-  const { data } = supabase.storage.from('avatars').getPublicUrl(path);
-  return data.publicUrl;
+  const path = `avatars/${userId}/avatar-${Date.now()}.${ext}`;
+  const fileRef = ref(storage, path);
+  await uploadBytes(fileRef, file, { cacheControl: '3600' });
+  return getDownloadURL(fileRef);
 }
 
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];

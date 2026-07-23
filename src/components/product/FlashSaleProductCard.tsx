@@ -6,7 +6,7 @@ import { PriceTag } from '@/components/ui/PriceTag';
 import { Rating } from '@/components/ui/Rating';
 import { ProductImage } from '@/components/ui/ProductImage';
 import { useWishlist } from '@/hooks/useWishlist';
-import { useRatingSummary } from '@/hooks/useProducts';
+import { useInventory } from '@/hooks/useInventory';
 import { cn } from '@/lib/utils';
 import { CountdownTimer } from './CountdownTimer';
 import { StockIndicator } from './StockIndicator';
@@ -17,15 +17,19 @@ interface FlashSaleProductCardProps {
   className?: string;
 }
 
+/**
+ * "Flash Sale" has no distinct fields in the new data model (see productService.getFlashSales,
+ * which aliases it to Deal of the Day) — stock/countdown here come from the real inventory doc and
+ * product.deal_ends_at instead of the old flash_sale_total_stock/claimed/ends_at fields.
+ */
 export function FlashSaleProductCard({ product, onExpire, className }: FlashSaleProductCardProps) {
   const { isWishlisted, toggle } = useWishlist();
   const wishlisted = isWishlisted(product.id);
-  const { data: ratingSummary } = useRatingSummary(product.id);
+  const { data: inventory } = useInventory(product.id);
   const primaryImage = product.thumbnailUrl ?? product.imageUrl ?? product.images[0]?.url;
 
-  const totalStock = product.flash_sale_total_stock ?? 0;
-  const claimed = product.flash_sale_claimed ?? 0;
-  const isSoldOut = totalStock > 0 && claimed >= totalStock;
+  const totalStock = inventory?.total_stock ?? 0;
+  const isSoldOut = inventory !== undefined && inventory !== null && totalStock <= 0;
 
   return (
     <motion.div
@@ -65,10 +69,10 @@ export function FlashSaleProductCard({ product, onExpire, className }: FlashSale
         <div className="space-y-1.5 p-3">
           <p className="truncate text-xs font-medium text-primary-400">{product.brand?.name}</p>
           <h3 className="line-clamp-2 min-h-[2.5rem] text-sm font-medium text-primary-900 dark:text-white">{product.name}</h3>
-          <Rating value={ratingSummary?.average_rating ?? 0} count={ratingSummary?.total_reviews ?? 0} showValue />
+          <Rating value={product.rating} count={product.rating_count} showValue />
           <PriceTag price={product.price} mrp={product.mrp} size="sm" />
-          <CountdownTimer endsAt={product.flash_sale_ends_at} onExpire={() => onExpire?.(product.id)} />
-          <StockIndicator claimed={claimed} total={totalStock} />
+          <CountdownTimer endsAt={product.deal_ends_at} onExpire={() => onExpire?.(product.id)} />
+          {inventory && <StockIndicator claimed={Math.max(0, totalStock - inventory.low_stock_threshold)} total={totalStock} />}
         </div>
       </Link>
     </motion.div>

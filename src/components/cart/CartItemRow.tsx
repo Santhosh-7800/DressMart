@@ -1,13 +1,13 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Trash2, Heart } from 'lucide-react';
-import type { CartItem } from '@/types';
+import type { CartLineItem } from '@/services/cartService';
 import { QuantitySelector } from '@/components/ui/QuantitySelector';
 import { ProductImage } from '@/components/ui/ProductImage';
 import { formatCurrency } from '@/lib/utils';
 
 interface CartItemRowProps {
-  item: CartItem;
+  item: CartLineItem;
   onUpdateQuantity: (quantity: number) => void;
   onRemove: () => void;
   onSaveForLater?: () => void;
@@ -18,7 +18,7 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove, onSaveForLater, 
   const product = item.product;
   const variant = item.variant;
   const price = variant?.price_override ?? product?.price ?? 0;
-  const outOfStock = (variant?.stock ?? 0) <= 0;
+  const outOfStock = item.availableStock <= 0;
 
   if (!product) return null;
 
@@ -49,7 +49,7 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove, onSaveForLater, 
           {outOfStock && <p className="mt-1 text-xs font-semibold text-red-500">Out of stock</p>}
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <QuantitySelector value={item.quantity} onChange={onUpdateQuantity} max={Math.max(variant?.stock ?? 10, 1)} />
+          <QuantitySelector value={item.quantity} onChange={onUpdateQuantity} max={Math.max(item.availableStock, 1)} />
           <p className="font-semibold">{formatCurrency(price * item.quantity)}</p>
         </div>
         <div className="flex gap-4 text-xs">

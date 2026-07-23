@@ -1,6 +1,5 @@
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
-import { CompareBar } from '@/components/product/CompareBar';
 import { AnimatedOutlet, useOuterTransitionKey } from '@/components/common/PageTransition';
 
 export function MainLayout() {
@@ -13,7 +12,6 @@ export function MainLayout() {
         <AnimatedOutlet transitionKey={transitionKey} />
       </main>
       <Footer />
-      <CompareBar />
     </div>
   );
 }

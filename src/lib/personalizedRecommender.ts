@@ -68,8 +68,11 @@ export async function buildPersonalizedRecommendations(inputs: RecommendationInp
 
   const pool = await productService.list({ categorySlugs: topCategorySlugs, sort: 'rating', pageSize: CANDIDATE_POOL_SIZE });
 
+  // Stock now lives in a separate inventory doc (see types/database.ts), not on Product — checking
+  // it for every candidate here would mean a batch of extra reads just to build a recommendation
+  // list. Out-of-stock items still get recommended; the PDP/cart are where stock is actually enforced.
   const scored = pool.items
-    .filter((p) => !excludeIds.has(p.id) && p.total_stock > 0)
+    .filter((p) => !excludeIds.has(p.id))
     .map((product) => {
       let score = (categoryScores.get(product.category?.slug ?? '') ?? 0) * 2 + (brandScores.get(product.brand_id) ?? 0) * 2 + product.rating / 5;
       if (topBrandIds.has(product.brand_id)) score += 1;

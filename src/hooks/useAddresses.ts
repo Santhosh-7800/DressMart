@@ -6,18 +6,20 @@ import { useAuth } from '@/contexts/AuthContext';
 import type { Address } from '@/types';
 
 export function useAddresses() {
-  const { identityId } = useAuth();
+  const { user, isAuthenticated } = useAuth();
+  const userId = user?.id ?? '';
   const queryClient = useQueryClient();
 
   const query = useQuery({
-    queryKey: [...queryKeys.addresses.all, identityId],
-    queryFn: () => addressService.list(identityId),
+    queryKey: [...queryKeys.addresses.all, userId],
+    queryFn: () => addressService.list(userId),
+    enabled: isAuthenticated,
   });
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: [...queryKeys.addresses.all, identityId] });
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: [...queryKeys.addresses.all, userId] });
 
   const addAddress = useMutation({
-    mutationFn: (address: Omit<Address, 'id' | 'user_id'>) => addressService.add(identityId, address),
+    mutationFn: (address: Omit<Address, 'id' | 'user_id'>) => addressService.add(userId, address),
     onSuccess: () => {
       invalidate();
       toast.success('Address saved');
@@ -25,7 +27,7 @@ export function useAddresses() {
   });
 
   const updateAddress = useMutation({
-    mutationFn: ({ addressId, updates }: { addressId: string; updates: Partial<Address> }) => addressService.update(identityId, addressId, updates),
+    mutationFn: ({ addressId, updates }: { addressId: string; updates: Partial<Address> }) => addressService.update(userId, addressId, updates),
     onSuccess: () => {
       invalidate();
       toast.success('Address updated');
@@ -33,7 +35,7 @@ export function useAddresses() {
   });
 
   const removeAddress = useMutation({
-    mutationFn: (addressId: string) => addressService.remove(identityId, addressId),
+    mutationFn: (addressId: string) => addressService.remove(userId, addressId),
     onSuccess: () => {
       invalidate();
       toast('Address removed', { icon: '🗑️' });

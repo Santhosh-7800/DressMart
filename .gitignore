@@ -24,5 +24,8 @@ pnpm-debug.log*
 .DS_Store
 Thumbs.db
 
-# generated seed output (large, regenerate via scripts/seed.ts)
-supabase/seed/generated
+# firebase emulators
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+.firebase/

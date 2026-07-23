@@ -43,32 +43,35 @@ const PROJECT_ID = process.env.VITE_FIREBASE_PROJECT_ID || process.env.GCLOUD_PR
 if (!process.env.FIRESTORE_EMULATOR_HOST && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
   console.error(
     '\n✖ No Firestore target configured.\n' +
-      '  Either start the emulators and set FIRESTORE_EMULATOR_HOST=localhost:8080, or set\n' +
+      '  Either start the emulators and set FIRESTORE_EMULATOR_HOST=localhost:8081, or set\n' +
       '  GOOGLE_APPLICATION_CREDENTIALS to a service-account JSON key for a real project.\n',
   );
   process.exit(1);
 }
 
 initializeApp({ projectId: PROJECT_ID });
-const db = getFirestore();
+/** Exported so other seed scripts (e.g. seedCuratedFormalShirts.ts) reuse this same app/db instance
+ *  instead of calling initializeApp() a second time, which firebase-admin doesn't allow. */
+export const db = getFirestore();
 
 // --- Fictional seller roster the seeded catalog is distributed across (no real Auth users behind
 // these — fine for storefront display; a real seller's own dashboard only ever queries their own
-// seller_id, so these never show up there). ---
-const SELLERS = [
+// seller_id, so these never show up there). Exported so other seed scripts (e.g.
+// seedCuratedFormalShirts.ts) distribute their products across the same roster consistently. ---
+export const SELLERS = [
   { id: 'seed-seller-northfield', name: 'Northfield Direct' },
   { id: 'seed-seller-urban-threadworks', name: 'Urban Threadworks Store' },
   { id: 'seed-seller-kids-world', name: 'Kids World Retail' },
   { id: 'seed-seller-dressmart-marketplace', name: 'DressMart Marketplace Co.' },
 ];
 
-function sellerFor(brandSlug: string): (typeof SELLERS)[number] {
+export function sellerFor(brandSlug: string): (typeof SELLERS)[number] {
   let hash = 0;
   for (let i = 0; i < brandSlug.length; i++) hash = (hash * 31 + brandSlug.charCodeAt(i)) >>> 0;
   return SELLERS[hash % SELLERS.length];
 }
 
-const PRICE_BANDS: Record<string, { min: number; max: number }> = {
+export const PRICE_BANDS: Record<string, { min: number; max: number }> = {
   shirt: { min: 799, max: 2999 },
   tshirt: { min: 399, max: 1799 },
   jeans: { min: 999, max: 3499 },
@@ -81,7 +84,7 @@ const PRICE_BANDS: Record<string, { min: number; max: number }> = {
 };
 const KIDS_PRICE_MULTIPLIER = 0.55;
 
-function washCareFor(material: string): string {
+export function washCareFor(material: string): string {
   if (material.includes('Wool')) return 'Dry clean only. Do not bleach. Iron on low heat.';
   if (material.includes('Denim')) return 'Machine wash cold, inside out. Do not tumble dry. Iron on reverse.';
   if (material.includes('Linen')) return 'Hand wash or gentle machine cycle. Line dry in shade. Iron while damp.';
@@ -276,7 +279,12 @@ async function main() {
   console.log(`\n✔ Seed complete — ${BRAND_DEFS.length} brands, ${allCategoryDefs.length + 2} categories, ${productCount} products + matching inventory docs.`);
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+// Guarded so other seed scripts can import this module's exports (SELLERS, sellerFor, PRICE_BANDS,
+// washCareFor) without re-triggering the full catalog seed as a side effect.
+import { pathToFileURL } from 'node:url';
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  main().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}

@@ -48,8 +48,8 @@ By default (`VITE_USE_FIREBASE_EMULATOR=true` in `.env`, or simply no real Fireb
 ### Running against the emulators
 
 1. Install the Firebase CLI if you don't have it: `npm install -g firebase-tools`, then `firebase login`.
-2. In one terminal: `npm run emulators` (starts Auth, Firestore, Storage, and Functions emulators + the Emulator UI at `http://localhost:4000`).
-3. Seed some data: `npm run seed` — writes brands/categories/products/inventory across a handful of fictional sellers into the Firestore emulator (uses `firebase-admin`, so it needs `FIRESTORE_EMULATOR_HOST=localhost:8080` set, which the script does for you when the emulator is running locally).
+2. In one terminal: `npm run emulators` (starts Auth on 9099, Firestore on 8081, Storage on 9199, Functions on 5001, and the Emulator UI at `http://localhost:4000`; data is imported/exported from `.emulator-data/` on start/stop, so a graceful restart doesn't wipe your seeded catalog — a forceful kill will).
+3. Seed some data: `FIRESTORE_EMULATOR_HOST=localhost:8081 npm run seed` — writes brands/categories/products/inventory across a handful of fictional sellers into the Firestore emulator (`firebase-admin` auto-detects that env var and talks to the emulator instead of a real project). The emulator suite persists its data across restarts (see `npm run emulators` below), so you don't need to re-seed every time — only after wiping `.emulator-data/` or seeding a fresh project.
 4. In another terminal: `npm run dev`.
 
 ### Connecting a real Firebase project
@@ -137,6 +137,7 @@ firestore.rules / firestore.indexes.json / storage.rules / firebase.json
 | `npm run lint` | Run ESLint |
 | `npm run typecheck` | Type-check without emitting |
 | `npm run seed` | Seed Firestore (emulator or real project) with a generated catalog |
+| `npm run seed:curated-formal-shirts` | Seed/update the hand-verified Formal Shirt products from `src/lib/productImages.ts`'s `REAL_PRODUCT_PHOTOGRAPHY` map — additive/idempotent, never touches the rest of the catalog (see `scripts/seedCuratedFormalShirts.ts`'s own docstring for the pattern to follow when curating another category/batch this way) |
 | `npm run emulators` | Start the local Firebase Emulator Suite |
 
 ---

@@ -131,7 +131,7 @@ interface PhotographyEntry {
  * generated colors are overridden to match, so what the customer sees always agrees with what's
  * photographed. Products not listed here show only the shared placeholder.
  */
-const REAL_PRODUCT_PHOTOGRAPHY: Record<string, PhotographyEntry> = {
+export const REAL_PRODUCT_PHOTOGRAPHY: Record<string, PhotographyEntry> = {
   // Sage green + teal — same tattooed, man-bun model, same stone balcony background, same pose
   // across both codes: one product, two colors.
   'ashworth-studio-signature-skinny-fit-formal-shirt-formal-shirts-150': {

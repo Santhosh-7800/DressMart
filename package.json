@@ -12,9 +12,10 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "seed": "tsx scripts/seedFirestore.ts",
+    "seed:curated-formal-shirts": "tsx scripts/seedCuratedFormalShirts.ts",
     "typecheck": "tsc -b --noEmit",
     "images:scan": "tsx scripts/generateImageManifest.ts",
-    "emulators": "firebase emulators:start"
+    "emulators": "firebase emulators:start --import=./.emulator-data --export-on-exit=./.emulator-data"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

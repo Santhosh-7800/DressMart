@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { brandService, categoryService, productService } from '@/services/productService';
 import { reviewService } from '@/services/reviewService';
@@ -19,6 +20,29 @@ export function useProduct(slug: string | undefined) {
     queryFn: () => productService.getBySlug(slug as string),
     enabled: Boolean(slug),
   });
+}
+
+/**
+ * Realtime subscription on the product doc itself — layered on top of the cache-backed
+ * `useProduct(slug)` first paint so a seller's price/status/image/color/stock-threshold edit shows
+ * up on the PDP immediately, without a refetch or page refresh. Returns `undefined` until the
+ * first snapshot arrives (or immediately if no id is given yet); the caller should merge this with
+ * the initial query result, e.g. `liveProduct ?? initialProduct`.
+ */
+export function useProductRealtime(productId: string | null | undefined) {
+  const [product, setProduct] = useState<Product | null | undefined>(undefined);
+
+  useEffect(() => {
+    if (!productId) {
+      setProduct(undefined);
+      return;
+    }
+    setProduct(undefined);
+    const unsubscribe = productService.subscribeToProduct(productId, setProduct);
+    return unsubscribe;
+  }, [productId]);
+
+  return { data: product, isLoading: product === undefined };
 }
 
 export function useRelatedProducts(product: Product | null | undefined) {

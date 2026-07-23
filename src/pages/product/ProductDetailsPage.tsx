@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Heart, Share2, Truck, RotateCcw, ShieldCheck, ChevronDown } from 'lucide-react';
+import { Heart, Share2, Truck, RotateCcw, ShieldCheck, ChevronDown, Info, AlertTriangle, Store } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { ProductGallery } from '@/components/product/ProductGallery';
 import { ColorSwatches } from '@/components/product/ColorSwatches';
@@ -18,7 +18,7 @@ import { ReviewCard } from '@/components/product/ReviewCard';
 import { WriteReviewForm } from '@/components/product/WriteReviewForm';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ProductImage } from '@/components/ui/ProductImage';
-import { useFrequentlyBoughtTogether, useProduct, useRatingSummary, useRelatedProducts, useReviews } from '@/hooks/useProducts';
+import { useFrequentlyBoughtTogether, useProduct, useProductRealtime, useRatingSummary, useRelatedProducts, useReviews } from '@/hooks/useProducts';
 import { useInventoryRealtime } from '@/hooks/useInventory';
 import { useRecentlyViewed } from '@/hooks/useRecentlyViewed';
 import { useCart } from '@/hooks/useCart';
@@ -43,7 +43,12 @@ function Accordion({ title, children, defaultOpen = false }: { title: string; ch
 export function ProductDetailsPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const { data: product, isLoading } = useProduct(slug);
+  // First paint comes from the cache-backed getBySlug query; once that resolves an id, the
+  // realtime subscription below takes over as the source of truth, so a seller's price/status/
+  // image/color/stock-threshold edit shows up live without a refetch or page refresh.
+  const { data: initialProduct, isLoading } = useProduct(slug);
+  const { data: liveProduct } = useProductRealtime(initialProduct?.id);
+  const product = liveProduct ?? initialProduct;
   const relatedQuery = useRelatedProducts(product);
   const fbtQuery = useFrequentlyBoughtTogether(product);
   const reviewsQuery = useReviews(product?.id);
@@ -76,11 +81,16 @@ export function ProductDetailsPage() {
 
   const sizesForColor = useMemo(() => {
     if (!product || !activeColor) return [];
+    const threshold = inventory?.low_stock_threshold ?? 5;
     // While inventory is still loading, assume in-stock rather than flashing every size as
     // sold-out for a frame — the realtime subscription corrects this the instant it resolves.
     return product.variants
       .filter((v) => v.color === activeColor)
-      .map((v) => ({ size: v.size, inStock: inventory === undefined ? true : (inventory?.variant_stock[v.id] ?? 0) > 0 }));
+      .map((v) => {
+        const stockCount = inventory?.variant_stock[v.id] ?? 0;
+        const inStock = inventory === undefined ? true : stockCount > 0;
+        return { size: v.size, inStock, stockCount, isLowStock: inStock && stockCount > 0 && stockCount <= threshold };
+      });
   }, [product, activeColor, inventory]);
 
   const activeVariant = useMemo(
@@ -88,7 +98,7 @@ export function ProductDetailsPage() {
     [product, activeColor, activeSize],
   );
 
-  if (isLoading || !product) {
+  if (isLoading) {
     return (
       <div className="container-app py-8">
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
@@ -104,9 +114,32 @@ export function ProductDetailsPage() {
     );
   }
 
+  // Covers both "never existed" (initial getBySlug fetch came back empty) and "removed while the
+  // buyer was looking at it" (the realtime subscription's next snapshot reports the doc gone).
+  if (!product) {
+    return (
+      <div className="container-app py-16 text-center">
+        <p className="text-lg font-semibold">Product not found</p>
+        <p className="mt-1 text-sm text-primary-400">This product may have been removed or is no longer available.</p>
+        <Button className="mt-4" onClick={() => navigate('/')}>Back to Home</Button>
+      </div>
+    );
+  }
+
+  // Overall product-level unavailability — a seller can mark the whole product out_of_stock (or
+  // every variant can independently read zero) even if the per-selected-variant stock below looks
+  // fine for a stale selection; either condition must block checkout, not just an empty variant.
+  const productUnavailable = product.status === 'out_of_stock' || (inventory !== undefined && inventory !== null && inventory.total_stock <= 0);
   const activeVariantStock = activeVariant ? (inventory?.variant_stock[activeVariant.id] ?? 0) : 0;
+  const lowStockThreshold = inventory?.low_stock_threshold ?? 5;
+  const isActiveVariantLowStock = activeVariantStock > 0 && activeVariantStock <= lowStockThreshold;
+  const canTransact = !productUnavailable && (!activeVariant || activeVariantStock > 0);
 
   const handleAddToCart = async () => {
+    if (productUnavailable) {
+      toast.error('This product is currently out of stock');
+      return;
+    }
     if (!activeSize) {
       toast.error('Please select a size');
       return;
@@ -119,6 +152,10 @@ export function ProductDetailsPage() {
   };
 
   const handleBuyNow = async () => {
+    if (productUnavailable) {
+      toast.error('This product is currently out of stock');
+      return;
+    }
     if (!activeSize) {
       toast.error('Please select a size');
       return;
@@ -166,6 +203,11 @@ export function ProductDetailsPage() {
           <div className="mt-4">
             <PriceTag price={activeVariant?.price_override ?? product.price} mrp={product.mrp} discountPercent={product.discount_percent} size="lg" />
             <p className="mt-1 text-xs text-primary-400">Inclusive of all taxes</p>
+            {product.seller_name && (
+              <p className="mt-1 flex items-center gap-1 text-xs text-primary-400">
+                <Store size={12} /> Sold by <span className="font-medium text-primary-600 dark:text-primary-300">{product.seller_name}</span>
+              </p>
+            )}
           </div>
 
           <div className="mt-6 space-y-5">
@@ -178,17 +220,43 @@ export function ProductDetailsPage() {
             />
           </div>
 
+          {/* Stock-status banner for the currently selected color+size combo (or the product as a
+              whole, when it's unavailable outright) — the buttons below stay in sync with this. */}
+          {productUnavailable ? (
+            <div className="mt-4 flex items-center gap-2 rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 dark:bg-red-900/20 dark:text-red-400">
+              <AlertTriangle size={16} /> Out of Stock — this product is currently unavailable
+            </div>
+          ) : activeVariant && activeVariantStock <= 0 ? (
+            <div className="mt-4 flex items-center gap-2 rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 dark:bg-red-900/20 dark:text-red-400">
+              <AlertTriangle size={16} /> This size is out of stock
+            </div>
+          ) : activeVariant && isActiveVariantLowStock ? (
+            <div className="mt-4 flex items-center gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-600 dark:bg-amber-900/20 dark:text-amber-400">
+              <AlertTriangle size={16} /> Low Stock — only {activeVariantStock} left
+            </div>
+          ) : activeVariant ? (
+            <div className="mt-4 flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400">
+              In Stock
+            </div>
+          ) : null}
+
+          {product.cod_available === false && (
+            <div className="mt-3 flex items-center gap-2 text-xs text-primary-400">
+              <Info size={13} /> Cash on Delivery is not available for this item
+            </div>
+          )}
+
           <div className="mt-6 flex gap-3">
-            {inventory !== undefined && inventory !== null && inventory.total_stock <= 0 ? (
+            {productUnavailable ? (
               <div className="flex h-12 flex-1 items-center justify-center rounded-xl bg-primary-100 text-sm font-semibold text-red-500 dark:bg-primary-800">
                 Out of Stock
               </div>
             ) : (
               <>
-                <Button variant="outline" size="lg" fullWidth onClick={handleAddToCart}>
+                <Button variant="outline" size="lg" fullWidth onClick={handleAddToCart} disabled={!canTransact}>
                   Add to Cart
                 </Button>
-                <Button variant="accent" size="lg" fullWidth onClick={handleBuyNow}>
+                <Button variant="accent" size="lg" fullWidth onClick={handleBuyNow} disabled={!canTransact}>
                   Buy Now
                 </Button>
               </>
@@ -227,8 +295,8 @@ export function ProductDetailsPage() {
             </Accordion>
             <Accordion title="Specifications">
               <dl className="grid grid-cols-2 gap-y-2 text-sm">
-                <dt className="text-primary-400">Material</dt>
-                <dd>{product.specifications.material}</dd>
+                <dt className="text-primary-400">Fabric</dt>
+                <dd>{product.specifications.fabric}</dd>
                 <dt className="text-primary-400">Fit</dt>
                 <dd>{product.specifications.fit}</dd>
                 {product.specifications.pattern && (
@@ -237,13 +305,33 @@ export function ProductDetailsPage() {
                     <dd>{product.specifications.pattern}</dd>
                   </>
                 )}
+                {product.specifications.sleeve && (
+                  <>
+                    <dt className="text-primary-400">Sleeve</dt>
+                    <dd>{product.specifications.sleeve}</dd>
+                  </>
+                )}
+                {product.specifications.collar && (
+                  <>
+                    <dt className="text-primary-400">Collar</dt>
+                    <dd>{product.specifications.collar}</dd>
+                  </>
+                )}
+                {product.specifications.occasion && (
+                  <>
+                    <dt className="text-primary-400">Occasion</dt>
+                    <dd>{product.specifications.occasion}</dd>
+                  </>
+                )}
                 <dt className="text-primary-400">Country of Origin</dt>
                 <dd>{product.specifications.country_of_origin}</dd>
               </dl>
             </Accordion>
-            <Accordion title="Wash Care">
-              <p>{product.specifications.wash_care}</p>
-            </Accordion>
+            {product.specifications.wash_care && (
+              <Accordion title="Wash Care">
+                <p>{product.specifications.wash_care}</p>
+              </Accordion>
+            )}
             <Accordion title="Return Policy">
               <p>This item is eligible for free returns within 7 days of delivery. Refunds are processed within 5-7 business days after we receive the returned item.</p>
             </Accordion>
@@ -260,7 +348,7 @@ export function ProductDetailsPage() {
             {[product, ...fbtQuery.data].map((p) => (
               <ProductImage
                 key={p.id}
-                src={p.imageUrl ?? p.images[0]?.url}
+                src={p.coverImage || p.imageUrl || p.images[0]?.url}
                 alt={p.name}
                 className="h-28 w-24 rounded-lg border border-primary-100 dark:border-primary-700"
                 priority

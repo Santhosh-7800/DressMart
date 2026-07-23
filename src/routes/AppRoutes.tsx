@@ -61,6 +61,7 @@ const SellerReturnsPage = lazyWithRetry(() => import('@/pages/seller/SellerRetur
 const SellerExchangesPage = lazyWithRetry(() => import('@/pages/seller/SellerExchangesPage').then((m) => ({ default: m.SellerExchangesPage })));
 const SellerSettingsPage = lazyWithRetry(() => import('@/pages/seller/SellerSettingsPage').then((m) => ({ default: m.SellerSettingsPage })));
 const SellerSellersPage = lazyWithRetry(() => import('@/pages/seller/SellerSellersPage').then((m) => ({ default: m.SellerSellersPage })));
+const SellerAllProductsPage = lazyWithRetry(() => import('@/pages/seller/SellerAllProductsPage').then((m) => ({ default: m.SellerAllProductsPage })));
 const SellerAnalyticsPage = lazyWithRetry(() => import('@/pages/seller/SellerAnalyticsPage').then((m) => ({ default: m.SellerAnalyticsPage })));
 const SellerReportsPage = lazyWithRetry(() => import('@/pages/seller/SellerReportsPage').then((m) => ({ default: m.SellerReportsPage })));
 const SellerCouponsPage = lazyWithRetry(() => import('@/pages/seller/SellerCouponsPage').then((m) => ({ default: m.SellerCouponsPage })));
@@ -143,6 +144,7 @@ export function AppRoutes() {
             {/* Head Seller (Admin) only routes */}
             <Route element={<RequireHeadSeller />}>
               <Route path="/seller/sellers" element={<SellerSellersPage />} />
+              <Route path="/seller/all-products" element={<SellerAllProductsPage />} />
               <Route path="/seller/analytics" element={<SellerAnalyticsPage />} />
               <Route path="/seller/reports" element={<SellerReportsPage />} />
               <Route path="/seller/coupons" element={<SellerCouponsPage />} />

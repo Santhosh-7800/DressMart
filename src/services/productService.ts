@@ -5,27 +5,32 @@ import {
   getDoc,
   getDocs,
   limit as fsLimit,
+  onSnapshot,
   query,
   setDoc,
   updateDoc,
   where,
   type QueryConstraint,
+  type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { slugify, calculateDiscount } from '@/lib/utils';
 import { inventoryService } from './inventoryService';
+import { isActiveStatus } from '@/types';
 import type {
   Brand,
   Category,
   Gender,
+  Inventory,
   PaginatedResult,
   Product,
   ProductFacets,
   ProductFilters,
   ProductImage,
+  ProductStatus,
   ProductVariant,
 } from '@/types';
-import type { SellerProductInput } from '@/types/seller';
+import type { SellerProductColorInput, SellerProductInput } from '@/types/seller';
 
 const PRODUCTS_COLLECTION = 'products';
 const CATALOG_FETCH_LIMIT = 500; // safety valve on the bounded client-side-filtered fetch — see list() below.
@@ -131,43 +136,72 @@ function sortProducts(items: Product[], sort: ProductFilters['sort']): Product[]
 }
 
 /**
- * Builds the variant list from the seller's size/color selections. When editing, `existingVariants`
- * lets an unchanged size+color combo keep its original variant id — so its inventory.variant_stock
- * entry (keyed by variant id) stays attached instead of orphaning on every edit. A genuinely new
- * combo still gets a fresh id with no stock until the seller adds some via the Inventory page.
+ * Builds the variant list AND the per-variant stock map directly from the seller's per-color,
+ * per-size stock entries (one ProductVariant per (color, size) with a `sizeStock` entry — a size
+ * a color doesn't stock simply has no variant). When editing, `existingVariants` lets an unchanged
+ * combo keep its original variant id, so its inventory history/SKU stay stable across edits.
  */
-function buildVariantsFromInput(input: SellerProductInput, productId: string, existingVariants: ProductVariant[] = []): ProductVariant[] {
-  const sizes = input.sizes.length > 0 ? input.sizes : ['One Size'];
-  const colors = input.colors.length > 0 ? input.colors : [{ name: 'Default', hex: '#1a1a1a' }];
+function buildVariantsFromInput(
+  input: SellerProductInput,
+  productId: string,
+  existingVariants: ProductVariant[] = [],
+): { variants: ProductVariant[]; variantStock: Record<string, number> } {
+  const colors = input.colors.length > 0 ? input.colors : [{ name: 'Default', hex: '#1a1a1a', images: [], sizeStock: { 'One Size': 0 } }];
   const existingByCombo = new Map(existingVariants.map((v) => [`${v.color}::${v.size}`, v]));
   const variants: ProductVariant[] = [];
+  const variantStock: Record<string, number> = {};
+
   colors.forEach((color, colorIdx) => {
+    const sizes = Object.keys(color.sizeStock).length > 0 ? Object.keys(color.sizeStock) : ['One Size'];
     sizes.forEach((size, sizeIdx) => {
       const existing = existingByCombo.get(`${color.name}::${size}`);
+      const id = existing?.id ?? `${productId}-v-${colorIdx}-${sizeIdx}`;
       variants.push({
-        id: existing?.id ?? `${productId}-v-${colorIdx}-${sizeIdx}`,
+        id,
         size,
         color: color.name,
         color_hex: color.hex,
         sku: existing?.sku ?? `${input.sku}-${color.name.replace(/\s+/g, '').slice(0, 4).toUpperCase()}-${size.replace(/\s+/g, '')}`,
         price_override: existing?.price_override ?? null,
       });
+      variantStock[id] = Math.max(0, Math.round(color.sizeStock[size] ?? 0));
     });
   });
-  return variants;
+
+  return { variants, variantStock };
 }
 
-/** Splits the seller's single stock_quantity evenly across every variant, remainder to the first few — kept simple per spec. */
-function splitStockAcrossVariants(totalStock: number, variants: ProductVariant[]): Record<string, number> {
-  const count = variants.length || 1;
-  const base = Math.floor(totalStock / count);
-  let remainder = totalStock - base * count;
-  const stock: Record<string, number> = {};
-  variants.forEach((v) => {
-    stock[v.id] = base + (remainder > 0 ? 1 : 0);
-    if (remainder > 0) remainder--;
+/** Flattens each color's images (in color order) into the product's `images: ProductImage[]`, capped at 10 total. */
+function buildImagesFromColors(colors: SellerProductColorInput[], productId: string, productName: string): ProductImage[] {
+  const images: ProductImage[] = [];
+  colors.forEach((color) => {
+    color.images.forEach((url) => {
+      if (images.length >= 10) return;
+      images.push({ id: `${productId}-img-${images.length}`, url, alt: productName, color: color.name, sort_order: images.length });
+    });
   });
-  return stock;
+  return images;
+}
+
+/**
+ * Reconstructs the seller form's per-color input (name/hex/images/per-size stock) from a saved
+ * Product + its Inventory doc — powers prefilling the Edit Product form.
+ */
+export function toColorInputs(product: Product, inventory: Inventory | null): SellerProductColorInput[] {
+  const stock = inventory?.variant_stock ?? {};
+  const byColor = new Map<string, SellerProductColorInput>();
+  product.variants.forEach((v) => {
+    if (!byColor.has(v.color)) {
+      byColor.set(v.color, {
+        name: v.color,
+        hex: v.color_hex,
+        images: product.images.filter((img) => img.color === v.color).map((img) => img.url),
+        sizeStock: {},
+      });
+    }
+    byColor.get(v.color)!.sizeStock[v.size] = stock[v.id] ?? 0;
+  });
+  return [...byColor.values()];
 }
 
 export const productService = {
@@ -342,8 +376,10 @@ export const productService = {
    *  taken from the signed-in seller, never trusted from the form (see firestore.rules). */
   async create(sellerId: string, sellerName: string, input: SellerProductInput): Promise<Product> {
     const ref = doc(collection(db, PRODUCTS_COLLECTION));
-    const variants = buildVariantsFromInput(input, ref.id);
+    const { variants, variantStock } = buildVariantsFromInput(input, ref.id);
+    const images = buildImagesFromColors(input.colors, ref.id, input.name);
     const now = new Date().toISOString();
+    const sku = input.sku.trim() || `SKU-${ref.id.slice(0, 8).toUpperCase()}`;
 
     const product: Product = {
       id: ref.id,
@@ -353,104 +389,138 @@ export const productService = {
       slug: slugify(`${input.name}-${ref.id.slice(0, 6)}`),
       brand_id: input.brand_id,
       category_id: input.category_id,
+      subcategory: input.subcategory || null,
       gender: input.gender,
       description: input.description,
-      sku: input.sku,
+      sku,
       mrp: input.mrp,
       price: input.price,
       discount_percent: calculateDiscount(input.mrp, input.price),
       gst_percent: input.gst_percent,
+      cod_available: input.cod_available,
       rating: 0,
       rating_count: 0,
-      is_active: input.is_active,
+      status: input.status,
+      is_active: isActiveStatus(input.status),
       is_bestseller: false,
       is_new_arrival: true,
       is_trending: false,
+      is_featured: false,
       is_deal_of_day: false,
       deal_ends_at: null,
       is_return_eligible: input.is_return_eligible,
       is_exchange_eligible: input.is_exchange_eligible,
       specifications: {
-        material: input.material,
+        fabric: input.fabric,
         fit: input.fit,
-        wash_care: input.wash_care,
+        pattern: input.pattern || undefined,
+        sleeve: input.sleeve || undefined,
+        collar: input.collar || undefined,
+        occasion: input.occasion || undefined,
         country_of_origin: 'India',
       },
-      tags: [...new Set([...input.colors.map((c) => c.name.toLowerCase()), ...input.sizes.map((s) => s.toLowerCase())])],
+      tags: [...new Set(input.colors.map((c) => c.name.toLowerCase()))],
       video_url: null,
+      coverImage: images[0]?.url ?? '',
       created_at: now,
       updated_at: now,
-      images: input.images.map((url, idx): ProductImage => ({ id: `${ref.id}-img-${idx}`, url, alt: input.name, color: null, sort_order: idx })),
+      images,
       variants,
     };
 
     await setDoc(ref, product);
-    await inventoryService.createInventory(ref.id, sellerId, splitStockAcrossVariants(input.stock_quantity, variants), input.low_stock_threshold);
+    await inventoryService.createInventory(ref.id, sellerId, variantStock, input.low_stock_threshold);
 
     const [hydrated] = await hydrate([product]);
     return hydrated;
   },
 
   /**
-   * Updates an existing product owned by the caller. Reuses variant ids for unchanged size/color
-   * combos (see buildVariantsFromInput) so existing per-variant stock survives an edit. If the
-   * seller entered a non-zero stock_quantity, that many units are split across brand-new variant
-   * combos only (existing combos' stock is left untouched — use the Inventory page to adjust those).
+   * Updates an existing product owned by the caller. Reuses variant ids for unchanged color/size
+   * combos (see buildVariantsFromInput) so existing per-variant stock survives an edit; a combo's
+   * stock is always taken directly from the submitted per-color sizeStock (the Inventory page is
+   * for quick stock-only tweaks — editing the product here is the source of truth for the full grid).
    */
   async update(productId: string, sellerId: string, sellerName: string, input: SellerProductInput): Promise<Product> {
     const existing = await this.getById(productId);
-    const variants = buildVariantsFromInput(input, productId, existing?.variants ?? []);
+    const { variants, variantStock } = buildVariantsFromInput(input, productId, existing?.variants ?? []);
+    const images = buildImagesFromColors(input.colors, productId, input.name);
+    const sku = input.sku.trim() || existing?.sku || `SKU-${productId.slice(0, 8).toUpperCase()}`;
+
     const updates: Partial<Product> = {
       seller_id: sellerId,
       seller_name: sellerName,
       name: input.name,
       brand_id: input.brand_id,
       category_id: input.category_id,
+      subcategory: input.subcategory || null,
       gender: input.gender,
       description: input.description,
-      sku: input.sku,
+      sku,
       mrp: input.mrp,
       price: input.price,
       discount_percent: calculateDiscount(input.mrp, input.price),
       gst_percent: input.gst_percent,
-      is_active: input.is_active,
+      cod_available: input.cod_available,
+      status: input.status,
+      is_active: isActiveStatus(input.status),
       is_return_eligible: input.is_return_eligible,
       is_exchange_eligible: input.is_exchange_eligible,
       specifications: {
-        material: input.material,
+        fabric: input.fabric,
         fit: input.fit,
-        wash_care: input.wash_care,
+        pattern: input.pattern || undefined,
+        sleeve: input.sleeve || undefined,
+        collar: input.collar || undefined,
+        occasion: input.occasion || undefined,
         country_of_origin: 'India',
       },
-      tags: [...new Set([...input.colors.map((c) => c.name.toLowerCase()), ...input.sizes.map((s) => s.toLowerCase())])],
+      tags: [...new Set(input.colors.map((c) => c.name.toLowerCase()))],
       updated_at: new Date().toISOString(),
-      images: input.images.map((url, idx): ProductImage => ({ id: `${productId}-img-${idx}`, url, alt: input.name, color: null, sort_order: idx })),
+      coverImage: images[0]?.url ?? existing?.coverImage ?? '',
+      images,
       variants,
     };
     await updateDoc(doc(db, PRODUCTS_COLLECTION, productId), updates);
-
-    if (input.stock_quantity > 0) {
-      const existingVariantIds = new Set((existing?.variants ?? []).map((v) => v.id));
-      const brandNewVariants = variants.filter((v) => !existingVariantIds.has(v.id));
-      if (brandNewVariants.length > 0) {
-        const inventory = await inventoryService.getInventory(productId);
-        const additional = splitStockAcrossVariants(input.stock_quantity, brandNewVariants);
-        const mergedStock = { ...(inventory?.variant_stock ?? {}), ...additional };
-        await inventoryService.updateStock(productId, mergedStock, input.low_stock_threshold);
-      }
-    }
+    await inventoryService.updateStock(productId, variantStock, input.low_stock_threshold);
 
     const product = await this.getById(productId);
     if (!product) throw new Error('Product not found after update.');
     return product;
   },
 
-  async setActive(productId: string, isActive: boolean): Promise<void> {
-    await updateDoc(doc(db, PRODUCTS_COLLECTION, productId), { is_active: isActive, updated_at: new Date().toISOString() });
+  /** Sets the merchandising status directly (draft/active/out_of_stock/hidden) — used by the Seller
+   *  Products list's quick publish/hide actions and the Head Seller's "hide any product" action. */
+  async setStatus(productId: string, status: ProductStatus): Promise<void> {
+    await updateDoc(doc(db, PRODUCTS_COLLECTION, productId), { status, is_active: isActiveStatus(status), updated_at: new Date().toISOString() });
+  },
+
+  /** Head-Seller-only "Feature this product" toggle. */
+  async setFeatured(productId: string, featured: boolean): Promise<void> {
+    await updateDoc(doc(db, PRODUCTS_COLLECTION, productId), { is_featured: featured, updated_at: new Date().toISOString() });
   },
 
   async remove(productId: string): Promise<void> {
     await deleteDoc(doc(db, PRODUCTS_COLLECTION, productId));
+  },
+
+  /** Every product in the catalog, any seller, any status — powers the Head Seller's "All Products" page. */
+  async listAll(): Promise<Product[]> {
+    const snap = await getDocs(query(collection(db, PRODUCTS_COLLECTION), fsLimit(1000)));
+    const items = snap.docs.map((d) => d.data() as Product).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    return hydrate(items);
+  },
+
+  /** Realtime subscription — the PDP subscribes so a seller's price/status/image/color edit shows up immediately, no refresh needed. */
+  subscribeToProduct(productId: string, callback: (product: Product | null) => void): Unsubscribe {
+    return onSnapshot(doc(db, PRODUCTS_COLLECTION, productId), async (snap) => {
+      if (!snap.exists()) {
+        callback(null);
+        return;
+      }
+      const [hydrated] = await hydrate([snap.data() as Product]);
+      callback(hydrated);
+    });
   },
 };
 

@@ -73,6 +73,14 @@ export function generateOrderNumber(): string {
   return `DM-${year}-${rand}`;
 }
 
+/** Auto-generated SKU for a seller who leaves the SKU field blank, e.g. "TSH-BRD-4F2A1". */
+export function generateSku(categoryName: string, brandName: string): string {
+  const catPart = (categoryName || 'GEN').replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase() || 'GEN';
+  const brandPart = (brandName || 'DM').replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase() || 'DM';
+  const suffix = Math.random().toString(36).slice(2, 7).toUpperCase();
+  return `${catPart}-${brandPart}-${suffix}`;
+}
+
 /** Short, shareable referral code derived from the user's name, e.g. "JOHN4F2A". */
 export function generateReferralCode(fullName: string): string {
   const initials = fullName

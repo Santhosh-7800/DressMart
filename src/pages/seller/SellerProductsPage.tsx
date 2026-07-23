@@ -1,8 +1,8 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Plus, Search, Copy, Eye, EyeOff, Trash2, Pencil, Upload, Download, AlertTriangle, PackageSearch } from 'lucide-react';
+import { Plus, Search, Eye, EyeOff, Trash2, Pencil, AlertTriangle, PackageSearch } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -10,57 +10,44 @@ import { Pagination } from '@/components/ui/Pagination';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useAuth } from '@/contexts/AuthContext';
-import {
-  useSellerProducts,
-  useCreateProduct,
-  useSetProductActive,
-  useDeleteProduct,
-} from '@/hooks/useSellerProducts';
+import { useSellerProducts, useSetProductStatus, useDeleteProduct } from '@/hooks/useSellerProducts';
 import { inventoryService } from '@/services/inventoryService';
-import { parseCsvToRecords } from '@/lib/csv';
 import { formatCurrency, cn } from '@/lib/utils';
-import type { Product, SellerProductInput } from '@/types';
+import type { ProductStatus } from '@/types';
 
 const PAGE_SIZE = 20;
 
-function csvRowToInput(row: Record<string, string>): SellerProductInput {
-  return {
-    name: row.name ?? '',
-    sku: row.sku ?? '',
-    brand_id: row.brand_id ?? '',
-    category_id: row.category_id ?? '',
-    gender: (row.gender === 'kids' ? 'kids' : 'men') as 'men' | 'kids',
-    description: row.description ?? '',
-    price: Number(row.price) || 0,
-    mrp: Number(row.mrp) || Number(row.price) || 0,
-    gst_percent: Number(row.gst_percent) || 5,
-    material: row.material ?? '',
-    fit: row.fit ?? '',
-    wash_care: row.wash_care ?? '',
-    sizes: (row.sizes ?? '').split('|').map((s) => s.trim()).filter(Boolean),
-    colors: (row.colors ?? '')
-      .split('|')
-      .map((c) => c.trim())
-      .filter(Boolean)
-      .map((name) => ({ name, hex: '#888888' })),
-    stock_quantity: Number(row.stock_quantity) || 0,
-    low_stock_threshold: Number(row.low_stock_threshold) || 5,
-    images: [],
-    is_active: row.is_active !== 'false',
-    is_return_eligible: row.is_return_eligible !== 'false',
-    is_exchange_eligible: row.is_exchange_eligible !== 'false',
-  };
-}
+const STATUS_TABS: { value: ProductStatus | 'all'; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'active', label: 'Active' },
+  { value: 'out_of_stock', label: 'Out of Stock' },
+  { value: 'hidden', label: 'Hidden' },
+];
+
+const STATUS_BADGE_CLASS: Record<ProductStatus, string> = {
+  draft: 'badge bg-primary-100 text-primary-600 dark:bg-primary-700 dark:text-primary-200',
+  active: 'badge-success',
+  out_of_stock: 'badge bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+  hidden: 'badge-danger',
+};
+
+const STATUS_LABEL: Record<ProductStatus, string> = {
+  draft: 'Draft',
+  active: 'Active',
+  out_of_stock: 'Out of Stock',
+  hidden: 'Hidden',
+};
 
 export function SellerProductsPage() {
   const { user } = useAuth();
   const isPending = user?.seller_status === 'pending';
   const isSuspendedOrRejected = user?.seller_status === 'suspended' || user?.seller_status === 'rejected';
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<ProductStatus | 'all'>('all');
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: allProducts = [], isLoading: isLoadingProducts } = useSellerProducts();
   const { data: inventoryMap = {}, isLoading: isLoadingInventory } = useQuery({
@@ -69,13 +56,13 @@ export function SellerProductsPage() {
     enabled: allProducts.length > 0,
   });
 
-  const createProduct = useCreateProduct();
-  const setActive = useSetProductActive();
+  const setStatus = useSetProductStatus();
   const remove = useDeleteProduct();
 
   const isLoading = isLoadingProducts || isLoadingInventory;
 
   const filteredProducts = allProducts.filter((p) => {
+    if (statusFilter !== 'all' && p.status !== statusFilter) return false;
     const q = search.trim().toLowerCase();
     if (!q) return true;
     return p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q);
@@ -84,6 +71,11 @@ export function SellerProductsPage() {
   const total = filteredProducts.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const items = filteredProducts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const statusCounts = STATUS_TABS.reduce<Record<string, number>>((acc, tab) => {
+    acc[tab.value] = tab.value === 'all' ? allProducts.length : allProducts.filter((p) => p.status === tab.value).length;
+    return acc;
+  }, {});
 
   const toggleSelected = (id: string) => {
     setSelectedIds((prev) => {
@@ -98,71 +90,26 @@ export function SellerProductsPage() {
     setSelectedIds((prev) => (prev.size === items.length ? new Set() : new Set(items.map((p) => p.id))));
   };
 
-  const handleDuplicate = async (product: Product) => {
-    const input: SellerProductInput = {
-      name: `${product.name} (Copy)`,
-      sku: `${product.sku}-COPY`,
-      brand_id: product.brand_id,
-      category_id: product.category_id,
-      gender: product.gender,
-      description: product.description,
-      price: product.price,
-      mrp: product.mrp,
-      gst_percent: product.gst_percent,
-      material: product.specifications.material,
-      fit: product.specifications.fit,
-      wash_care: product.specifications.wash_care ?? '',
-      sizes: [...new Set(product.variants.map((v) => v.size))],
-      colors: [...new Map(product.variants.map((v) => [v.color, { name: v.color, hex: v.color_hex }])).values()],
-      stock_quantity: 0,
-      low_stock_threshold: inventoryMap[product.id]?.low_stock_threshold ?? 5,
-      images: product.images.map((i) => i.url),
-      is_return_eligible: product.is_return_eligible ?? true,
-      is_exchange_eligible: product.is_exchange_eligible ?? true,
-      is_active: false,
-    };
-    try {
-      await createProduct.mutateAsync(input);
-      toast.success('Product duplicated as a draft');
-    } catch (e: any) {
-      toast.error(e.message || 'Duplication failed');
-    }
-  };
-
-  const handleBulkAction = async (action: 'publish' | 'hide' | 'delete') => {
+  const handleBulkStatus = async (status: ProductStatus) => {
     setIsBulkProcessing(true);
     try {
-      if (action === 'delete') {
-        if (!confirm(`Delete ${selectedIds.size} product(s)? This cannot be undone.`)) return;
-        await Promise.all([...selectedIds].map((id) => remove.mutateAsync(id)));
-        toast.success('Selected products deleted');
-      } else {
-        const isActive = action === 'publish';
-        await Promise.all([...selectedIds].map((id) => setActive.mutateAsync({ productId: id, isActive })));
-        toast.success(`Selected products ${isActive ? 'published' : 'hidden'}`);
-      }
+      await Promise.all([...selectedIds].map((id) => setStatus.mutateAsync({ productId: id, status })));
       setSelectedIds(new Set());
-    } catch (err: any) {
-      toast.error(err.message || 'Bulk action failed');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Bulk action failed');
     } finally {
       setIsBulkProcessing(false);
     }
   };
 
-  const handleImportFile = async (file: File) => {
-    const text = await file.text();
-    const rows = parseCsvToRecords(text);
-    if (rows.length === 0) {
-      toast.error('No rows found in that CSV');
-      return;
-    }
-    const inputs = rows.map(csvRowToInput);
+  const handleBulkDelete = async () => {
+    if (!confirm(`Delete ${selectedIds.size} product(s)? This cannot be undone.`)) return;
     setIsBulkProcessing(true);
     try {
-      await Promise.all(inputs.map((input) => createProduct.mutateAsync(input)));
-      toast.success(`Successfully imported ${inputs.length} product(s)`);
-    } catch (err: any) {
-      toast.error(err.message || 'Import failed');
+      await Promise.all([...selectedIds].map((id) => remove.mutateAsync(id)));
+      setSelectedIds(new Set());
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Bulk delete failed');
     } finally {
       setIsBulkProcessing(false);
     }
@@ -174,32 +121,9 @@ export function SellerProductsPage() {
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">Products</h1>
         {!isPending && !isSuspendedOrRejected && (
-          <div className="flex flex-wrap gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleImportFile(file);
-                e.target.value = '';
-              }}
-            />
-            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} isLoading={isBulkProcessing}>
-              <Upload size={14} /> Bulk Import
-            </Button>
-            <a
-              href={`data:text/csv;charset=utf-8,${encodeURIComponent('name,sku,brand_id,category_id,gender,description,price,mrp,gst_percent,material,fit,wash_care,sizes,colors,stock_quantity,low_stock_threshold,is_active,is_return_eligible,is_exchange_eligible\n')}`}
-              download="product-import-template.csv"
-              className="btn-outline text-sm"
-            >
-              <Download size={14} /> CSV Template
-            </a>
-            <Link to="/seller/products/new" className="btn-accent text-sm">
-              <Plus size={15} /> Add Product
-            </Link>
-          </div>
+          <Link to="/seller/products/new" className="btn-accent text-sm">
+            <Plus size={15} /> Add Product
+          </Link>
         )}
       </div>
 
@@ -219,12 +143,31 @@ export function SellerProductsPage() {
           <AlertTriangle size={18} className="mt-0.5 shrink-0" />
           <div>
             <p className="font-semibold">Your seller account is {user?.seller_status}</p>
-            <p className="mt-0.5">
-              {user?.seller_status_reason ?? 'You cannot add or edit products while your account is in this state.'}
-            </p>
+            <p className="mt-0.5">{user?.seller_status_reason ?? 'You cannot add or edit products while your account is in this state.'}</p>
           </div>
         </div>
       )}
+
+      <div className="mb-4 flex flex-wrap gap-2">
+        {STATUS_TABS.map((tab) => (
+          <button
+            key={tab.value}
+            type="button"
+            onClick={() => {
+              setStatusFilter(tab.value);
+              setPage(1);
+            }}
+            className={cn(
+              'rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors',
+              statusFilter === tab.value
+                ? 'border-accent bg-accent-50 text-accent-700 dark:bg-accent-900/30'
+                : 'border-primary-200 text-primary-500 hover:bg-primary-50 dark:border-primary-600 dark:hover:bg-primary-800',
+            )}
+          >
+            {tab.label} ({statusCounts[tab.value] ?? 0})
+          </button>
+        ))}
+      </div>
 
       <div className="mb-4">
         <Input
@@ -241,28 +184,13 @@ export function SellerProductsPage() {
       {selectedIds.size > 0 && (
         <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl bg-accent-50 p-3 text-sm dark:bg-accent-900/20">
           <span className="font-medium">{selectedIds.size} selected</span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleBulkAction('publish')}
-            isLoading={isBulkProcessing}
-          >
+          <Button variant="outline" size="sm" onClick={() => handleBulkStatus('active')} isLoading={isBulkProcessing}>
             Bulk Publish
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleBulkAction('hide')}
-            isLoading={isBulkProcessing}
-          >
+          <Button variant="outline" size="sm" onClick={() => handleBulkStatus('hidden')} isLoading={isBulkProcessing}>
             Bulk Hide
           </Button>
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={() => handleBulkAction('delete')}
-            isLoading={isBulkProcessing}
-          >
+          <Button variant="danger" size="sm" onClick={handleBulkDelete} isLoading={isBulkProcessing}>
             Bulk Delete
           </Button>
         </div>
@@ -307,7 +235,7 @@ export function SellerProductsPage() {
                     <td className="p-3">
                       <div className="flex items-center gap-2.5">
                         <img
-                          src={product.imageUrl ?? product.images[0]?.url}
+                          src={product.coverImage || product.images[0]?.url}
                           alt=""
                           className="h-11 w-10 shrink-0 rounded-[16px] object-cover shadow-sm ring-1 ring-admin-border transition-transform duration-200 hover:scale-105"
                         />
@@ -318,27 +246,30 @@ export function SellerProductsPage() {
                     <td className="p-3">{formatCurrency(product.price)}</td>
                     <td className={cn('p-3', stock <= 0 && 'font-semibold text-red-500')}>{stock}</td>
                     <td className="p-3">
-                      <span className={product.is_active ? 'badge-success' : 'badge-danger'}>{product.is_active ? 'Published' : 'Hidden'}</span>
+                      <span className={STATUS_BADGE_CLASS[product.status]}>{STATUS_LABEL[product.status]}</span>
                     </td>
                     <td className="p-3">
                       <div className="flex items-center justify-end gap-1">
                         <Link to={`/seller/products/${product.id}/edit`} className="rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700" title="Edit">
                           <Pencil size={15} />
                         </Link>
-                        <button
-                          onClick={() => handleDuplicate(product)}
-                          className="rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700"
-                          title="Duplicate"
-                        >
-                          <Copy size={15} />
-                        </button>
-                        <button
-                          onClick={() => setActive.mutate({ productId: product.id, isActive: !product.is_active })}
-                          className="rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700"
-                          title={product.is_active ? 'Hide' : 'Publish'}
-                        >
-                          {product.is_active ? <EyeOff size={15} /> : <Eye size={15} />}
-                        </button>
+                        {product.status === 'active' ? (
+                          <button
+                            onClick={() => setStatus.mutate({ productId: product.id, status: 'hidden' })}
+                            className="rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700"
+                            title="Hide"
+                          >
+                            <EyeOff size={15} />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => setStatus.mutate({ productId: product.id, status: 'active' })}
+                            className="rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700"
+                            title="Publish"
+                          >
+                            <Eye size={15} />
+                          </button>
+                        )}
                         <button
                           onClick={() => {
                             if (confirm(`Delete "${product.name}"? This cannot be undone.`)) remove.mutate(product.id);

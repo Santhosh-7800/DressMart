@@ -20,8 +20,12 @@ export function ProductCard({ product, className }: ProductCardProps) {
   // Stock lives in its own inventory doc, not on Product — see types/database.ts. Loading/missing
   // inventory is treated as "in stock" rather than blocking the card on an extra round-trip.
   const { data: inventory } = useInventory(product.id);
-  const primaryImage = product.thumbnailUrl ?? product.imageUrl ?? product.images[0]?.url;
-  const isOutOfStock = inventory !== undefined && inventory !== null && inventory.total_stock <= 0;
+  // coverImage (first image, denormalized) is the fast-path thumbnail source; fall back to the
+  // pre-existing chain for older seed data that never got a coverImage populated.
+  const primaryImage = product.coverImage || product.thumbnailUrl || product.imageUrl || product.images[0]?.url;
+  // A seller can mark a product out_of_stock explicitly (still buyer-visible per is_active) even
+  // before the inventory doc itself reads zero — check both so the badge never lags.
+  const isOutOfStock = product.status === 'out_of_stock' || (inventory !== undefined && inventory !== null && inventory.total_stock <= 0);
 
   return (
     <motion.div
@@ -46,13 +50,20 @@ export function ProductCard({ product, className }: ProductCardProps) {
       )}
 
       <Link to={`/product/${product.slug}`} className="block">
-        <ProductImage
-          src={primaryImage}
-          alt={product.images[0]?.alt ?? product.name}
-          className="aspect-[4/5] w-full bg-primary-50 dark:bg-primary-800"
-          imgClassName={cn('transition-transform duration-300 group-hover:scale-105', isOutOfStock && 'opacity-50 grayscale')}
-          sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
-        />
+        <div className="relative overflow-hidden">
+          <ProductImage
+            src={primaryImage}
+            alt={product.images[0]?.alt ?? product.name}
+            className="aspect-[4/5] w-full bg-primary-50 dark:bg-primary-800"
+            imgClassName={cn('transition-transform duration-300 group-hover:scale-105', isOutOfStock && 'opacity-50 grayscale')}
+            sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+          />
+          {isOutOfStock && (
+            <div className="absolute inset-0 flex items-center justify-center bg-primary-950/40">
+              <span className="rounded-full bg-primary-950/80 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">Out of Stock</span>
+            </div>
+          )}
+        </div>
         <div className="space-y-1 p-3">
           <p className="truncate text-xs font-medium text-primary-400">{product.brand?.name}</p>
           <h3 className="line-clamp-2 min-h-[2.5rem] text-sm font-medium text-primary-900 dark:text-white">{product.name}</h3>

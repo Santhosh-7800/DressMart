@@ -188,7 +188,7 @@ function FeaturedCollections() {
             <p className="mb-2 font-semibold">{collection.title}</p>
             <div className="grid grid-cols-2 gap-1.5">
               {collection.products.slice(0, 4).map((p) => (
-                <ProductImage key={p.id} src={p.imageUrl ?? p.images[0]?.url} alt="" className="aspect-square rounded-lg" />
+                <ProductImage key={p.id} src={p.coverImage || p.imageUrl || p.images[0]?.url} alt="" className="aspect-square rounded-lg" />
               ))}
             </div>
           </Link>

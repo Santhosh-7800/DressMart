@@ -26,7 +26,7 @@ export function FlashSaleProductCard({ product, onExpire, className }: FlashSale
   const { isWishlisted, toggle } = useWishlist();
   const wishlisted = isWishlisted(product.id);
   const { data: inventory } = useInventory(product.id);
-  const primaryImage = product.thumbnailUrl ?? product.imageUrl ?? product.images[0]?.url;
+  const primaryImage = product.coverImage || product.thumbnailUrl || product.imageUrl || product.images[0]?.url;
 
   const totalStock = inventory?.total_stock ?? 0;
   const isSoldOut = inventory !== undefined && inventory !== null && totalStock <= 0;

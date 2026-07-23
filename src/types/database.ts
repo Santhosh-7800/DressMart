@@ -71,14 +71,26 @@ export interface ProductImage {
 }
 
 export interface ProductSpecifications {
-  material: string;
+  fabric: string;
   fit: string;
-  wash_care: string;
+  wash_care?: string;
   pattern?: string;
   sleeve?: string;
-  neck?: string;
+  collar?: string;
   occasion?: string;
   country_of_origin: string;
+}
+
+/**
+ * Merchandising status a seller/Head Seller sets explicitly. `is_active` (below) is derived from
+ * this — 'active' and 'out_of_stock' are both buyer-visible (an out-of-stock listing still shows,
+ * just marked unavailable, same as any real storefront), 'draft' and 'hidden' are not — so every
+ * existing `where('is_active', ...)` catalog query keeps working unchanged.
+ */
+export type ProductStatus = 'draft' | 'active' | 'out_of_stock' | 'hidden';
+
+export function isActiveStatus(status: ProductStatus): boolean {
+  return status === 'active' || status === 'out_of_stock';
 }
 
 export interface Product {
@@ -93,6 +105,8 @@ export interface Product {
   brand?: Brand;
   category_id: string;
   category?: Category;
+  /** Free-text sub-category (e.g. "Polo Shirts" under "Shirts") — no dedicated taxonomy collection. */
+  subcategory: string | null;
   gender: Gender;
   description: string;
   sku: string;
@@ -101,12 +115,18 @@ export interface Product {
   discount_percent: number;
   /** GST rate applied at checkout, as a percentage (e.g. 5 for 5%). */
   gst_percent: number;
+  /** Per-product Cash-on-Delivery availability toggle. */
+  cod_available: boolean;
   rating: number;
   rating_count: number;
+  status: ProductStatus;
+  /** Derived from `status` (see isActiveStatus) — the field every buyer-facing catalog query filters on. */
   is_active: boolean;
   is_bestseller: boolean;
   is_new_arrival: boolean;
   is_trending: boolean;
+  /** Head-Seller-only "Feature this product" toggle — surfaces it in featured placements. */
+  is_featured: boolean;
   is_deal_of_day: boolean;
   deal_ends_at: string | null;
   /** Gates the Return/Exchange actions on an order item — some categories (e.g. innerwear) are never eligible. */
@@ -115,6 +135,8 @@ export interface Product {
   specifications: ProductSpecifications;
   tags: string[];
   video_url: string | null;
+  /** First image overall — denormalized for fast list rendering without needing the full `images` array. */
+  coverImage: string;
   imageUrl?: string;
   thumbnailUrl?: string;
   created_at: string;

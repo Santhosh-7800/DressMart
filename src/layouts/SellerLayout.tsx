@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import {
   LayoutDashboard,
   Package,
+  Layers,
   Boxes,
   ShoppingBag,
   RotateCcw,
@@ -49,6 +50,7 @@ const BASE_NAV_ITEMS: NavItem[] = [
 
 const HEAD_SELLER_NAV_ITEMS: NavItem[] = [
   { to: '/seller/sellers', label: 'Sellers', icon: Users },
+  { to: '/seller/all-products', label: 'All Products', icon: Layers },
   { to: '/seller/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/seller/reports', label: 'Revenue Reports', icon: FileBarChart },
   { to: '/seller/coupons', label: 'Coupons', icon: Ticket },

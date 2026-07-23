@@ -1,7 +1,17 @@
-import { Link } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { Seo } from '@/components/common/Seo';
 
 export function NotFoundPage() {
+  const location = useLocation();
+
+  // Logged so a stale bookmark/history entry pointing at a removed route (e.g. an old feature
+  // that no longer exists) is identifiable in the console instead of just silently showing 404 —
+  // useful when Back/Forward walks into a URL from before a route was removed.
+  useEffect(() => {
+    console.warn(`[NotFoundPage] No route matched "${location.pathname}${location.search}" — rendering 404 fallback.`);
+  }, [location.pathname, location.search]);
+
   return (
     <div className="container-app flex min-h-[70vh] flex-col items-center justify-center text-center">
       <Seo title="Page Not Found" />

@@ -1,17 +1,25 @@
+import { useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Seo } from '@/components/common/Seo';
 import { ProductGrid } from '@/components/product/ProductGrid';
 import { SortDropdown } from '@/components/product/SortDropdown';
 import { Pagination } from '@/components/ui/Pagination';
 import { useProductList } from '@/hooks/useProducts';
-import { useState, useMemo } from 'react';
+import { filtersFromSearchParams, applyFiltersToSearchParams } from '@/lib/filterUrlSync';
 import type { SortOption } from '@/types';
 
+/** Sort/page live in the URL (see lib/filterUrlSync.ts), same as ProductListingPage — otherwise
+ *  opening a product from search results and hitting Back would reset sort/page to defaults. */
 export function SearchResultsPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get('q') ?? '';
-  const [sort, setSort] = useState<SortOption>('popularity');
-  const [page, setPage] = useState(1);
+  const { sort, page } = useMemo(() => {
+    const f = filtersFromSearchParams(searchParams);
+    return { sort: f.sort ?? ('popularity' as SortOption), page: f.page ?? 1 };
+  }, [searchParams]);
+
+  const setSort = (nextSort: SortOption) => setSearchParams(applyFiltersToSearchParams(searchParams, { sort: nextSort, page: 1 }), { replace: true });
+  const setPage = (nextPage: number) => setSearchParams(applyFiltersToSearchParams(searchParams, { sort, page: nextPage }), { replace: true });
 
   const productsQuery = useProductList({ search: query, sort, page, pageSize: 24 });
   const totalPages = useMemo(() => Math.ceil((productsQuery.data?.total ?? 0) / 24), [productsQuery.data]);

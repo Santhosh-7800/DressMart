@@ -9,24 +9,40 @@ import { SortDropdown } from '@/components/product/SortDropdown';
 import { Pagination } from '@/components/ui/Pagination';
 import { useProductFacets, useProductList } from '@/hooks/useProducts';
 import { useCategoryHistory } from '@/hooks/useCategoryHistory';
+import { filtersFromSearchParams, applyFiltersToSearchParams } from '@/lib/filterUrlSync';
 
 interface ProductListingPageProps {
   gender: Gender;
 }
 
+/**
+ * Filters/sort/pagination live in the URL query string (see lib/filterUrlSync.ts), not plain
+ * useState — that's what makes them survive Back navigation: opening a product and returning
+ * restores this exact URL (filters and all) instead of remounting to a reset default state.
+ * Filter/sort/page changes use `replace` so tweaking a filter doesn't pile up history entries —
+ * Back from the listing page should return to wherever you came from, not step through every
+ * filter tweak one at a time.
+ */
 export function ProductListingPage({ gender }: ProductListingPageProps) {
   const { categorySlug } = useParams<{ categorySlug: string }>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
-  const [filters, setFilters] = useState<Filters>({
-    gender,
-    categorySlugs: categorySlug ? [categorySlug] : undefined,
-    sort: (searchParams.get('sort') as Filters['sort']) ?? 'popularity',
-    page: 1,
-    pageSize: 24,
-  });
 
-  const productsQuery = useProductList({ ...filters, categorySlugs: categorySlug ? [categorySlug] : filters.categorySlugs });
+  const filters: Filters = useMemo(
+    () => ({
+      gender,
+      categorySlugs: categorySlug ? [categorySlug] : undefined,
+      pageSize: 24,
+      ...filtersFromSearchParams(searchParams),
+    }),
+    [gender, categorySlug, searchParams],
+  );
+
+  const updateFilters = (next: Filters) => {
+    setSearchParams(applyFiltersToSearchParams(searchParams, next), { replace: true });
+  };
+
+  const productsQuery = useProductList(filters);
   const facetsQuery = useProductFacets(gender, categorySlug);
   const { recordCategoryView } = useCategoryHistory();
 
@@ -59,13 +75,13 @@ export function ProductListingPage({ gender }: ProductListingPageProps) {
           <button onClick={() => setIsMobileFiltersOpen(true)} className="btn-outline lg:hidden">
             <SlidersHorizontal size={15} /> Filters
           </button>
-          <SortDropdown value={filters.sort ?? 'popularity'} onChange={(sort) => setFilters((f) => ({ ...f, sort, page: 1 }))} />
+          <SortDropdown value={filters.sort ?? 'popularity'} onChange={(sort) => updateFilters({ ...filters, sort, page: 1 })} />
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[260px_1fr]">
         <div className="hidden lg:block">
-          <ProductFilters facets={facetsQuery.data} filters={filters} onChange={setFilters} />
+          <ProductFilters facets={facetsQuery.data} filters={filters} onChange={(next) => updateFilters({ ...next, page: 1 })} />
         </div>
 
         {isMobileFiltersOpen && (
@@ -78,14 +94,14 @@ export function ProductListingPage({ gender }: ProductListingPageProps) {
                   <X size={20} />
                 </button>
               </div>
-              <ProductFilters facets={facetsQuery.data} filters={filters} onChange={setFilters} />
+              <ProductFilters facets={facetsQuery.data} filters={filters} onChange={(next) => updateFilters({ ...next, page: 1 })} />
             </div>
           </div>
         )}
 
         <div>
           <ProductGrid products={productsQuery.data?.items ?? []} isLoading={productsQuery.isLoading} />
-          <Pagination page={filters.page ?? 1} totalPages={totalPages} onChange={(page) => setFilters((f) => ({ ...f, page }))} />
+          <Pagination page={filters.page ?? 1} totalPages={totalPages} onChange={(page) => updateFilters({ ...filters, page })} />
         </div>
       </div>
     </div>

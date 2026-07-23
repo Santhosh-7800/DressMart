@@ -1,16 +1,24 @@
 import { useLayoutEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigationType } from 'react-router-dom';
 
 /**
- * BrowserRouter navigations (Link, NavLink, useNavigate, Back/Forward) never trigger a real page
- * load, so the window simply keeps whatever scrollY the previous route left it at — e.g. opening
- * a product from partway down the Home page left Product Details visually scrolled to that same
- * position instead of starting at the top. The browser's own scroll restoration only kicks in for
- * Back/Forward (not Link/useNavigate) and would fight this, so it's switched to 'manual' once and
- * every route change resets to the top itself instead — uniformly for every kind of navigation.
+ * BrowserRouter navigations (Link, NavLink, useNavigate) never trigger a real page load, so the
+ * window simply keeps whatever scrollY the previous route left it at unless something resets it —
+ * e.g. opening a product from partway down the Home page would otherwise leave Product Details
+ * scrolled to that same position instead of starting at the top.
+ *
+ * The browser's native scroll restoration can't tell PUSH (opening a new page — should start at the
+ * top) from POP (Back/Forward — should return you to where you were) any better once we're
+ * manually managing it, so this does both itself: PUSH/REPLACE always scroll to top; POP looks up
+ * the scroll position this exact history entry (`location.key`) had when it was last left, saved in
+ * the module-level map below, and restores it — the actual fix for "Back drops you at the top of a
+ * page you'd scrolled down on" / "lost scroll position after returning from a product".
  */
+const scrollPositionByKey = new Map<string, number>();
+
 export function ScrollToTop() {
-  const { pathname } = useLocation();
+  const { key } = useLocation();
+  const navigationType = useNavigationType();
 
   useLayoutEffect(() => {
     if (typeof window !== 'undefined' && 'scrollRestoration' in window.history) {
@@ -19,8 +27,19 @@ export function ScrollToTop() {
   }, []);
 
   useLayoutEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
-  }, [pathname]);
+    if (navigationType === 'POP') {
+      const saved = scrollPositionByKey.get(key);
+      window.scrollTo({ top: saved ?? 0, left: 0, behavior: 'instant' as ScrollBehavior });
+    } else {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+    }
+
+    // Cleanup runs right before the NEXT navigation's effect, while `key` here still refers to the
+    // entry being left — exactly when we want to snapshot its scroll position.
+    return () => {
+      scrollPositionByKey.set(key, window.scrollY);
+    };
+  }, [key, navigationType]);
 
   return null;
 }

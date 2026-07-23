@@ -18,7 +18,11 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
-    console.error('DressMart UI error:', error, info.componentStack);
+    // Includes the current path so a render failure scoped to one route (vs. the whole app) is
+    // identifiable in the console — this boundary wraps <Outlet> per-route (see PageTransition.tsx),
+    // so most failures caught here are route-specific rather than global.
+    const path = typeof window !== 'undefined' ? window.location.pathname : '(unknown)';
+    console.error(`[ErrorBoundary] Failed to render route "${path}":`, error, info.componentStack);
   }
 
   render() {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import { Store, CheckCircle2, Loader2 } from 'lucide-react';
@@ -20,6 +20,7 @@ const EMPTY_FORM: FormState = { full_name: '', phone: '', store_name: '', gst_nu
  *  existing sellers/head-sellers are redirected straight to their dashboard. */
 export function SellerApplyPage() {
   const { user, isLoading: isAuthLoading } = useAuth();
+  const navigate = useNavigate();
   const [form, setForm] = useState<FormState>(() => ({ ...EMPTY_FORM, full_name: user?.full_name ?? '', phone: user?.phone ?? '' }));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -71,7 +72,7 @@ export function SellerApplyPage() {
             Thanks, {form.full_name.split(' ')[0]}! Your application for <span className="font-semibold">{form.store_name}</span> is now pending review by
             our Head Seller team. We'll notify you here and by email as soon as a decision is made — usually within 1–2 business days.
           </p>
-          <Button variant="account" className="mt-6" onClick={() => (window.location.href = '/profile')}>
+          <Button variant="account" className="mt-6" onClick={() => navigate('/profile')}>
             Back to My Account
           </Button>
         </motion.div>

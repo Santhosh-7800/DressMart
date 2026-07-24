@@ -575,3 +575,38 @@ export function getRealProductPhotography(productSlug: string): RealProductPhoto
 export function buildProductImageSet(productSlug: string): ProductImageSet {
   return getRealProductPhotography(productSlug) ?? PLACEHOLDER_IMAGE_SET;
 }
+
+export interface VerifiedColor {
+  name: string;
+  hex: string;
+}
+
+/**
+ * Code -> hand-verified color, independent of which (mock-catalog-era) product slug a photo set was
+ * originally bound to — e.g. "FS004" -> Purple. This is what lets a freshly-generated product (with
+ * a brand-new random slug/id) that happens to reuse code FS004's photos still get assigned the
+ * CORRECT color instead of an arbitrary random one. Built once from REAL_PRODUCT_PHOTOGRAPHY.
+ */
+const CODE_TO_VERIFIED_COLOR: Map<string, VerifiedColor> = (() => {
+  const map = new Map<string, VerifiedColor>();
+  for (const entry of Object.values(REAL_PRODUCT_PHOTOGRAPHY)) {
+    entry.colors.forEach((color, i) => {
+      (entry.photoSetsByColorIndex[i] ?? []).forEach((filename) => {
+        const code = filename.split('-')[0];
+        map.set(code, color);
+      });
+    });
+  }
+  return map;
+})();
+
+/** Hand-verified color for a real photo's product code (e.g. "FS004" -> Purple), if any is known. */
+export function getVerifiedColorForCode(code: string): VerifiedColor | null {
+  return CODE_TO_VERIFIED_COLOR.get(code) ?? null;
+}
+
+/** Same lookup, from a full image URL/filename (extracts the leading code, e.g. ".../FS004-1.jpeg" -> "FS004"). */
+export function getVerifiedColorForImageUrl(url: string): VerifiedColor | null {
+  const match = url.match(/([A-Za-z]+\d+)-\d+\.\w+$/);
+  return match ? getVerifiedColorForCode(match[1]) : null;
+}

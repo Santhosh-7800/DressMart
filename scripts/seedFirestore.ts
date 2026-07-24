@@ -36,7 +36,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { BRAND_DEFS, MEN_CATEGORY_DEFS, KIDS_CATEGORY_DEFS, SIZE_SETS, COLOR_PALETTE, MATERIALS, FITS, PATTERNS, OCCASIONS, ADJECTIVES, type CategoryDef } from '../src/data/catalogSource';
 import { SeededRng } from '../src/lib/seededRandom';
 import { slugify, calculateDiscount } from '../src/lib/utils';
-import { getImageFolder, PLACEHOLDER_IMAGE_PATH } from '../src/lib/productImages';
+import { getImageFolder, PLACEHOLDER_IMAGE_PATH, getVerifiedColorForCode } from '../src/lib/productImages';
 import { PRODUCT_IMAGE_MANIFEST } from '../src/data/productImageManifest';
 
 const SEED = 20260722;
@@ -182,12 +182,21 @@ export async function main() {
       const discountPercent = rng.bool(0.7) ? rng.int(10, 45) : 0;
       const price = Math.max(Math.round((mrp * (1 - discountPercent / 100)) / 10) * 10 - 1, 149);
 
+      // Real photos (if this category folder has any) round-robin assigned by product index —
+      // still genuine on-disk photography, just not hand-bound to one specific generated product.
+      const photoSet = photoSets.length > 0 ? photoSets[i % photoSets.length] : null;
+
       // Exactly one declared color per generated product — every product here only ever has ONE
       // real (or placeholder) photo set, never distinct photography per color. Randomly assigning
-      // several fake color names to a single photo set was the root cause of "select Mustard
-      // Yellow, see a Black shirt": switching color could never show a matching photo because no
-      // color-specific photo existed. One color, one photo set, zero possibility of a mismatch.
-      const colors = rng.pickMany(COLOR_PALETTE, 1);
+      // several fake color names to a single photo set was the original root cause of "select
+      // Mustard Yellow, see a Black shirt": switching color could never show a matching photo
+      // because no color-specific photo existed. One color, one photo set, zero possibility of a
+      // switching-colors mismatch. But a random color name can STILL be wrong for what the photo
+      // actually shows (e.g. calling a verified-Purple photo "Khaki") — for any code with a
+      // hand-verified color (src/lib/productImages.ts's REAL_PRODUCT_PHOTOGRAPHY), use that
+      // instead of guessing; only fall back to random when no ground truth exists for this photo.
+      const verifiedColor = photoSet ? getVerifiedColorForCode(photoSet[0].split('-')[0]) : null;
+      const colors = verifiedColor ? [verifiedColor] : rng.pickMany(COLOR_PALETTE, 1);
 
       const variants: GeneratedVariant[] = [];
       const variantStock: Record<string, number> = {};
@@ -212,11 +221,8 @@ export async function main() {
       const isDealOfDay = rng.bool(0.05);
       const isReturnEligible = def.slug !== 'innerwear';
 
-      // Real photos (if this category folder has any) round-robin assigned by product index —
-      // still genuine on-disk photography, just not hand-bound to one specific generated product.
       // Tagged with this product's one declared color — safe since there's only one color, so this
       // can never be mistaken for (or leak into) a different color's gallery.
-      const photoSet = photoSets.length > 0 ? photoSets[i % photoSets.length] : null;
       const images = photoSet
         ? photoSet.map((filename, idx) => ({
             id: `${ref.id}-img-${idx}`,

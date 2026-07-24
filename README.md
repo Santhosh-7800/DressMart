@@ -150,6 +150,7 @@ firestore.rules / firestore.indexes.json / storage.rules / firebase.json
 | `npm run typecheck` | Type-check without emitting |
 | `npm run seed` | Seed Firestore (emulator or real project) with a generated catalog |
 | `npm run seed:curated-formal-shirts` | Seed/update the hand-verified Formal Shirt products from `src/lib/productImages.ts`'s `REAL_PRODUCT_PHOTOGRAPHY` map — additive/idempotent, never touches the rest of the catalog (see `scripts/seedCuratedFormalShirts.ts`'s own docstring for the pattern to follow when curating another category/batch this way) |
+| `npx tsx scripts/migrateFormalShirtVariants.ts` | One-off repair for a color/photo data-integrity bug in generically-seeded Formal Shirts (a product's declared color didn't always match what its verified photo actually showed) — safe to re-run any time, a no-op once everything's already correct. Preserves product ids/URLs/reviews/orders; only relabels color/color_hex/sku/tags/image color tags to match the verified truth. Prints a full before/after + flagged-for-review report. |
 | `npm run emulators` | Start the local Firebase Emulator Suite (with data persistence) |
 
 `scripts/ensureSeeded.ts` isn't run directly — it's wired into `predev` and auto-seeds only when `products` is empty (see "Reliability" above).

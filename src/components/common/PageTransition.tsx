@@ -1,6 +1,6 @@
 import { Suspense, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Outlet, useLocation } from 'react-router-dom';
+import { useLocation, useOutlet } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { ErrorBoundary } from './ErrorBoundary';
 import { debugLog } from '@/lib/debugLog';
@@ -29,6 +29,20 @@ function ContentFallback() {
 export function AnimatedOutlet({ transitionKey }: AnimatedOutletProps) {
   const location = useLocation();
   const key = transitionKey ?? location.pathname;
+  // Resolved ONCE, right now, into a plain React element — not the live <Outlet/> component. This
+  // is the fix for content silently going blank after a Back navigation: AnimatePresence keeps the
+  // PREVIOUS render's motion.div mounted while playing its exit animation. A live <Outlet/> sitting
+  // inside that still-mounted node re-resolves itself against the CURRENT route on every render
+  // (including renders that happen mid-exit), so it swaps over to the new page while the wrapper
+  // around it is still mid-flight toward the exit animation's opacity:0/y:-8. Framer Motion then
+  // considers that exit "finished" and never runs an enter transition for the new page — as far as
+  // it's concerned no new child ever appeared — so the new page ends up fully rendered in the DOM
+  // but permanently stuck wearing the old page's exit styles. Capturing the matched element via
+  // useOutlet() here freezes it as static data: the motion.div AnimatePresence holds onto for the
+  // outgoing page keeps that exact frozen element as its children for the rest of its exit
+  // animation, while a genuinely new motion.div (new key) mounts with the new page's own frozen
+  // element and runs its own enter transition, matching what AnimatePresence actually expects.
+  const outlet = useOutlet();
   debugLog('AnimatedOutlet', 'render for', location.pathname, 'key=', key);
 
   return (
@@ -45,9 +59,7 @@ export function AnimatedOutlet({ transitionKey }: AnimatedOutletProps) {
             instead of leaving the content area silently blank. Suspense is nested the same way
             so a slow chunk load only shows a spinner in the content area, not over the whole page. */}
         <ErrorBoundary>
-          <Suspense fallback={<ContentFallback />}>
-            <Outlet />
-          </Suspense>
+          <Suspense fallback={<ContentFallback />}>{outlet}</Suspense>
         </ErrorBoundary>
       </motion.div>
     </AnimatePresence>

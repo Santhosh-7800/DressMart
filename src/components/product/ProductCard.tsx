@@ -1,4 +1,6 @@
+import { memo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Heart } from 'lucide-react';
 import type { Product } from '@/types';
@@ -7,6 +9,8 @@ import { Rating } from '@/components/ui/Rating';
 import { ProductImage } from '@/components/ui/ProductImage';
 import { useWishlist } from '@/hooks/useWishlist';
 import { useInventory } from '@/hooks/useInventory';
+import { productService } from '@/services/productService';
+import { queryKeys } from '@/lib/queryClient';
 import { cn } from '@/lib/utils';
 
 interface ProductCardProps {
@@ -14,18 +18,31 @@ interface ProductCardProps {
   className?: string;
 }
 
-export function ProductCard({ product, className }: ProductCardProps) {
+function ProductCardImpl({ product, className }: ProductCardProps) {
   const { isWishlisted, toggle } = useWishlist();
   const wishlisted = isWishlisted(product.id);
   // Stock lives in its own inventory doc, not on Product — see types/database.ts. Loading/missing
   // inventory is treated as "in stock" rather than blocking the card on an extra round-trip.
   const { data: inventory } = useInventory(product.id);
+  const queryClient = useQueryClient();
   // coverImage (first image, denormalized) is the fast-path thumbnail source; fall back to the
   // pre-existing chain for older seed data that never got a coverImage populated.
   const primaryImage = product.coverImage || product.thumbnailUrl || product.imageUrl || product.images[0]?.url;
   // A seller can mark a product out_of_stock explicitly (still buyer-visible per is_active) even
   // before the inventory doc itself reads zero — check both so the badge never lags.
   const isOutOfStock = product.status === 'out_of_stock' || (inventory !== undefined && inventory !== null && inventory.total_stock <= 0);
+
+  // Warms the Product Details query cache while the shopper is still deciding whether to click —
+  // by the time navigation actually happens, the page renders from cache instantly instead of
+  // waiting on a fresh Firestore round-trip. Cheap/idempotent: prefetchQuery no-ops if the slug's
+  // data is already fresh in the cache (default staleTime), so hovering the same card repeatedly
+  // (or a card already visited) doesn't refetch.
+  const prefetchDetails = useCallback(() => {
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.products.detail(product.slug),
+      queryFn: () => productService.getBySlug(product.slug),
+    });
+  }, [queryClient, product.slug]);
 
   return (
     <motion.div
@@ -49,7 +66,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
         <span className="badge-accent absolute left-2 top-2 z-10">{product.discount_percent}% OFF</span>
       )}
 
-      <Link to={`/product/${product.slug}`} className="block">
+      <Link to={`/product/${product.slug}`} className="block" onMouseEnter={prefetchDetails} onFocus={prefetchDetails}>
         <div className="relative overflow-hidden">
           <ProductImage
             src={primaryImage}
@@ -75,3 +92,8 @@ export function ProductCard({ product, className }: ProductCardProps) {
     </motion.div>
   );
 }
+
+/** Memoized — a grid renders dozens of these, and TanStack Query returns structurally-stable
+ *  `product` references across unrelated re-renders (e.g. a cart update elsewhere on the page), so
+ *  this reliably skips re-rendering cards whose own data hasn't changed. */
+export const ProductCard = memo(ProductCardImpl);

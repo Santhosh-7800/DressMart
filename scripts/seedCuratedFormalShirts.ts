@@ -19,7 +19,7 @@ import { BRAND_DEFS, FITS, PATTERNS, OCCASIONS, MATERIALS, SIZE_SETS } from '../
 import { SeededRng, hashStringToSeed } from '../src/lib/seededRandom';
 import { slugify, calculateDiscount } from '../src/lib/utils';
 import { REAL_PRODUCT_PHOTOGRAPHY, resolveProductImagePath } from '../src/lib/productImages';
-import { db, SELLERS, sellerFor, PRICE_BANDS, washCareFor } from './seedFirestore';
+import { db, sellerFor, PRICE_BANDS, washCareFor } from './seedFirestore';
 
 // Old-style brand-slug prefixes as they appear inside these entries' keys -> the CURRENT brand slug
 // in src/data/catalogSource.ts (three brands were renamed slightly when the catalog was rebuilt for

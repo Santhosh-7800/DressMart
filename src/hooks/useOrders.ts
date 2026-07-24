@@ -25,6 +25,9 @@ export function useOrders() {
       setIsLoading(false);
     });
     return unsubscribe;
+    // user?.id only, intentionally — see useCart.ts's identical note (AuthContext's user reference
+    // changes on every profile field edit; only an actual identity change should resubscribe).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
   return { data: orders, isLoading };
@@ -68,6 +71,7 @@ export function useOrderGroup(groupId: string | undefined) {
       setIsLoading(false);
     });
     return unsubscribe;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId, user?.id]);
 
   return { data: orders, isLoading };
@@ -113,6 +117,7 @@ export function useSellerOrders() {
       setIsLoading(false);
     });
     return unsubscribe;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, user?.role]);
 
   return { data: orders, isLoading };

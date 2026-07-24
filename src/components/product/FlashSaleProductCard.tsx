@@ -1,4 +1,6 @@
+import { memo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Heart } from 'lucide-react';
 import type { Product } from '@/types';
@@ -7,6 +9,8 @@ import { Rating } from '@/components/ui/Rating';
 import { ProductImage } from '@/components/ui/ProductImage';
 import { useWishlist } from '@/hooks/useWishlist';
 import { useInventory } from '@/hooks/useInventory';
+import { productService } from '@/services/productService';
+import { queryKeys } from '@/lib/queryClient';
 import { cn } from '@/lib/utils';
 import { CountdownTimer } from './CountdownTimer';
 import { StockIndicator } from './StockIndicator';
@@ -22,14 +26,19 @@ interface FlashSaleProductCardProps {
  * which aliases it to Deal of the Day) — stock/countdown here come from the real inventory doc and
  * product.deal_ends_at instead of the old flash_sale_total_stock/claimed/ends_at fields.
  */
-export function FlashSaleProductCard({ product, onExpire, className }: FlashSaleProductCardProps) {
+function FlashSaleProductCardImpl({ product, onExpire, className }: FlashSaleProductCardProps) {
   const { isWishlisted, toggle } = useWishlist();
   const wishlisted = isWishlisted(product.id);
   const { data: inventory } = useInventory(product.id);
+  const queryClient = useQueryClient();
   const primaryImage = product.coverImage || product.thumbnailUrl || product.imageUrl || product.images[0]?.url;
 
   const totalStock = inventory?.total_stock ?? 0;
   const isSoldOut = inventory !== undefined && inventory !== null && totalStock <= 0;
+
+  const prefetchDetails = useCallback(() => {
+    queryClient.prefetchQuery({ queryKey: queryKeys.products.detail(product.slug), queryFn: () => productService.getBySlug(product.slug) });
+  }, [queryClient, product.slug]);
 
   return (
     <motion.div
@@ -51,7 +60,7 @@ export function FlashSaleProductCard({ product, onExpire, className }: FlashSale
 
       {product.discount_percent > 0 && <span className="badge-accent absolute left-2 top-2 z-10">{product.discount_percent}% OFF</span>}
 
-      <Link to={`/product/${product.slug}`} className="block">
+      <Link to={`/product/${product.slug}`} className="block" onMouseEnter={prefetchDetails} onFocus={prefetchDetails}>
         <div className="relative aspect-[4/5] w-full overflow-hidden bg-primary-50 dark:bg-primary-800">
           <ProductImage
             src={primaryImage}
@@ -78,3 +87,5 @@ export function FlashSaleProductCard({ product, onExpire, className }: FlashSale
     </motion.div>
   );
 }
+
+export const FlashSaleProductCard = memo(FlashSaleProductCardImpl);

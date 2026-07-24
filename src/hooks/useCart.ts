@@ -32,6 +32,11 @@ export function useCart() {
       unsubActive();
       unsubSaved();
     };
+    // Intentionally keyed on user?.id, not the whole `user` object — AuthContext's profile is a
+    // realtime subscription, so `user` gets a new reference on every unrelated field change (name,
+    // avatar, phone...). Re-subscribing the cart listeners on every one of those would be wasted
+    // Firestore reads/renders; only a genuine identity change should tear them down and reconnect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, user?.id]);
 
   const requireAuth = () => {

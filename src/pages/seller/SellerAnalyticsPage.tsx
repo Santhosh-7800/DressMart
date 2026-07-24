@@ -9,7 +9,11 @@ import { formatCurrency } from '@/lib/utils';
 import { queryKeys } from '@/lib/queryClient';
 import { sellerAdminService } from '@/services/sellerAdminService';
 import { sellerStatsService, groupOrdersByStatus, groupOrdersByDay, topProductsFromOrders, revenueBySeller } from '@/services/sellerStatsService';
-import type { OrderStatus } from '@/types';
+import type { Order, OrderStatus } from '@/types';
+
+/** Stable reference so `orders` doesn't become a brand-new [] on every render while the query is
+ *  still loading — that would otherwise invalidate every useMemo below on each re-render. */
+const EMPTY_ORDERS: Order[] = [];
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
   placed: 'Placed',
@@ -49,7 +53,7 @@ export function SellerAnalyticsPage() {
     queryFn: () => sellerAdminService.listSellers(),
   });
 
-  const orders = ordersQuery.data ?? [];
+  const orders = ordersQuery.data ?? EMPTY_ORDERS;
   const sellerNameById = useMemo(() => {
     const map = new Map<string, string>();
     for (const s of sellersQuery.data ?? []) map.set(s.id, s.store_name || s.full_name);

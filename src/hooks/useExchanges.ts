@@ -24,6 +24,9 @@ export function useExchanges() {
       setIsLoading(false);
     });
     return unsubscribe;
+    // user?.id only, intentionally — see useCart.ts's identical note (AuthContext's user reference
+    // changes on every profile field edit; only an actual identity change should resubscribe).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
   return { data: exchanges, isLoading };
@@ -46,6 +49,7 @@ export function useSellerExchanges() {
       setIsLoading(false);
     });
     return unsubscribe;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, user?.role]);
 
   return { data: exchanges, isLoading };

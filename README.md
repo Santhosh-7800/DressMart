@@ -48,8 +48,9 @@ By default (`VITE_USE_FIREBASE_EMULATOR=true` in `.env`, or simply no real Fireb
 ### Running against the emulators
 
 1. Install the Firebase CLI if you don't have it: `npm install -g firebase-tools`, then `firebase login`.
-2. In one terminal: `npm run emulators` (starts Auth on 9099, Firestore on 8081, Storage on 9199, Functions on 5001, and the Emulator UI at `http://localhost:4000`; data is imported/exported from `.emulator-data/` on start/stop, so a graceful restart doesn't wipe your seeded catalog — a forceful kill, e.g. the machine/container restarting, will).
-3. In another terminal: `npm run dev`. You don't need to seed anything by hand — `predev` automatically checks whether `products` is empty and, if so, seeds the full catalog for you (see "Reliability" below). This is what makes the app recover on its own after an emulator restart wipes its data.
+2. **Required, one-time:** `cp functions/.env.example functions/.env` (git-ignored, so this doesn't happen automatically). Without it, `defineString('RAZORPAY_KEY_ID')` has no value anywhere and the Firebase CLI tries to interactively prompt for one at Functions-emulator startup — which hangs forever in any non-interactive terminal, silently blocking **every** callable (`placeCodOrder`, `verifyAndPlaceOrder`, `cancelOrder`, everything), not just Razorpay-dependent ones. The emulator log's tell: `? Enter a string value for RAZORPAY_KEY_ID:` with no further output. If Buy Now/checkout/order placement all silently fail, check for exactly that line first.
+3. In one terminal: `npm run emulators` (starts Auth on 9099, Firestore on 8081, Storage on 9199, Functions on 5001, and the Emulator UI at `http://localhost:4000`; data is imported/exported from `.emulator-data/` on start/stop, so a graceful restart doesn't wipe your seeded catalog — a forceful kill, e.g. the machine/container restarting, will). Confirm it printed `functions: Loaded environment variables from .env.` — if it's sitting at the prompt above instead, see step 2.
+4. In another terminal: `npm run dev`. You don't need to seed anything by hand — `predev` automatically checks whether `products` is empty and, if so, seeds the full catalog for you (see "Reliability" below). This is what makes the app recover on its own after an emulator restart wipes its data.
 
 ### Connecting a real Firebase project
 

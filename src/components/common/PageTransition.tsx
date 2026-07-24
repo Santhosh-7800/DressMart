@@ -1,8 +1,9 @@
-import { Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { ErrorBoundary } from './ErrorBoundary';
+import { debugLog } from '@/lib/debugLog';
 
 interface AnimatedOutletProps {
   /** Override the key AnimatePresence tracks — pass a stable constant to suppress
@@ -11,6 +12,13 @@ interface AnimatedOutletProps {
 }
 
 function ContentFallback() {
+  // If this stays mounted (visible as a spinner, never blank) longer than a lazy chunk should take
+  // to load, the mount/unmount pair below pinpoints exactly which route never resolved its Suspense.
+  useEffect(() => {
+    debugLog('Suspense', 'ContentFallback mounted at', window.location.pathname);
+    return () => debugLog('Suspense', 'ContentFallback unmounted at', window.location.pathname);
+  }, []);
+
   return (
     <div className="flex min-h-[40vh] items-center justify-center">
       <Loader2 className="animate-spin text-primary-300" size={28} />
@@ -21,6 +29,7 @@ function ContentFallback() {
 export function AnimatedOutlet({ transitionKey }: AnimatedOutletProps) {
   const location = useLocation();
   const key = transitionKey ?? location.pathname;
+  debugLog('AnimatedOutlet', 'render for', location.pathname, 'key=', key);
 
   return (
     <AnimatePresence mode="wait" initial={false}>

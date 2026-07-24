@@ -1,5 +1,6 @@
 import { useLayoutEffect } from 'react';
 import { useLocation, useNavigationType } from 'react-router-dom';
+import { debugLog } from '@/lib/debugLog';
 
 /**
  * BrowserRouter navigations (Link, NavLink, useNavigate) never trigger a real page load, so the
@@ -27,6 +28,7 @@ export function ScrollToTop() {
   }, []);
 
   useLayoutEffect(() => {
+    debugLog('route-transition', navigationType, window.location.pathname, 'key=', key);
     if (navigationType === 'POP') {
       const saved = scrollPositionByKey.get(key);
       window.scrollTo({ top: saved ?? 0, left: 0, behavior: 'instant' as ScrollBehavior });

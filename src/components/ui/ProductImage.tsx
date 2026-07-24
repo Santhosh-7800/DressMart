@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ImageOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { debugLog } from '@/lib/debugLog';
 
 /** Shared static fallback shown whenever a product has no photo yet, or its photo fails to load. */
 export const FALLBACK_IMAGE_SRC = '/images/placeholder-shirt.webp';
@@ -50,6 +51,7 @@ export function ProductImage({ src, alt, className, imgClassName, sizes, srcSet,
   }, [currentSrc]);
 
   const handleError = () => {
+    debugLog('ProductImage', 'onError', currentSrc, usedFallback ? '(fallback also failed)' : '(falling back to placeholder)');
     if (!usedFallback) {
       // The real photo 404'd (or doesn't exist yet) — drop to the shared placeholder image.
       setUsedFallback(true);
@@ -59,6 +61,11 @@ export function ProductImage({ src, alt, className, imgClassName, sizes, srcSet,
       // Even the placeholder image is unavailable — last resort, a plain icon.
       setStatus('error');
     }
+  };
+
+  const handleLoad = () => {
+    debugLog('ProductImage', 'onLoad', currentSrc);
+    setStatus('loaded');
   };
 
   if (status === 'error') {
@@ -95,7 +102,7 @@ export function ProductImage({ src, alt, className, imgClassName, sizes, srcSet,
         alt={alt}
         loading={priority ? 'eager' : 'lazy'}
         decoding="async"
-        onLoad={() => setStatus('loaded')}
+        onLoad={handleLoad}
         onError={handleError}
         draggable={false}
         className={cn('h-full w-full select-none object-cover opacity-100', imgClassName)}

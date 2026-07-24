@@ -1,27 +1,37 @@
 import { useRef, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 import type { Product } from '@/types';
 import { ProductCard } from './ProductCard';
 import { ProductCardSkeleton } from '@/components/ui/Skeleton';
+import { debugLog } from '@/lib/debugLog';
 
 interface ProductCarouselProps {
   title: ReactNode;
   products: Product[];
   isLoading?: boolean;
+  /** True when the underlying query failed — distinct from "loaded successfully with zero
+   *  results". Without this, a fetch error (isLoading:false, data:undefined -> products:[]) was
+   *  indistinguishable from "genuinely no products", so the whole section silently vanished
+   *  instead of showing anything — the actual mechanism behind product sections going blank. */
+  isError?: boolean;
+  onRetry?: () => void;
   viewAllHref?: string;
   countdownTo?: string | null;
 }
 
-export function ProductCarousel({ title, products, isLoading, viewAllHref }: ProductCarouselProps) {
+export function ProductCarousel({ title, products, isLoading, isError, onRetry, viewAllHref }: ProductCarouselProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  debugLog('ProductCarousel', 'render', typeof title === 'string' ? title : '(node)', { isLoading, isError, count: products.length });
 
   const scroll = (dir: 'left' | 'right') => {
     scrollRef.current?.scrollBy({ left: dir === 'left' ? -320 : 320, behavior: 'smooth' });
   };
 
-  if (!isLoading && products.length === 0) return null;
+  // Only a confirmed-successful, confirmed-empty result hides the section. A fetch error is
+  // rendered explicitly below instead of ever silently disappearing.
+  if (!isLoading && !isError && products.length === 0) return null;
 
   return (
     <section className="container-app py-8">
@@ -41,25 +51,38 @@ export function ProductCarousel({ title, products, isLoading, viewAllHref }: Pro
           </button>
         </div>
       </div>
-      <div ref={scrollRef} className="scrollbar-thin flex gap-4 overflow-x-auto pb-2">
-        {isLoading
-          ? Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="w-44 shrink-0 sm:w-52">
-                <ProductCardSkeleton />
-              </div>
-            ))
-          : products.map((product, index) => (
-              <motion.div
-                key={product.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25, delay: Math.min(index, 6) * 0.03 }}
-                className="w-44 shrink-0 sm:w-52"
-              >
-                <ProductCard product={product} />
-              </motion.div>
-            ))}
-      </div>
+
+      {isError ? (
+        <div className="flex flex-col items-center gap-2 rounded-xl bg-primary-50 py-8 text-center dark:bg-primary-800">
+          <AlertTriangle size={20} className="text-primary-400" />
+          <p className="text-sm text-primary-500 dark:text-primary-300">Couldn't load this section.</p>
+          {onRetry && (
+            <button onClick={onRetry} className="text-sm font-medium text-accent-600 hover:underline">
+              Retry
+            </button>
+          )}
+        </div>
+      ) : (
+        <div ref={scrollRef} className="scrollbar-thin flex gap-4 overflow-x-auto pb-2">
+          {isLoading
+            ? Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="w-44 shrink-0 sm:w-52">
+                  <ProductCardSkeleton />
+                </div>
+              ))
+            : products.map((product, index) => (
+                <motion.div
+                  key={product.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.25, delay: Math.min(index, 6) * 0.03 }}
+                  className="w-44 shrink-0 sm:w-52"
+                >
+                  <ProductCard product={product} />
+                </motion.div>
+              ))}
+        </div>
+      )}
     </section>
   );
 }

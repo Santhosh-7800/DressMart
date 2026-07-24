@@ -34,7 +34,13 @@ export function SearchResultsPage() {
         </div>
         <SortDropdown value={sort} onChange={setSort} />
       </div>
-      <ProductGrid products={productsQuery.data?.items ?? []} isLoading={productsQuery.isLoading} emptyMessage={`We couldn't find anything for "${query}". Try a different search term.`} />
+      <ProductGrid
+        products={productsQuery.data?.items ?? []}
+        isLoading={productsQuery.isLoading}
+        isError={productsQuery.isError}
+        onRetry={() => productsQuery.refetch()}
+        emptyMessage={`We couldn't find anything for "${query}". Try a different search term.`}
+      />
       <Pagination page={page} totalPages={totalPages} onChange={setPage} />
     </div>
   );

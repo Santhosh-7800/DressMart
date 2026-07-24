@@ -45,5 +45,10 @@ export function usePersonalizedRecommendations() {
     recommendations: recommendationsQuery.data?.products ?? [],
     topCategoryLabel: recommendationsQuery.data?.topCategoryLabel ?? null,
     isLoading: !signalsReady || recommendationsQuery.isLoading,
+    isError: orderedProductsQuery.isError || recommendationsQuery.isError,
+    retry: () => {
+      orderedProductsQuery.refetch();
+      recommendationsQuery.refetch();
+    },
   };
 }

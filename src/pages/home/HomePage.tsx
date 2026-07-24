@@ -58,7 +58,7 @@ function BannerSlider() {
 }
 
 function FlashSaleWidget() {
-  const { data, isLoading } = useFlashSales();
+  const { data, isLoading, isError, refetch } = useFlashSales();
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -72,7 +72,9 @@ function FlashSaleWidget() {
     setDismissedIds((prev) => new Set(prev).add(productId));
   };
 
-  if (!isLoading && visibleProducts.length === 0) return null;
+  // A fetch error is shown, not silently treated as "no flash sale right now" (see ProductCarousel's
+  // identical distinction below).
+  if (!isLoading && !isError && visibleProducts.length === 0) return null;
 
   return (
     <section className="container-app py-8">
@@ -86,27 +88,36 @@ function FlashSaleWidget() {
           View all
         </Link>
       </div>
-      <div className="scrollbar-thin flex gap-4 overflow-x-auto pb-2">
-        {isLoading
-          ? Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="w-44 shrink-0 sm:w-52">
-                <ProductCardSkeleton />
-              </div>
-            ))
-          : visibleProducts.map((product) => (
-              <div key={product.id} className="w-44 shrink-0 sm:w-52">
-                <FlashSaleProductCard product={product} onExpire={handleExpire} />
-              </div>
-            ))}
-      </div>
+      {isError ? (
+        <div className="flex flex-col items-center gap-2 rounded-xl bg-primary-50 py-8 text-center dark:bg-primary-800">
+          <p className="text-sm text-primary-500 dark:text-primary-300">Couldn't load flash sale items.</p>
+          <button onClick={() => refetch()} className="text-sm font-medium text-accent-600 hover:underline">
+            Retry
+          </button>
+        </div>
+      ) : (
+        <div className="scrollbar-thin flex gap-4 overflow-x-auto pb-2">
+          {isLoading
+            ? Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="w-44 shrink-0 sm:w-52">
+                  <ProductCardSkeleton />
+                </div>
+              ))
+            : visibleProducts.map((product) => (
+                <div key={product.id} className="w-44 shrink-0 sm:w-52">
+                  <FlashSaleProductCard product={product} onExpire={handleExpire} />
+                </div>
+              ))}
+        </div>
+      )}
     </section>
   );
 }
 
 function PersonalizedRecommendations() {
-  const { recommendations, topCategoryLabel, isLoading } = usePersonalizedRecommendations();
+  const { recommendations, topCategoryLabel, isLoading, isError, retry } = usePersonalizedRecommendations();
 
-  if (!isLoading && recommendations.length === 0) return null;
+  if (!isLoading && !isError && recommendations.length === 0) return null;
 
   return (
     <div>
@@ -118,6 +129,8 @@ function PersonalizedRecommendations() {
         }
         products={recommendations}
         isLoading={isLoading}
+        isError={isError}
+        onRetry={retry}
       />
       {topCategoryLabel && <p className="container-app -mt-6 pb-2 text-xs text-primary-400">Based on your interest in {topCategoryLabel}</p>}
     </div>
@@ -217,19 +230,57 @@ export function HomePage() {
       <CategoryShowcase />
       <FeaturedBrandsStrip />
 
-      {dealsQuery.data && dealsQuery.data.length > 0 && (
+      {/* Each carousel below distinguishes "confirmed empty" from "the query failed" (isError) —
+          a fetch error used to be indistinguishable from zero results and silently rendered
+          nothing, which is the actual mechanism behind whole sections going blank. */}
+      {(dealsQuery.isLoading || dealsQuery.isError || (dealsQuery.data?.length ?? 0) > 0) && (
         <div>
-          <ProductCarousel title="Deals of the Day" products={dealsQuery.data} isLoading={dealsQuery.isLoading} viewAllHref="/deals" />
-          <div className="container-app -mt-6 flex justify-end pb-2">
-            <DealsCountdown dealEndsAt={dealsQuery.data[0]?.deal_ends_at} />
-          </div>
+          <ProductCarousel
+            title="Deals of the Day"
+            products={dealsQuery.data ?? []}
+            isLoading={dealsQuery.isLoading}
+            isError={dealsQuery.isError}
+            onRetry={() => dealsQuery.refetch()}
+            viewAllHref="/deals"
+          />
+          {dealsQuery.data && dealsQuery.data.length > 0 && (
+            <div className="container-app -mt-6 flex justify-end pb-2">
+              <DealsCountdown dealEndsAt={dealsQuery.data[0]?.deal_ends_at} />
+            </div>
+          )}
         </div>
       )}
 
-      <ProductCarousel title="Trending Now" products={trendingQuery.data ?? []} isLoading={trendingQuery.isLoading} />
-      <ProductCarousel title="New Arrivals" products={newArrivalsQuery.data ?? []} isLoading={newArrivalsQuery.isLoading} viewAllHref="/new-arrivals" />
-      <ProductCarousel title="Top Rated" products={topRatedQuery.data ?? []} isLoading={topRatedQuery.isLoading} />
-      <ProductCarousel title="Best Sellers" products={bestSellersQuery.data ?? []} isLoading={bestSellersQuery.isLoading} viewAllHref="/best-sellers" />
+      <ProductCarousel
+        title="Trending Now"
+        products={trendingQuery.data ?? []}
+        isLoading={trendingQuery.isLoading}
+        isError={trendingQuery.isError}
+        onRetry={() => trendingQuery.refetch()}
+      />
+      <ProductCarousel
+        title="New Arrivals"
+        products={newArrivalsQuery.data ?? []}
+        isLoading={newArrivalsQuery.isLoading}
+        isError={newArrivalsQuery.isError}
+        onRetry={() => newArrivalsQuery.refetch()}
+        viewAllHref="/new-arrivals"
+      />
+      <ProductCarousel
+        title="Top Rated"
+        products={topRatedQuery.data ?? []}
+        isLoading={topRatedQuery.isLoading}
+        isError={topRatedQuery.isError}
+        onRetry={() => topRatedQuery.refetch()}
+      />
+      <ProductCarousel
+        title="Best Sellers"
+        products={bestSellersQuery.data ?? []}
+        isLoading={bestSellersQuery.isLoading}
+        isError={bestSellersQuery.isError}
+        onRetry={() => bestSellersQuery.refetch()}
+        viewAllHref="/best-sellers"
+      />
 
       <FeaturedCollections />
 

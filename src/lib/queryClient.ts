@@ -1,4 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
+import { debugLog } from './debugLog';
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -13,6 +14,23 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+// Traces every product-query's cache transitions (success/error/observer-added) so a query that
+// errors — or one that gets torn down and never re-observed after a Back navigation — is visible
+// in the console instead of silently producing an empty result set.
+if (import.meta.env.DEV) {
+  queryClient.getQueryCache().subscribe((event) => {
+    const key = event.query.queryKey;
+    if (Array.isArray(key) && key[0] === 'products') {
+      debugLog('query-cache', event.type, key, {
+        status: event.query.state.status,
+        fetchStatus: event.query.state.fetchStatus,
+        error: event.query.state.error,
+        observers: event.query.getObserversCount(),
+      });
+    }
+  });
+}
 
 export const queryKeys = {
   products: {

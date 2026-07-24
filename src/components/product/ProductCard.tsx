@@ -12,6 +12,7 @@ import { useInventory } from '@/hooks/useInventory';
 import { productService } from '@/services/productService';
 import { queryKeys } from '@/lib/queryClient';
 import { cn } from '@/lib/utils';
+import { debugLog } from '@/lib/debugLog';
 
 interface ProductCardProps {
   product: Product;
@@ -19,6 +20,7 @@ interface ProductCardProps {
 }
 
 function ProductCardImpl({ product, className }: ProductCardProps) {
+  debugLog('ProductCard', 'render', product.id, product.slug);
   const { isWishlisted, toggle } = useWishlist();
   const wishlisted = isWishlisted(product.id);
   // Stock lives in its own inventory doc, not on Product — see types/database.ts. Loading/missing

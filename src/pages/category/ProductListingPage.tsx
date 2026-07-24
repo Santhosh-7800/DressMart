@@ -100,7 +100,12 @@ export function ProductListingPage({ gender }: ProductListingPageProps) {
         )}
 
         <div>
-          <ProductGrid products={productsQuery.data?.items ?? []} isLoading={productsQuery.isLoading} />
+          <ProductGrid
+            products={productsQuery.data?.items ?? []}
+            isLoading={productsQuery.isLoading}
+            isError={productsQuery.isError}
+            onRetry={() => productsQuery.refetch()}
+          />
           <Pagination page={filters.page ?? 1} totalPages={totalPages} onChange={(page) => updateFilters({ ...filters, page })} />
         </div>
       </div>

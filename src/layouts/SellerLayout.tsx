@@ -21,6 +21,10 @@ import {
   Store,
   AlertTriangle,
   ShieldAlert,
+  MessageSquare,
+  Bell,
+  FolderTree,
+  Image,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -45,15 +49,19 @@ const BASE_NAV_ITEMS: NavItem[] = [
   { to: '/seller/orders', label: 'Orders', icon: ShoppingBag },
   { to: '/seller/returns', label: 'Returns', icon: RotateCcw },
   { to: '/seller/exchanges', label: 'Exchanges', icon: Repeat },
+  { to: '/seller/reviews', label: 'Reviews', icon: MessageSquare },
+  { to: '/seller/notifications', label: 'Notifications', icon: Bell },
   { to: '/seller/settings', label: 'Profile & Settings', icon: Settings },
 ];
 
 const HEAD_SELLER_NAV_ITEMS: NavItem[] = [
-  { to: '/seller/sellers', label: 'Sellers', icon: Users },
+  { to: '/seller/sellers', label: 'Seller Management', icon: Users },
   { to: '/seller/all-products', label: 'All Products', icon: Layers },
   { to: '/seller/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/seller/reports', label: 'Revenue Reports', icon: FileBarChart },
   { to: '/seller/coupons', label: 'Coupons', icon: Ticket },
+  { to: '/seller/categories', label: 'Categories', icon: FolderTree },
+  { to: '/seller/banners', label: 'Banner Management', icon: Image },
   { to: '/seller/platform-settings', label: 'Platform Settings', icon: SlidersHorizontal },
 ];
 

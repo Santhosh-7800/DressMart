@@ -29,6 +29,29 @@ export interface Profile {
   seller_status_reason?: string | null;
   /** Web Push (FCM) registration tokens for this user's browsers — appended via arrayUnion by useFcmToken, one entry per opted-in browser/device. */
   fcm_tokens?: string[];
+  /** Shop branding/logistics — present only for seller/head_seller, same as store_name/gst_number. */
+  shop_logo_url?: string | null;
+  shop_banner_url?: string | null;
+  pickup_address?: ShopAddress | null;
+  return_address?: ShopAddress | null;
+  /** Informational only — no payout automation exists in this app. */
+  bank_account_holder?: string;
+  bank_account_number?: string;
+  bank_ifsc?: string;
+  /** Shop-level COD default — distinct from the per-product Product.cod_available. */
+  shop_cod_available?: boolean;
+}
+
+/** Embedded address shape for a seller's pickup/return address — deliberately not the same as the
+ *  buyer-facing Address type (which carries id/user_id/type/is_default that make no sense embedded
+ *  directly on Profile). */
+export interface ShopAddress {
+  line1: string;
+  line2: string | null;
+  city: string;
+  state: string;
+  pincode: string;
+  landmark: string | null;
 }
 
 export interface Brand {
@@ -38,6 +61,18 @@ export interface Brand {
   logo_url: string | null;
   description: string | null;
   is_featured: boolean;
+}
+
+/** Head-Seller-managed homepage banner carousel — `banners` collection. */
+export interface Banner {
+  id: string;
+  image_url: string | null;
+  title: string;
+  subtitle: string | null;
+  link: string;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
 }
 
 export interface Category {
@@ -177,6 +212,9 @@ export interface Review {
   helpful_count: number;
   created_at: string;
   updated_at: string;
+  /** Absent on reviews written before this feature — optional rather than `| null` since existing
+   *  Firestore docs were never backfilled with the field. */
+  seller_reply?: { text: string; replied_at: string } | null;
 }
 
 export interface RatingSummary {

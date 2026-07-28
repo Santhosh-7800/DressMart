@@ -12,7 +12,7 @@ import { Skeleton, ProductCardSkeleton } from '@/components/ui/Skeleton';
 import { ProductImage } from '@/components/ui/ProductImage';
 
 function BannerSlider() {
-  const { data: banners, isLoading } = useBanners();
+  const { data: banners, isLoading, isError } = useBanners();
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
@@ -22,13 +22,21 @@ function BannerSlider() {
   }, [banners]);
 
   if (isLoading) return <Skeleton className="h-48 w-full sm:h-64 lg:h-80" />;
-  if (!banners?.length) return null;
+  // A fetch error is distinct from "no banners configured" — silently returning null here would
+  // otherwise make the whole homepage banner section vanish on a transient query error.
+  if (isError || !banners?.length) return null;
 
   const banner = banners[index];
 
   return (
     <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary-800 to-primary-900 text-white">
-      <Link to={banner.link} className="flex h-48 flex-col items-start justify-center gap-2 p-8 sm:h-64 lg:h-80">
+      {banner.image_url && (
+        <>
+          <img src={banner.image_url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-r from-primary-950/80 via-primary-950/40 to-transparent" />
+        </>
+      )}
+      <Link to={banner.link} className="relative flex h-48 flex-col items-start justify-center gap-2 p-8 sm:h-64 lg:h-80">
         <span className="badge-accent">Limited Time</span>
         <h2 className="max-w-md text-2xl font-bold sm:text-4xl">{banner.title}</h2>
         {banner.subtitle && <p className="max-w-md text-sm text-primary-200 sm:text-base">{banner.subtitle}</p>}
@@ -77,7 +85,7 @@ function FlashSaleWidget() {
   if (!isLoading && !isError && visibleProducts.length === 0) return null;
 
   return (
-    <section className="container-app py-8">
+    <section className="container-app py-6 sm:py-8">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Zap size={20} className="fill-red-500 text-red-500" />
@@ -143,7 +151,7 @@ function CategoryShowcase() {
   const featured = [...(menCategories ?? []).slice(0, 6), ...(kidsCategories ?? []).slice(0, 2)];
 
   return (
-    <section className="container-app py-8">
+    <section className="container-app py-6 sm:py-8">
       <h2 className="mb-4 text-xl font-bold">Shop by Category</h2>
       <div className="grid grid-cols-4 gap-3 sm:grid-cols-4 lg:grid-cols-8">
         {featured.map((category) => (
@@ -164,7 +172,7 @@ function FeaturedBrandsStrip() {
   if (!brands?.length) return null;
 
   return (
-    <section className="container-app py-8">
+    <section className="container-app py-6 sm:py-8">
       <h2 className="mb-4 text-xl font-bold">Featured Brands</h2>
       <div className="scrollbar-thin flex gap-4 overflow-x-auto pb-2">
         {brands.map((brand) => (
@@ -193,7 +201,7 @@ function FeaturedCollections() {
   if (!collections?.length) return null;
 
   return (
-    <section className="container-app py-8">
+    <section className="container-app py-6 sm:py-8">
       <h2 className="mb-4 text-xl font-bold">Featured Collections</h2>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {collections.map((collection) => (

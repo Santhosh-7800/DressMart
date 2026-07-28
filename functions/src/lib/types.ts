@@ -11,6 +11,15 @@ export type Gender = 'men' | 'kids';
 export type UserRole = 'buyer' | 'seller' | 'head_seller';
 export type SellerStatus = 'pending' | 'approved' | 'rejected' | 'suspended';
 
+export interface ShopAddress {
+  line1: string;
+  line2: string | null;
+  city: string;
+  state: string;
+  pincode: string;
+  landmark: string | null;
+}
+
 export interface Profile {
   id: string;
   email: string;
@@ -27,6 +36,14 @@ export interface Profile {
   seller_approved_at?: string | null;
   seller_status_reason?: string | null;
   fcm_tokens?: string[];
+  shop_logo_url?: string | null;
+  shop_banner_url?: string | null;
+  pickup_address?: ShopAddress | null;
+  return_address?: ShopAddress | null;
+  bank_account_holder?: string;
+  bank_account_number?: string;
+  bank_ifsc?: string;
+  shop_cod_available?: boolean;
 }
 
 export interface Brand {

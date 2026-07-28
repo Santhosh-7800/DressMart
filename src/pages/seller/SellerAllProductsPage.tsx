@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Eye, EyeOff, Trash2, Pencil, Star, Layers } from 'lucide-react';
+import { Search, Eye, EyeOff, Trash2, Pencil, Star, Layers, Zap } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
+import { Modal } from '@/components/ui/Modal';
 import { Pagination } from '@/components/ui/Pagination';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { useAllSellerProducts, useSetProductStatus, useSetProductFeatured, useDeleteProduct } from '@/hooks/useSellerProducts';
+import { useAllSellerProducts, useSetProductStatus, useSetProductFeatured, useSetProductDealOfDay, useDeleteProduct } from '@/hooks/useSellerProducts';
 import { formatCurrency, cn } from '@/lib/utils';
-import type { ProductStatus } from '@/types';
+import type { Product, ProductStatus } from '@/types';
 
 const PAGE_SIZE = 20;
 
@@ -42,15 +44,20 @@ const STATUS_LABEL: Record<ProductStatus, string> = {
 export function SellerAllProductsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<ProductStatus | 'all'>('all');
+  const [dealsOnly, setDealsOnly] = useState(false);
   const [page, setPage] = useState(1);
+  const [dealTarget, setDealTarget] = useState<Product | null>(null);
+  const [dealEndsAt, setDealEndsAt] = useState('');
 
   const { data: allProducts = [], isLoading } = useAllSellerProducts();
   const setStatus = useSetProductStatus();
   const setFeatured = useSetProductFeatured();
+  const setDealOfDay = useSetProductDealOfDay();
   const remove = useDeleteProduct();
 
   const filtered = allProducts.filter((p) => {
     if (statusFilter !== 'all' && p.status !== statusFilter) return false;
+    if (dealsOnly && !p.is_deal_of_day) return false;
     const q = search.trim().toLowerCase();
     if (!q) return true;
     return p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q) || p.seller_name.toLowerCase().includes(q);
@@ -67,6 +74,23 @@ export function SellerAllProductsPage() {
 
   const handleDelete = (id: string, name: string) => {
     if (confirm(`Delete "${name}"? This cannot be undone.`)) remove.mutate(id);
+  };
+
+  const handleToggleDeal = (product: Product) => {
+    if (product.is_deal_of_day) {
+      setDealOfDay.mutate({ productId: product.id, isDeal: false, dealEndsAt: null });
+    } else {
+      setDealTarget(product);
+      setDealEndsAt(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16));
+    }
+  };
+
+  const confirmDeal = () => {
+    if (!dealTarget) return;
+    setDealOfDay.mutate(
+      { productId: dealTarget.id, isDeal: true, dealEndsAt: new Date(dealEndsAt).toISOString() },
+      { onSuccess: () => setDealTarget(null) },
+    );
   };
 
   return (
@@ -97,6 +121,21 @@ export function SellerAllProductsPage() {
             {tab.label} ({statusCounts[tab.value] ?? 0})
           </button>
         ))}
+        <button
+          type="button"
+          onClick={() => {
+            setDealsOnly((v) => !v);
+            setPage(1);
+          }}
+          className={cn(
+            'rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors',
+            dealsOnly
+              ? 'border-accent bg-accent-50 text-accent-700 dark:bg-accent-900/30'
+              : 'border-primary-200 text-primary-500 hover:bg-primary-50 dark:border-primary-600 dark:hover:bg-primary-800',
+          )}
+        >
+          <Zap size={13} className="mr-1 inline" /> Deals only ({allProducts.filter((p) => p.is_deal_of_day).length})
+        </button>
       </div>
 
       <div className="mb-4">
@@ -130,6 +169,7 @@ export function SellerAllProductsPage() {
                 <th className="p-3">Price</th>
                 <th className="p-3">Status</th>
                 <th className="p-3">Featured</th>
+                <th className="p-3">Deal</th>
                 <th className="p-3 text-right">Actions</th>
               </tr>
             </thead>
@@ -162,6 +202,18 @@ export function SellerAllProductsPage() {
                       title={product.is_featured ? 'Unfeature' : 'Feature'}
                     >
                       <Star size={15} fill={product.is_featured ? 'currentColor' : 'none'} />
+                    </button>
+                  </td>
+                  <td className="p-3">
+                    <button
+                      onClick={() => handleToggleDeal(product)}
+                      className={cn(
+                        'flex items-center gap-1 rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700',
+                        product.is_deal_of_day && 'text-accent',
+                      )}
+                      title={product.is_deal_of_day ? 'Remove from Deal of the Day' : 'Add to Deal of the Day'}
+                    >
+                      <Zap size={15} fill={product.is_deal_of_day ? 'currentColor' : 'none'} />
                     </button>
                   </td>
                   <td className="p-3">
@@ -203,7 +255,7 @@ export function SellerAllProductsPage() {
               ))}
               {items.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-primary-400">
+                  <td colSpan={8} className="p-8 text-center text-primary-400">
                     No products match your search.
                   </td>
                 </tr>
@@ -214,6 +266,23 @@ export function SellerAllProductsPage() {
       )}
 
       <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+
+      <Modal isOpen={Boolean(dealTarget)} onClose={() => setDealTarget(null)} title={`Add "${dealTarget?.name ?? ''}" to Deal of the Day`}>
+        <div className="space-y-4">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-primary-800 dark:text-primary-100">Deal ends at</label>
+            <input type="datetime-local" value={dealEndsAt} onChange={(e) => setDealEndsAt(e.target.value)} className="input-field" />
+          </div>
+          <div className="flex gap-3">
+            <Button variant="outline" fullWidth onClick={() => setDealTarget(null)}>
+              Cancel
+            </Button>
+            <Button variant="account" fullWidth onClick={confirmDeal} isLoading={setDealOfDay.isPending}>
+              Add to Deal of the Day
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

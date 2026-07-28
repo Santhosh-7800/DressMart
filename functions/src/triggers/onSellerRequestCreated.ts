@@ -16,6 +16,6 @@ export const onSellerRequestCreated = onDocumentCreated('seller_requests/{reques
     title: 'New seller application',
     message: `${sellerRequest.store_name} (${sellerRequest.full_name}) applied to become a seller.`,
     type: 'seller_registration',
-    link: `/head-seller/sellers/${event.params.requestId}`,
+    link: '/seller/sellers',
   });
 });

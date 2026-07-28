@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Check, X, Ban, RotateCcw, Store, Clock } from 'lucide-react';
+import { Check, X, Ban, RotateCcw, Store, Clock, Plus, KeyRound, Trash2 } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -187,6 +187,33 @@ function RosterSection() {
     onError: (error: Error) => toast.error(error.message || 'Could not update this seller.'),
   });
 
+  const resetPasswordMutation = useMutation({
+    mutationFn: sellerAdminService.resetSellerPassword,
+    onError: (error: Error) => toast.error(error.message || "Could not reset this seller's password."),
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: sellerAdminService.removeSeller,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.seller.sellers });
+      queryClient.invalidateQueries({ queryKey: queryKeys.seller.platformOverview });
+    },
+    onError: (error: Error) => toast.error(error.message || 'Could not remove this seller.'),
+  });
+
+  const handleResetPassword = (seller: Profile) => {
+    resetPasswordMutation.mutate(seller.id, {
+      onSuccess: () => toast.success(`Password reset email sent to ${seller.email}`),
+    });
+  };
+
+  const handleRemove = (seller: Profile) => {
+    if (!confirm(`Permanently remove ${seller.store_name || seller.full_name}? This deletes their login and product listings and cannot be undone.`)) return;
+    removeMutation.mutate(seller.id, {
+      onSuccess: () => toast.success(`${seller.store_name || seller.full_name} removed`),
+    });
+  };
+
   const handleReactivate = (seller: Profile) => {
     suspendMutation.mutate(
       { sellerId: seller.id, reason: '', suspend: false },
@@ -239,7 +266,10 @@ function RosterSection() {
                   <p className="mt-1 text-xs text-red-600 dark:text-red-400">Reason: {seller.seller_status_reason}</p>
                 )}
               </div>
-              <div className="shrink-0">
+              <div className="flex shrink-0 flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={() => handleResetPassword(seller)} isLoading={resetPasswordMutation.isPending}>
+                  <KeyRound size={15} /> Reset Password
+                </Button>
                 {seller.seller_status === 'suspended' ? (
                   <Button size="sm" variant="account" onClick={() => handleReactivate(seller)} isLoading={suspendMutation.isPending}>
                     <RotateCcw size={15} /> Reactivate
@@ -249,6 +279,9 @@ function RosterSection() {
                     <Ban size={15} /> Suspend
                   </Button>
                 )}
+                <Button size="sm" variant="danger" onClick={() => handleRemove(seller)} isLoading={removeMutation.isPending}>
+                  <Trash2 size={15} /> Remove
+                </Button>
               </div>
             </Card>
           ))}
@@ -273,11 +306,73 @@ function RosterSection() {
   );
 }
 
+const BLANK_ADD_SELLER_FORM = { fullName: '', email: '', phone: '', storeName: '', gstNumber: '' };
+
+function AddSellerButton() {
+  const queryClient = useQueryClient();
+  const [isOpen, setIsOpen] = useState(false);
+  const [form, setForm] = useState(BLANK_ADD_SELLER_FORM);
+
+  const addMutation = useMutation({
+    mutationFn: sellerAdminService.addSeller,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.seller.sellers });
+      queryClient.invalidateQueries({ queryKey: queryKeys.seller.platformOverview });
+      toast.success(`${form.storeName} added — a password setup email was sent to ${form.email}`);
+      setIsOpen(false);
+      setForm(BLANK_ADD_SELLER_FORM);
+    },
+    onError: (error: Error) => toast.error(error.message || 'Could not add this seller.'),
+  });
+
+  const handleSubmit = () => {
+    if (!form.fullName.trim() || !form.email.trim() || !form.storeName.trim()) {
+      toast.error('Full name, email, and store name are required.');
+      return;
+    }
+    addMutation.mutate({
+      fullName: form.fullName.trim(),
+      email: form.email.trim(),
+      phone: form.phone.trim() || undefined,
+      storeName: form.storeName.trim(),
+      gstNumber: form.gstNumber.trim() || undefined,
+    });
+  };
+
+  return (
+    <>
+      <Button variant="account" onClick={() => setIsOpen(true)}>
+        <Plus size={15} /> Add Seller
+      </Button>
+      <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title="Add Seller">
+        <div className="space-y-4">
+          <Input floating label="Full Name" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
+          <Input floating label="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          <Input floating label="Store Name" value={form.storeName} onChange={(e) => setForm({ ...form, storeName: e.target.value })} />
+          <Input floating label="Phone (optional)" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          <Input floating label="GST Number (optional)" value={form.gstNumber} onChange={(e) => setForm({ ...form, gstNumber: e.target.value })} />
+          <div className="flex gap-3">
+            <Button variant="outline" fullWidth onClick={() => setIsOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="account" fullWidth onClick={handleSubmit} isLoading={addMutation.isPending}>
+              Add Seller
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </>
+  );
+}
+
 export function SellerSellersPage() {
   return (
     <div className="space-y-8">
       <Seo title="Manage Sellers" />
-      <h1 className="text-2xl font-bold text-acc-text dark:text-white">Sellers</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold text-acc-text dark:text-white">Sellers</h1>
+        <AddSellerButton />
+      </div>
       <ApplicationsSection />
       <RosterSection />
     </div>

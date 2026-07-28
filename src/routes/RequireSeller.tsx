@@ -17,7 +17,7 @@ export function RequireSeller() {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+    return <Navigate to="/seller/login" state={{ from: location.pathname }} replace />;
   }
 
   if (!isSellerRole(user?.role)) {

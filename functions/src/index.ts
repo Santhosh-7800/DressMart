@@ -10,6 +10,10 @@ export { verifyAndPlaceOrder } from './callables/verifyAndPlaceOrder';
 export { cancelOrder } from './callables/cancelOrder';
 export { reviewSellerRequest } from './callables/reviewSellerRequest';
 export { suspendSellerAccount } from './callables/suspendSellerAccount';
+export { addSeller } from './callables/addSeller';
+export { createHeadSeller } from './callables/createHeadSeller';
+export { resetSellerPassword } from './callables/resetSellerPassword';
+export { removeSeller } from './callables/removeSeller';
 
 // Firestore triggers
 export { onOrderStatusChange } from './triggers/onOrderStatusChange';

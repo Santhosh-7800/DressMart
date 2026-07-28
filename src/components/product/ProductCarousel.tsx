@@ -34,7 +34,7 @@ export function ProductCarousel({ title, products, isLoading, isError, onRetry, 
   if (!isLoading && !isError && products.length === 0) return null;
 
   return (
-    <section className="container-app py-8">
+    <section className="container-app py-6 sm:py-8">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-xl font-bold text-primary-900 dark:text-white">{title}</h2>
         <div className="flex items-center gap-2">

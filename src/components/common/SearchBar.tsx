@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mic, Search, X, Clock, TrendingUp, Flame, LayoutGrid, Tag } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { Mic, ScanLine, Search, X, Clock, TrendingUp, Flame, LayoutGrid, Tag } from 'lucide-react';
 import { useSearch } from '@/hooks/useSearch';
 import { useOnClickOutside } from '@/hooks/useOnClickOutside';
 import { ProductImage } from '@/components/ui/ProductImage';
@@ -101,6 +102,15 @@ export function SearchBar() {
           title="Voice search"
         >
           <Mic size={16} />
+        </button>
+        <button
+          type="button"
+          onClick={() => toast('Barcode scanning is coming soon', { icon: '📷' })}
+          className="mr-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-700"
+          aria-label="Scan barcode"
+          title="Scan barcode"
+        >
+          <ScanLine size={16} />
         </button>
         <button type="submit" className="hidden bg-accent px-5 py-2.5 text-sm font-semibold text-primary-900 sm:block">
           Search

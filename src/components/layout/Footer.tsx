@@ -43,7 +43,10 @@ const TRUST_BADGES = [
 
 export function Footer() {
   return (
-    <footer className="mt-16 bg-primary text-primary-100">
+    // Hidden on mobile — a heavy multi-column desktop footer has no place on a phone-sized app
+    // screen; its links are reachable from the Profile tab (BottomNavBar) instead. Still shown at
+    // md:+ for anyone browsing on a tablet/desktop viewport.
+    <footer className="mt-16 hidden bg-primary text-primary-100 md:block">
       <div className="container-app grid grid-cols-2 gap-6 border-b border-primary-700 py-8 sm:grid-cols-4">
         {TRUST_BADGES.map(({ icon: Icon, label }) => (
           <div key={label} className="flex items-center gap-3">

@@ -1,5 +1,6 @@
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { SizeChartModal } from './SizeChartModal';
 
 interface SizeOption {
   size: string;
@@ -13,16 +14,23 @@ interface SizeSelectorProps {
   sizes: SizeOption[];
   activeSize: string | null;
   onChange: (size: string) => void;
+  gender?: 'men' | 'kids' | string;
 }
 
-export function SizeSelector({ sizes, activeSize, onChange }: SizeSelectorProps) {
+export function SizeSelector({ sizes, activeSize, onChange, gender = 'men' }: SizeSelectorProps) {
+  const [isChartOpen, setIsChartOpen] = useState(false);
+
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
         <p className="text-sm font-medium">Size</p>
-        <Link to="/help-center" className="text-xs text-accent-600 hover:underline">
+        <button
+          type="button"
+          onClick={() => setIsChartOpen(true)}
+          className="text-xs text-accent-600 hover:underline focus:outline-none"
+        >
           Size chart
-        </Link>
+        </button>
       </div>
       <div className="flex flex-wrap gap-2">
         {sizes.map(({ size, inStock, stockCount, isLowStock }) => (
@@ -54,6 +62,8 @@ export function SizeSelector({ sizes, activeSize, onChange }: SizeSelectorProps)
           </div>
         ))}
       </div>
+
+      <SizeChartModal isOpen={isChartOpen} onClose={() => setIsChartOpen(false)} gender={gender} />
     </div>
   );
 }

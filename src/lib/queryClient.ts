@@ -36,6 +36,9 @@ export const queryKeys = {
   products: {
     all: ['products'] as const,
     list: (filters: unknown) => ['products', 'list', filters] as const,
+    /** Keyed WITHOUT `page` — an infinite query has one cache entry per filter-set, with TanStack
+     *  Query itself tracking which pages have been fetched into it (see useInfiniteProductList). */
+    listInfinite: (filtersWithoutPage: unknown) => ['products', 'list-infinite', filtersWithoutPage] as const,
     detail: (slug: string) => ['products', 'detail', slug] as const,
     related: (productId: string) => ['products', 'related', productId] as const,
     facets: (gender?: string, categorySlug?: string) => ['products', 'facets', gender, categorySlug] as const,
@@ -51,6 +54,9 @@ export const queryKeys = {
   brands: {
     all: ['brands'] as const,
     featured: ['brands', 'featured'] as const,
+  },
+  banners: {
+    all: ['banners'] as const,
   },
   cart: {
     all: ['cart'] as const,

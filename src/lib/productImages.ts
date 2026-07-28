@@ -11,7 +11,7 @@ const CATEGORY_FOLDER_MAP: Record<string, string> = {
   'formal-shirts': 'formal-shirts',
   'casual-shirts': 'casual-shirts',
   'printed-shirts': 'casual-shirts',
-  'checked-shirts': 'casual-shirts',
+  'checked-shirts': 'checked-shirts',
   'solid-shirts': 'casual-shirts',
   'linen-shirts': 'casual-shirts',
   'cotton-shirts': 'casual-shirts',
@@ -580,6 +580,20 @@ export interface VerifiedColor {
   name: string;
   hex: string;
 }
+
+/**
+ * NOTE: real Checked Shirt photography (CHS001-CHS030, minus CHS015) now exists on disk under
+ * public/images/products/men/checked-shirts/ (uploaded directly, not via this codebase) — this
+ * superseded an earlier batch of procedurally-generated SVG placeholder art (see the now-unused
+ * scripts/generateCheckedShirtPlaceholders.mjs) that used to have entries here. Those invented
+ * colors no longer describe what's actually in the (real) photos, so they've been removed rather
+ * than left in place silently claiming ground truth they no longer have — that mismatch is exactly
+ * the "Purple shirt labeled Khaki" class of bug this whole verified-color mechanism exists to
+ * prevent. Until someone hand-verifies each CHS code's real photo the same way the FS031-073 batch
+ * was verified (see REAL_PRODUCT_PHOTOGRAPHY above), generic Checked Shirts products fall back to a
+ * random color pick from COLOR_PALETTE — the same, already-accepted behavior every other
+ * non-curated category (jeans, jackets, hoodies, etc.) already has.
+ */
 
 /**
  * Code -> hand-verified color, independent of which (mock-catalog-era) product slug a photo set was

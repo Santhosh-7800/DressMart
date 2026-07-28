@@ -51,12 +51,14 @@ async function main() {
   }
 
   console.log('⚠ Products collection is empty — auto-seeding the catalog now (this only happens once)...\n');
-  const [{ main: seedCatalog }, { main: seedCuratedFormalShirts }] = await Promise.all([
-    import('./seedFirestore'),
-    import('./seedCuratedFormalShirts'),
+  const [{ main: seedCatalog }, { main: seedCuratedFormalShirts }, { main: seedCuratedCheckedShirts }] = await Promise.all([
+    import('./seedFirestore.js'),
+    import('./seedCuratedFormalShirts.js'),
+    import('./seedCuratedCheckedShirts.js'),
   ]);
   await seedCatalog();
   await seedCuratedFormalShirts();
+  await seedCuratedCheckedShirts();
   console.log('\n✔ Auto-seed complete — the catalog is ready.');
 }
 

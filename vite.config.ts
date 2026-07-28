@@ -1,9 +1,52 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { VitePWA } from 'vite-plugin-pwa';
 import path from 'node:path';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      // Firebase Messaging already ships its own service worker (public/firebase-messaging-sw.js,
+      // registered manually by src/hooks/useFcmToken.ts) — this plugin's generated SW is a separate,
+      // additional one (app-shell precache + runtime image caching) and must not clobber that file.
+      injectRegister: 'auto',
+      manifest: {
+        name: 'DressMart',
+        short_name: 'DressMart',
+        description: "Premium online shopping for Men's and Kids' wear",
+        theme_color: '#131921',
+        background_color: '#131921',
+        display: 'standalone',
+        orientation: 'portrait',
+        start_url: '/',
+        scope: '/',
+        icons: [
+          { src: '/icons/icon.svg', sizes: '192x192', type: 'image/svg+xml' },
+          { src: '/icons/icon.svg', sizes: '512x512', type: 'image/svg+xml' },
+          { src: '/icons/icon-maskable.svg', sizes: '512x512', type: 'image/svg+xml', purpose: 'maskable' },
+        ],
+      },
+      workbox: {
+        // Precache the built app shell; runtime-cache product photos (the bulk of network traffic)
+        // with a stale-while-revalidate strategy so repeat visits render instantly while still
+        // picking up updated images in the background. Firestore/Storage API calls are intentionally
+        // NOT cached here — that's Firestore's own offline-persistence layer's job (see src/lib/firebase.ts).
+        globPatterns: ['**/*.{js,css,html,svg,woff2}'],
+        runtimeCaching: [
+          {
+            urlPattern: /\/images\/products\/.*/i,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'product-images',
+              expiration: { maxEntries: 300, maxAgeSeconds: 30 * 24 * 60 * 60 },
+            },
+          },
+        ],
+      },
+    }),
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

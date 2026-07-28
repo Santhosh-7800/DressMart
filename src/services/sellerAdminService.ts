@@ -3,6 +3,7 @@ import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '@/lib/firebase';
 import type { Profile, SellerRequest } from '@/types';
 import { SELLER_ROLES } from '@/lib/roles';
+import { authService } from './authService';
 
 /**
  * Head-Seller-only reads/actions over the seller roster and applications. Cross-document writes
@@ -39,5 +40,27 @@ export const sellerAdminService = {
       'suspendSellerAccount',
     );
     await call(input);
+  },
+
+  /** Creates a brand-new, already-approved seller account, then emails them Firebase's standard
+   *  "set your password" link — no one, including the Head Seller, ever sets/knows their password. */
+  async addSeller(input: { fullName: string; email: string; phone?: string; storeName: string; gstNumber?: string }): Promise<void> {
+    const call = httpsCallable<typeof input, { success: true; uid: string }>(functions, 'addSeller');
+    await call(input);
+    await authService.requestPasswordReset(input.email);
+  },
+
+  /** Re-sends the password-reset email to an existing seller. */
+  async resetSellerPassword(sellerId: string): Promise<void> {
+    const call = httpsCallable<{ sellerId: string }, { email: string }>(functions, 'resetSellerPassword');
+    const { data } = await call({ sellerId });
+    await authService.requestPasswordReset(data.email);
+  },
+
+  /** Permanently deletes a seller's Auth account, profile, and product/inventory docs. Refuses if
+   *  the seller has any order history — use suspendSellerAccount instead in that case. */
+  async removeSeller(sellerId: string): Promise<void> {
+    const call = httpsCallable<{ sellerId: string }, { success: true }>(functions, 'removeSeller');
+    await call({ sellerId });
   },
 };

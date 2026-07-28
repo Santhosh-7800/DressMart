@@ -22,6 +22,22 @@ service firebase.storage {
         && request.resource.contentType.matches('image/.*');
     }
 
+    // Seller shop branding (logo/banner) — publicly readable, writable only by that seller.
+    match /shop/{sellerId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isSignedIn() && request.auth.uid == sellerId
+        && request.resource.size < 4 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // Head Seller-managed homepage banner images — publicly readable, writable only by that account.
+    match /banners/{headSellerId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isSignedIn() && request.auth.uid == headSellerId
+        && request.resource.size < 8 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
     // Seller verification documents (GST certificate, etc.) — private, readable by the owner and
     // the Head Seller only (Head Seller read is enforced via a Cloud Function / Admin SDK signed
     // URL rather than this ruleset, since Storage rules can't call out to Firestore for role checks

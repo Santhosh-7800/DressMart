@@ -5,8 +5,18 @@ import { ChevronLeft, ChevronRight, PlayCircle, RotateCw, X, ZoomIn, ZoomOut } f
 import type { GalleryItem } from './galleryTypes';
 import { Product360Viewer } from './Product360Viewer';
 import { resolveSwipeDirection } from '@/lib/gesture';
-import { cn } from '@/lib/utils';
+import { cn, clamp } from '@/lib/utils';
 import { ProductImage, FALLBACK_IMAGE_SRC } from '@/components/ui/ProductImage';
+
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 4;
+const TAP_ZOOM = 2.2;
+
+function touchDistance(touches: React.TouchList): number {
+  const a = touches[0];
+  const b = touches[1];
+  return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+}
 
 interface ProductGalleryLightboxProps {
   items: GalleryItem[];
@@ -17,7 +27,12 @@ interface ProductGalleryLightboxProps {
 }
 
 export function ProductGalleryLightbox({ items, index, onIndexChange, onClose, productName }: ProductGalleryLightboxProps) {
-  const [isZoomed, setIsZoomed] = useState(false);
+  // A continuous scale (not a binary zoomed/not-zoomed flag) so a real two-finger pinch can land on
+  // any zoom level, not just one fixed jump — tap-to-toggle (desktop, or a quick mobile fallback)
+  // still exists, it just targets a fixed TAP_ZOOM level instead of being the only way to zoom.
+  const [scale, setScale] = useState(1);
+  const isZoomed = scale > 1.05;
+  const pinchRef = useRef<{ initialDistance: number; initialScale: number } | null>(null);
   const [erroredIds, setErroredIds] = useState<Set<string>>(new Set());
   const stageRef = useRef<HTMLDivElement>(null);
   const activeItem = items[index];
@@ -38,7 +53,8 @@ export function ProductGalleryLightbox({ items, index, onIndexChange, onClose, p
   }, [index, onClose]);
 
   useEffect(() => {
-    setIsZoomed(false);
+    setScale(1);
+    pinchRef.current = null;
   }, [index]);
 
   const goTo = (next: number) => {
@@ -50,6 +66,31 @@ export function ProductGalleryLightbox({ items, index, onIndexChange, onClose, p
     const direction = resolveSwipeDirection(info.offset.x, info.velocity.x);
     if (direction === 'left') goTo(index + 1);
     if (direction === 'right') goTo(index - 1);
+  };
+
+  /** Real two-finger pinch — tracks the ratio of current-to-initial finger distance against the
+   *  scale pinch started at, so it composes with repeated pinch gestures instead of always
+   *  starting back from 1x. Framer's `drag` prop only understands single-pointer gestures, so this
+   *  bypasses it entirely with plain touch events; `touchAction: none` on the image (below) stops
+   *  the browser's own native pinch-zoom from fighting this one over the same gesture. */
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      pinchRef.current = { initialDistance: touchDistance(e.touches), initialScale: scale };
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && pinchRef.current) {
+      const ratio = touchDistance(e.touches) / pinchRef.current.initialDistance;
+      setScale(clamp(pinchRef.current.initialScale * ratio, MIN_ZOOM, MAX_ZOOM));
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (e.touches.length < 2) {
+      pinchRef.current = null;
+      setScale((s) => (s < 1.05 ? 1 : s));
+    }
   };
 
   return createPortal(
@@ -82,11 +123,15 @@ export function ProductGalleryLightbox({ items, index, onIndexChange, onClose, p
                 dragConstraints={isZoomed ? stageRef : { left: 0, right: 0 }}
                 dragElastic={isZoomed ? 0.15 : 0.6}
                 onDragEnd={isZoomed ? undefined : handleSwipeEnd}
-                onClick={() => setIsZoomed((z) => !z)}
-                animate={{ scale: isZoomed ? 2.2 : 1 }}
-                transition={{ duration: 0.25 }}
+                onClick={() => setScale((s) => (s > 1.05 ? 1 : TAP_ZOOM))}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                animate={{ scale }}
+                transition={pinchRef.current ? { duration: 0 } : { duration: 0.25 }}
                 draggable={false}
                 onError={() => setErroredIds((prev) => (prev.has(activeItem.id) ? prev : new Set(prev).add(activeItem.id)))}
+                style={{ touchAction: 'none' }}
                 className={cn('max-h-full max-w-full select-none object-contain', isZoomed ? 'cursor-zoom-out' : 'cursor-zoom-in')}
               />
             </div>
@@ -129,7 +174,7 @@ export function ProductGalleryLightbox({ items, index, onIndexChange, onClose, p
 
           {activeItem.type === 'image' && (
             <button
-              onClick={() => setIsZoomed((z) => !z)}
+              onClick={() => setScale((s) => (s > 1.05 ? 1 : TAP_ZOOM))}
               className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs text-white hover:bg-white/20 sm:bottom-5 sm:right-5"
             >
               {isZoomed ? <ZoomOut size={14} /> : <ZoomIn size={14} />} {isZoomed ? 'Zoom out' : 'Zoom in'}

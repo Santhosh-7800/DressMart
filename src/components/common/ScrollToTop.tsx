@@ -17,6 +17,14 @@ import { debugLog } from '@/lib/debugLog';
  */
 const scrollPositionByKey = new Map<string, number>();
 
+/** Read-only peek at a history entry's saved scroll offset — used by infinite-scroll list pages
+ *  (see useInfiniteProductListing) to re-apply the restore a second time once they've finished
+ *  re-fetching however many pages were loaded before the shopper navigated away; without this,
+ *  the single restore below fires before that content exists and scrolls into a still-short list. */
+export function getSavedScrollY(key: string): number | undefined {
+  return scrollPositionByKey.get(key);
+}
+
 export function ScrollToTop() {
   const { key } = useLocation();
   const navigationType = useNavigationType();

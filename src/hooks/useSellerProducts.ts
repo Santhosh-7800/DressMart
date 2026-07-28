@@ -128,3 +128,36 @@ export function useDeleteProduct() {
     onError: (error: Error) => toast.error(error.message),
   });
 }
+
+/** Duplicates one of the signed-in seller's own products into a new draft. */
+export function useDuplicateProduct() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ productId, sellerId, sellerName }: { productId: string; sellerId: string; sellerName: string }) =>
+      productService.duplicate(productId, sellerId, sellerName),
+    onSuccess: (_data, { sellerId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.products.bySeller(sellerId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.products.bySeller(user?.id ?? '') });
+      queryClient.invalidateQueries({ queryKey: ['products', 'all-sellers'] });
+      toast.success('Product duplicated as a draft');
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+}
+
+/** Head-Seller-only "Deal of the Day" toggle — mirrors useSetProductFeatured. */
+export function useSetProductDealOfDay() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ productId, isDeal, dealEndsAt }: { productId: string; isDeal: boolean; dealEndsAt: string | null }) =>
+      productService.setDealOfDay(productId, isDeal, dealEndsAt),
+    onSuccess: (_data, { isDeal }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
+      queryClient.invalidateQueries({ queryKey: ['products', 'all-sellers'] });
+      queryClient.invalidateQueries({ queryKey: ['products', 'deals'] });
+      toast.success(isDeal ? 'Product added to Deal of the Day' : 'Product removed from Deal of the Day');
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+}

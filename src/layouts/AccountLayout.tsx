@@ -1,7 +1,5 @@
-import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
-import { User, Package, MapPin, Bell, Ticket, Heart, Store, Settings, LogOut, Menu, X, type LucideIcon } from 'lucide-react';
+import { User, Package, MapPin, Bell, Ticket, Heart, Settings, LogOut, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAvatar } from '@/hooks/useAvatar';
@@ -15,13 +13,12 @@ const NAV_ITEMS: { to: string; label: string; icon: LucideIcon; end?: boolean }[
   { to: '/coupons', label: 'Coupons', icon: Ticket },
   { to: '/addresses', label: 'Addresses', icon: MapPin },
   { to: '/notifications', label: 'Notifications', icon: Bell },
-  { to: '/sell', label: 'Sell on DressMart', icon: Store },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
 function NavItems({ collapsed, onNavigate }: { collapsed?: boolean; onNavigate?: () => void }) {
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const { signOut } = useAuth();
 
   const handleLogout = async () => {
     onNavigate?.();
@@ -29,12 +26,9 @@ function NavItems({ collapsed, onNavigate }: { collapsed?: boolean; onNavigate?:
     navigate('/');
   };
 
-  // Existing sellers manage their store from the Seller Dashboard, not this "apply to sell" link.
-  const items = NAV_ITEMS.filter((item) => item.to !== '/sell' || user?.role === 'buyer');
-
   return (
     <>
-      {items.map(({ to, label, icon: Icon, end }) => (
+      {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
         <NavLink
           key={to}
           to={to}
@@ -92,11 +86,12 @@ function AccountSummary() {
 
 /**
  * Shared shell for every "My Account" page — a centered 1200px container with a 260px desktop
- * sidebar (icon rail on tablet, bottom-sheet drawer on mobile) and a fluid content column, so
- * every account page (Profile, Orders, Addresses, ...) gets the same premium chrome for free.
+ * sidebar and a collapsed icon rail on tablet. On mobile there's no sidebar/drawer of its own
+ * anymore — the global BottomNavBar's Profile tab (see src/components/layout/BottomNavBar.tsx) is
+ * the only mobile navigation now, with ProfilePage acting as the hub these account pages are
+ * reached from (a normal "push a new screen" navigation, not a competing fixed-bottom nav).
  */
 export function AccountLayout() {
-  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const { user } = useAuth();
   const { avatarUrl } = useAvatar();
 
@@ -121,59 +116,11 @@ export function AccountLayout() {
           </aside>
 
           {/* Content — always centered within the 1200px shell, fluid width */}
-          <div className="min-w-0 flex-1 pb-24 md:pb-0">
+          <div className="min-w-0 flex-1">
             <AnimatedOutlet />
           </div>
         </div>
       </div>
-
-      {/* Mobile: bottom bar that opens a drawer */}
-      <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between border-t border-acc-border bg-white/95 px-4 py-3 backdrop-blur-md md:hidden dark:border-primary-700 dark:bg-card-dark/95">
-        <div>
-          <p className="text-xs text-acc-text-secondary">My Account</p>
-          <p className="text-sm font-semibold text-acc-text dark:text-white">Menu</p>
-        </div>
-        <button
-          onClick={() => setIsMobileNavOpen(true)}
-          className="flex items-center gap-2 rounded-full bg-acc-primary px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_24px_-10px_rgba(255,107,0,0.7)] transition-transform active:scale-95"
-        >
-          <Menu size={16} /> Account Menu
-        </button>
-      </div>
-
-      {/* Mobile: bottom-sheet drawer nav */}
-      <AnimatePresence>
-        {isMobileNavOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsMobileNavOpen(false)}
-              className="fixed inset-0 z-40 bg-primary-950/50 md:hidden"
-            />
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 30, stiffness: 320 }}
-              className="fixed inset-x-0 bottom-0 z-50 max-h-[80vh] overflow-y-auto rounded-t-[24px] bg-white p-4 shadow-popover md:hidden dark:bg-card-dark"
-            >
-              <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-primary-200 dark:bg-primary-700" />
-              <div className="mb-3 flex items-center justify-between px-1">
-                <h2 className="text-base font-bold text-acc-text dark:text-white">My Account</h2>
-                <button onClick={() => setIsMobileNavOpen(false)} className="rounded-full p-1.5 hover:bg-primary-100 dark:hover:bg-primary-800" aria-label="Close menu">
-                  <X size={18} />
-                </button>
-              </div>
-              <AccountSummary />
-              <nav className="flex flex-col gap-1.5">
-                <NavItems onNavigate={() => setIsMobileNavOpen(false)} />
-              </nav>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

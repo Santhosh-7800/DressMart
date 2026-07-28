@@ -3,9 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover is required for env(safe-area-inset-*) (see src/index.css's .pb-safe) to
+         resolve to real values instead of 0 on notched/gesture-nav Android & iOS devices. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="DressMart — premium online shopping for Men's and Kids' wear. Shop shirts, t-shirts, jeans, jackets, shoes and more with fast delivery and easy returns." />
     <meta name="theme-color" content="#131921" />
+    <!-- iOS home-screen/PWA install support (Android's install prompt reads the Web Manifest
+         instead, injected automatically by vite-plugin-pwa — see vite.config.ts). -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="DressMart" />
+    <link rel="apple-touch-icon" href="/icons/icon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet" />

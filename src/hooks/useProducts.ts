@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { brandService, categoryService, productService } from '@/services/productService';
 import { reviewService } from '@/services/reviewService';
 import { bannerService } from '@/services/bannerService';
@@ -11,6 +11,22 @@ export function useProductList(filters: ProductFilters) {
   return useQuery({
     queryKey: queryKeys.products.list(filters),
     queryFn: () => productService.list(filters),
+  });
+}
+
+/**
+ * Same data as useProductList, but accumulated page-by-page for infinite scroll instead of a single
+ * page — the query key deliberately excludes `page` (see queryKeys.products.listInfinite) since an
+ * infinite query has ONE cache entry per filter-set that TanStack Query grows itself; passing `page`
+ * through the key would fork a separate cache entry per page instead of accumulating one list.
+ */
+export function useInfiniteProductList(filters: ProductFilters) {
+  const { page: _page, ...keyFilters } = filters;
+  return useInfiniteQuery({
+    queryKey: queryKeys.products.listInfinite(keyFilters),
+    queryFn: ({ pageParam }) => productService.list({ ...filters, page: pageParam }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => (lastPage.hasMore ? lastPage.page + 1 : undefined),
   });
 }
 
@@ -128,9 +144,8 @@ export function useFeaturedBrands() {
   return useQuery({ queryKey: queryKeys.brands.featured, queryFn: () => brandService.featured() });
 }
 
-/** Banners are now a small hardcoded array (see bannerService) — no backend call, so no query key/network round-trip needed. */
 export function useBanners() {
-  return { data: bannerService.list(), isLoading: false };
+  return useQuery({ queryKey: queryKeys.banners.all, queryFn: () => bannerService.list() });
 }
 
 export function useDealsOfTheDay() {

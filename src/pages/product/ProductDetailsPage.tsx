@@ -77,9 +77,14 @@ export function ProductDetailsPage() {
 
   const colors = useMemo(() => {
     if (!product) return [];
-    const seen = new Map<string, string>();
-    product.variants.forEach((v) => seen.set(v.color, v.color_hex));
-    return Array.from(seen.entries()).map(([name, hex]) => ({ name, hex }));
+    const seen = new Map<string, { hex: string; image?: string }>();
+    product.variants.forEach((v) => {
+      if (!seen.has(v.color)) {
+        const colorImg = product.images.find((img) => img.color === v.color)?.url || product.images[0]?.url || product.coverImage;
+        seen.set(v.color, { hex: v.color_hex, image: colorImg });
+      }
+    });
+    return Array.from(seen.entries()).map(([name, { hex, image }]) => ({ name, hex, image }));
   }, [product]);
 
   const sizesForColor = useMemo(() => {
@@ -194,7 +199,7 @@ export function ProductDetailsPage() {
   };
 
   return (
-    <div className="container-app py-6">
+    <div className="container-app pt-6 pb-24 md:pb-6">
       <Seo title={product.name} description={product.description} />
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
@@ -227,7 +232,7 @@ export function ProductDetailsPage() {
 
           <div className="mt-6 space-y-5">
             <ColorSwatches colors={colors} activeColor={activeColor ?? ''} onChange={(c) => { setActiveColor(c); setActiveSize(null); }} />
-            <SizeSelector sizes={sizesForColor} activeSize={activeSize} onChange={setActiveSize} />
+            <SizeSelector sizes={sizesForColor} activeSize={activeSize} onChange={setActiveSize} gender={product.gender} />
             <SizeRecommender
               sizes={sizesForColor.map((s) => s.size)}
               stockBySize={Object.fromEntries(sizesForColor.map((s) => [s.size, s.inStock ? 1 : 0]))}
@@ -261,7 +266,7 @@ export function ProductDetailsPage() {
             </div>
           )}
 
-          <div className="mt-6 flex gap-3">
+          <div className="mt-6 hidden gap-3 md:flex">
             {productUnavailable ? (
               <div className="flex h-12 flex-1 items-center justify-center rounded-xl bg-primary-100 text-sm font-semibold text-red-500 dark:bg-primary-800">
                 Out of Stock
@@ -351,6 +356,36 @@ export function ProductDetailsPage() {
               <p>This item is eligible for free returns within 7 days of delivery. Refunds are processed within 5-7 business days after we receive the returned item.</p>
             </Accordion>
           </div>
+        </div>
+      </div>
+
+      {/* Mobile sticky action bar — mirrors the inline buttons above (hidden on mobile via
+          md:flex there) so the primary purchase actions stay reachable without scrolling back up,
+          matching every native Android shopping app's PDP pattern. Sits just above the global
+          BottomNavBar (bottom-16 == BottomNavBar's own reserved height, see MainLayout's pb-16). */}
+      <div className="fixed inset-x-0 bottom-16 z-30 border-t border-primary-100 bg-surface p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] md:hidden dark:border-primary-700 dark:bg-surface-dark">
+        <div className="flex gap-2">
+          <button
+            onClick={() => toggle(product.id)}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-primary-200 dark:border-primary-600"
+            aria-label="Toggle wishlist"
+          >
+            <Heart size={18} className={isWishlisted(product.id) ? 'fill-red-500 text-red-500' : ''} />
+          </button>
+          {productUnavailable ? (
+            <div className="flex h-11 flex-1 items-center justify-center rounded-xl bg-primary-100 text-sm font-semibold text-red-500 dark:bg-primary-800">
+              Out of Stock
+            </div>
+          ) : (
+            <>
+              <Button variant="outline" size="md" fullWidth onClick={handleAddToCart} disabled={!canTransact}>
+                Add to Cart
+              </Button>
+              <Button variant="accent" size="md" fullWidth onClick={handleBuyNow} disabled={!canTransact}>
+                Buy Now
+              </Button>
+            </>
+          )}
         </div>
       </div>
 

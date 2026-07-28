@@ -13,6 +13,8 @@
     "lint": "eslint .",
     "seed": "tsx scripts/seedFirestore.ts",
     "seed:curated-formal-shirts": "tsx scripts/seedCuratedFormalShirts.ts",
+    "seed:curated-checked-shirts": "tsx scripts/seedCuratedCheckedShirts.ts",
+    "validate:checked-shirts": "tsx scripts/validateCheckedShirtImages.ts",
     "typecheck": "tsc -b --noEmit",
     "images:scan": "tsx scripts/generateImageManifest.ts",
     "emulators": "firebase emulators:start --import=./.emulator-data --export-on-exit=./.emulator-data"
@@ -52,6 +54,7 @@
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.19.0",
-    "vite": "^6.0.6"
+    "vite": "^6.0.6",
+    "vite-plugin-pwa": "^1.3.0"
   }
 }

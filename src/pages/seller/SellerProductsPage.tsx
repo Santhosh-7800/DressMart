@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Plus, Search, Eye, EyeOff, Trash2, Pencil, AlertTriangle, PackageSearch } from 'lucide-react';
+import { Plus, Search, Eye, EyeOff, Trash2, Pencil, Copy, AlertTriangle, PackageSearch } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -10,7 +10,7 @@ import { Pagination } from '@/components/ui/Pagination';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useAuth } from '@/contexts/AuthContext';
-import { useSellerProducts, useSetProductStatus, useDeleteProduct } from '@/hooks/useSellerProducts';
+import { useSellerProducts, useSetProductStatus, useDeleteProduct, useDuplicateProduct } from '@/hooks/useSellerProducts';
 import { inventoryService } from '@/services/inventoryService';
 import { formatCurrency, cn } from '@/lib/utils';
 import type { ProductStatus } from '@/types';
@@ -41,6 +41,7 @@ const STATUS_LABEL: Record<ProductStatus, string> = {
 
 export function SellerProductsPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const isPending = user?.seller_status === 'pending';
   const isSuspendedOrRejected = user?.seller_status === 'suspended' || user?.seller_status === 'rejected';
   const [search, setSearch] = useState('');
@@ -58,6 +59,7 @@ export function SellerProductsPage() {
 
   const setStatus = useSetProductStatus();
   const remove = useDeleteProduct();
+  const duplicate = useDuplicateProduct();
 
   const isLoading = isLoadingProducts || isLoadingInventory;
 
@@ -270,6 +272,18 @@ export function SellerProductsPage() {
                             <Eye size={15} />
                           </button>
                         )}
+                        <button
+                          onClick={() => {
+                            duplicate.mutate(
+                              { productId: product.id, sellerId: product.seller_id, sellerName: product.seller_name },
+                              { onSuccess: (created) => navigate(`/seller/products/${created.id}/edit`) },
+                            );
+                          }}
+                          className="rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700"
+                          title="Duplicate"
+                        >
+                          <Copy size={15} />
+                        </button>
                         <button
                           onClick={() => {
                             if (confirm(`Delete "${product.name}"? This cannot be undone.`)) remove.mutate(product.id);

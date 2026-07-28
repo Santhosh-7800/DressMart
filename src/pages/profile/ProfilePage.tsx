@@ -1,8 +1,29 @@
 import { useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
-import { User, Mail, Phone, Ticket, MapPin, Sparkles, Package, Heart, Clock, Copy, Plus, Camera, Store, Clock3, ShieldAlert } from 'lucide-react';
+import {
+  User,
+  Mail,
+  Phone,
+  Ticket,
+  MapPin,
+  Sparkles,
+  Package,
+  Heart,
+  Clock,
+  Copy,
+  Plus,
+  Camera,
+  Store,
+  Clock3,
+  ShieldAlert,
+  Bell,
+  Settings as SettingsIcon,
+  HelpCircle,
+  LogOut,
+  ChevronRight,
+} from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -20,8 +41,15 @@ import { useWishlist } from '@/hooks/useWishlist';
 import { useRecentlyViewed } from '@/hooks/useRecentlyViewed';
 import { useAddresses } from '@/hooks/useAddresses';
 import { useCoupons } from '@/hooks/useCoupons';
+import { useNotifications } from '@/hooks/useNotifications';
 import { usePersonalizedRecommendations } from '@/hooks/usePersonalizedRecommendations';
 import { formatCurrency, formatDate } from '@/lib/utils';
+
+const MORE_LINKS: { to: string; label: string; icon: typeof Bell }[] = [
+  { to: '/notifications', label: 'Notifications', icon: Bell },
+  { to: '/settings', label: 'Settings', icon: SettingsIcon },
+  { to: '/help-center', label: 'Help & Support', icon: HelpCircle },
+];
 
 const ORDER_STATUS_STYLES: Record<string, string> = {
   placed: 'badge-accent',
@@ -35,7 +63,8 @@ const ORDER_STATUS_STYLES: Record<string, string> = {
 };
 
 export function ProfilePage() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const { updateProfile, isUpdating } = useProfile();
   const { avatarUrl, uploadAvatar, isUploading } = useAvatar();
   const { data: orders, isLoading: isLoadingOrders } = useOrders();
@@ -43,7 +72,13 @@ export function ProfilePage() {
   const { recentlyViewed, isLoading: isLoadingRecent } = useRecentlyViewed();
   const { addresses, isLoading: isLoadingAddresses } = useAddresses();
   const { data: coupons, isLoading: isLoadingCoupons } = useCoupons();
+  const { unreadCount } = useNotifications();
   const { recommendations, isLoading: isLoadingRecommendations } = usePersonalizedRecommendations();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/');
+  };
 
   const [fullName, setFullName] = useState(user?.full_name ?? '');
   const [phone, setPhone] = useState(user?.phone ?? '');
@@ -84,6 +119,40 @@ export function ProfilePage() {
       <Seo title="My Account" />
 
       <ProfileHeroCard user={user} orderCount={orders?.length ?? 0} wishlistCount={wishlistItems.length} />
+
+      {/* Mobile hub menu — this is the only way to reach Notifications/Settings/Help/Logout now
+          that AccountLayout no longer has its own mobile bottom-sheet nav (see BottomNavBar's
+          Profile tab). Shown at every breakpoint — harmless extra convenience on desktop too. */}
+      <Card className="p-2">
+        {MORE_LINKS.map(({ to, label, icon: Icon }) => (
+          <Link
+            key={to}
+            to={to}
+            className="flex items-center gap-3 rounded-2xl px-3 py-3 transition-colors hover:bg-acc-primary/5"
+          >
+            <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-acc-primary/10 text-acc-primary">
+              <Icon size={17} />
+              {to === '/notifications' && unreadCount > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-primary-900">
+                  {unreadCount}
+                </span>
+              )}
+            </span>
+            <span className="flex-1 text-sm font-medium text-acc-text dark:text-white">{label}</span>
+            <ChevronRight size={16} className="shrink-0 text-acc-text-secondary" />
+          </Link>
+        ))}
+        <button
+          type="button"
+          onClick={handleSignOut}
+          className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition-colors hover:bg-red-50 dark:hover:bg-red-900/20"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400">
+            <LogOut size={17} />
+          </span>
+          <span className="flex-1 text-sm font-medium text-red-600 dark:text-red-400">Sign Out</span>
+        </button>
+      </Card>
 
       {user.role === 'buyer' && (
         <motion.div whileHover={{ y: -3 }} transition={{ duration: 0.2 }}>

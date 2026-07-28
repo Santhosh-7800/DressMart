@@ -41,6 +41,15 @@ service cloud.firestore {
       return isSignedIn() && uid() == userId;
     }
 
+    // Singleton flag for the one-time Head Seller setup flow (see functions/src/callables/
+    // createHeadSeller.ts) — public read so the setup page can tell whether it's already been used,
+    // write-only via the Admin SDK inside that Cloud Function's transaction so the "exactly one Head
+    // Seller, created once" guarantee can't be bypassed by a direct client write.
+    match /system/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     match /users/{userId} {
       allow read: if isOwner(userId) || isHeadSeller();
       allow create: if isOwner(userId);
@@ -128,10 +137,21 @@ service cloud.firestore {
       allow write: if isHeadSeller();
     }
 
+    match /banners/{bannerId} {
+      allow read: if true;
+      allow write: if isHeadSeller();
+    }
+
     match /reviews/{reviewId} {
       allow read: if true;
       allow create: if isSignedIn() && request.resource.data.user_id == uid();
-      allow update, delete: if isSignedIn() && resource.data.user_id == uid();
+      allow update: if isSignedIn() && resource.data.user_id == uid();
+      // Seller reply: the owning seller of the reviewed product (or head-seller) may update ONLY
+      // the seller_reply field — the buyer-authored fields stay immutable to them.
+      allow update: if isSignedIn() &&
+        (isHeadSeller() || get(/databases/$(database)/documents/products/$(resource.data.product_id)).data.seller_id == uid()) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seller_reply']);
+      allow delete: if isSignedIn() && resource.data.user_id == uid();
     }
 
     match /platform_settings/{docId} {

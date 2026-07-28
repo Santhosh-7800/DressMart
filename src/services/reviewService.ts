@@ -1,9 +1,10 @@
-import { addDoc, collection, getDocs, orderBy, query, where } from 'firebase/firestore';
+import { addDoc, collection, doc, getDocs, orderBy, query, updateDoc, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Order, RatingSummary, Review, ReviewableOrderItem, SubmitReviewInput } from '@/types';
 
 const REVIEWS_COLLECTION = 'reviews';
 const ORDERS_COLLECTION = 'orders';
+const PRODUCTS_COLLECTION = 'products';
 
 /**
  * Rating aggregation: Firestore has no SQL views/materialized aggregates, and buyers aren't allowed
@@ -116,5 +117,31 @@ export const reviewService = {
     };
     const ref = await addDoc(collection(db, REVIEWS_COLLECTION), payload);
     return { id: ref.id, ...payload };
+  },
+
+  /** Seller/head-seller reply to a review — overwrites any existing reply (edit = re-submit). */
+  async replyToReview(reviewId: string, replyText: string): Promise<void> {
+    await updateDoc(doc(db, REVIEWS_COLLECTION, reviewId), {
+      seller_reply: { text: replyText, replied_at: new Date().toISOString() },
+    });
+  },
+
+  /** Every review across this seller's own products, newest first — reviews are keyed by
+   *  product_id, not seller_id, so this resolves the seller's product ids first. Powers
+   *  SellerReviewsPage. */
+  async listForSeller(sellerId: string): Promise<(Review & { product_name: string; product_slug: string })[]> {
+    const productsSnap = await getDocs(query(collection(db, PRODUCTS_COLLECTION), where('seller_id', '==', sellerId)));
+    const productsById = new Map(productsSnap.docs.map((d) => [d.id, d.data() as { name: string; slug: string }]));
+    const ids = [...productsById.keys()];
+    if (ids.length === 0) return [];
+
+    const chunks: string[][] = [];
+    for (let i = 0; i < ids.length; i += 30) chunks.push(ids.slice(i, i + 30));
+    const results = await Promise.all(chunks.map((chunk) => getDocs(query(collection(db, REVIEWS_COLLECTION), where('product_id', 'in', chunk)))));
+
+    return results
+      .flatMap((snap) => snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Review))
+      .map((r) => ({ ...r, product_name: productsById.get(r.product_id)?.name ?? '', product_slug: productsById.get(r.product_id)?.slug ?? '' }))
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   },
 };

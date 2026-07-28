@@ -20,8 +20,10 @@ export function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [isDeliveryOpen, setIsDeliveryOpen] = useState(false);
+  const [isMobileDeliveryOpen, setIsMobileDeliveryOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
   const deliveryRef = useRef<HTMLDivElement>(null);
+  const mobileDeliveryRef = useRef<HTMLDivElement>(null);
   const { isAuthenticated, user, signOut } = useAuth();
   const { totalItems } = useCart();
   const { items: wishlistItems } = useWishlist();
@@ -35,10 +37,51 @@ export function Header() {
 
   useOnClickOutside(accountRef, () => setIsAccountOpen(false));
   useOnClickOutside(deliveryRef, () => setIsDeliveryOpen(false));
+  useOnClickOutside(mobileDeliveryRef, () => setIsMobileDeliveryOpen(false));
 
   return (
     <header className="sticky top-0 z-40 bg-primary text-white shadow-md">
-      <div className="container-app flex items-center gap-4 py-3">
+      {/* Mobile app-bar: hamburger + logo + delivery chip + notifications on one slim row, full-width
+          search below — the desktop row's inline search/account/cart icons don't fit a phone width,
+          and Cart/Profile are already reachable from the global BottomNavBar, so they're dropped here
+          rather than squeezed in. */}
+      <div className="container-app flex flex-col gap-2 py-2.5 md:hidden">
+        <div className="flex items-center gap-3">
+          <button onClick={() => setIsMobileMenuOpen(true)} aria-label="Open menu">
+            <Menu size={22} />
+          </button>
+          <Link to="/" className="flex shrink-0 items-center gap-2">
+            <span className="text-lg font-bold tracking-tight">
+              Dress<span className="text-accent">Mart</span>
+            </span>
+          </Link>
+          <div ref={mobileDeliveryRef} className="relative ml-auto shrink-0">
+            <button
+              onClick={() => setIsMobileDeliveryOpen((v) => !v)}
+              className="flex items-center gap-1 text-xs"
+              title="Delivery location"
+              aria-label="Update delivery location"
+            >
+              <MapPin size={15} className="text-accent" />
+              <span className="font-semibold">{pincode}</span>
+            </button>
+            {isMobileDeliveryOpen && <DeliveryDropdown onClose={() => setIsMobileDeliveryOpen(false)} />}
+          </div>
+          <Link to="/notifications" className="relative shrink-0" aria-label="Notifications">
+            <Bell size={20} />
+            {unreadCount > 0 && (
+              <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-primary-900">
+                {unreadCount}
+              </span>
+            )}
+          </Link>
+        </div>
+        <SearchBar />
+      </div>
+
+      {/* Tablet/desktop row — unchanged from before, just now gated to md+ since the block above
+          takes over on phone widths. */}
+      <div className="container-app hidden items-center gap-4 py-3 md:flex">
         <button onClick={() => setIsMobileMenuOpen(true)} className="lg:hidden" aria-label="Open menu">
           <Menu size={24} />
         </button>
@@ -115,13 +158,9 @@ export function Header() {
                     <Link to="/settings" onClick={() => setIsAccountOpen(false)} className="block rounded-lg px-3 py-2 text-sm hover:bg-primary-50 dark:hover:bg-primary-800">
                       Settings
                     </Link>
-                    {user?.role === 'seller' || user?.role === 'head_seller' ? (
+                    {(user?.role === 'seller' || user?.role === 'head_seller') && (
                       <Link to="/seller/dashboard" onClick={() => setIsAccountOpen(false)} className="block rounded-lg px-3 py-2 text-sm font-medium text-accent hover:bg-primary-50 dark:hover:bg-primary-800">
                         Seller Dashboard
-                      </Link>
-                    ) : (
-                      <Link to="/sell" onClick={() => setIsAccountOpen(false)} className="block rounded-lg px-3 py-2 text-sm font-medium text-accent hover:bg-primary-50 dark:hover:bg-primary-800">
-                        Sell on DressMart
                       </Link>
                     )}
                     <button

@@ -26,6 +26,30 @@ export async function uploadAvatarImage(file: File, userId: string): Promise<str
   return getDownloadURL(fileRef);
 }
 
+/** Seller shop branding — `shop/{sellerId}/...`, matching storage.rules. */
+export async function uploadShopLogo(file: File | Blob, sellerId: string): Promise<string> {
+  const path = `shop/${sellerId}/logo-${Date.now()}.jpg`;
+  const fileRef = ref(storage, path);
+  await uploadBytes(fileRef, file, { cacheControl: '3600', contentType: 'image/jpeg' });
+  return getDownloadURL(fileRef);
+}
+
+export async function uploadShopBanner(file: File | Blob, sellerId: string): Promise<string> {
+  const path = `shop/${sellerId}/banner-${Date.now()}.jpg`;
+  const fileRef = ref(storage, path);
+  await uploadBytes(fileRef, file, { cacheControl: '3600', contentType: 'image/jpeg' });
+  return getDownloadURL(fileRef);
+}
+
+/** Head-Seller homepage banner images — `banners/{headSellerId}/...`, matching storage.rules. */
+export async function uploadBannerImage(file: File, headSellerId: string): Promise<string> {
+  const ext = file.name.split('.').pop() ?? 'jpg';
+  const path = `banners/${headSellerId}/${crypto.randomUUID()}.${ext}`;
+  const fileRef = ref(storage, path);
+  await uploadBytes(fileRef, file, { cacheControl: '3600' });
+  return getDownloadURL(fileRef);
+}
+
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 export function isAcceptedImageFile(file: File): boolean {

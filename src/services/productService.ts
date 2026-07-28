@@ -96,7 +96,8 @@ async function fetchActiveWindow(gender?: Gender, categorySlugs?: string[]): Pro
   }
   constraints.push(fsLimit(CATALOG_FETCH_LIMIT));
   const snap = await getDocs(query(collection(db, PRODUCTS_COLLECTION), ...constraints));
-  return hydrate(snap.docs.map((d) => d.data() as Product));
+  const hydrated = await hydrate(snap.docs.map((d) => d.data() as Product));
+  return hydrated.filter((p) => !p.coverImage?.endsWith('.svg') && !p.imageUrl?.endsWith('.svg'));
 }
 
 function matchesRemainingFilters(p: Product, filters: ProductFilters): boolean {
@@ -500,14 +501,62 @@ export const productService = {
     await updateDoc(doc(db, PRODUCTS_COLLECTION, productId), { is_featured: featured, updated_at: new Date().toISOString() });
   },
 
+  /** Head-Seller-only "Deal of the Day" toggle — mirrors setFeatured. Clears deal_ends_at when turned off. */
+  async setDealOfDay(productId: string, isDeal: boolean, dealEndsAt: string | null): Promise<void> {
+    await updateDoc(doc(db, PRODUCTS_COLLECTION, productId), {
+      is_deal_of_day: isDeal,
+      deal_ends_at: isDeal ? dealEndsAt : null,
+      updated_at: new Date().toISOString(),
+    });
+  },
+
   async remove(productId: string): Promise<void> {
     await deleteDoc(doc(db, PRODUCTS_COLLECTION, productId));
+  },
+
+  /** Duplicates an existing product into a new draft owned by the same seller. Images are
+   *  referenced, not re-uploaded (remove() never deletes Storage objects, so there's no cascade
+   *  risk in sharing URLs) — create() auto-generates a fresh SKU/variant ids off the new doc id,
+   *  so nothing collides with the original. Starting stock carries over from the source Inventory
+   *  doc; the seller can zero it out on the Inventory page before publishing if not actually in stock. */
+  async duplicate(productId: string, sellerId: string, sellerName: string): Promise<Product> {
+    const existing = await this.getById(productId);
+    if (!existing) throw new Error('Product not found.');
+    const inventory = await inventoryService.getInventory(productId);
+    const input: SellerProductInput = {
+      name: `${existing.name} (Copy)`,
+      sku: '',
+      brand_id: existing.brand_id,
+      category_id: existing.category_id,
+      subcategory: existing.subcategory ?? '',
+      gender: existing.gender,
+      description: existing.description,
+      fabric: existing.specifications.fabric,
+      sleeve: existing.specifications.sleeve ?? '',
+      fit: existing.specifications.fit,
+      pattern: existing.specifications.pattern ?? '',
+      collar: existing.specifications.collar ?? '',
+      occasion: existing.specifications.occasion ?? '',
+      price: existing.price,
+      mrp: existing.mrp,
+      gst_percent: existing.gst_percent,
+      cod_available: existing.cod_available,
+      low_stock_threshold: inventory?.low_stock_threshold ?? 5,
+      colors: toColorInputs(existing, inventory),
+      is_return_eligible: existing.is_return_eligible,
+      is_exchange_eligible: existing.is_exchange_eligible,
+      status: 'draft',
+    };
+    return this.create(sellerId, sellerName, input);
   },
 
   /** Every product in the catalog, any seller, any status — powers the Head Seller's "All Products" page. */
   async listAll(): Promise<Product[]> {
     const snap = await getDocs(query(collection(db, PRODUCTS_COLLECTION), fsLimit(1000)));
-    const items = snap.docs.map((d) => d.data() as Product).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    const items = snap.docs
+      .map((d) => d.data() as Product)
+      .filter((p) => !p.coverImage?.endsWith('.svg') && !p.imageUrl?.endsWith('.svg'))
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     return hydrate(items);
   },
 
@@ -528,6 +577,32 @@ export const categoryService = {
   async list(gender?: string): Promise<Category[]> {
     const categories = [...(await getCategoriesMap()).values()].sort((a, b) => a.sort_order - b.sort_order);
     return gender ? categories.filter((c) => c.gender === gender && c.parent_id) : categories;
+  },
+
+  /** Head-Seller-only category CRUD — powers SellerCategoriesPage. Every mutation invalidates the
+   *  module-level catalog cache (primeCatalogCaches) in addition to whatever the caller does with
+   *  React Query, since product hydration reads categories from that cache, not from a query. */
+  async create(input: Omit<Category, 'id'>): Promise<Category> {
+    const ref = doc(collection(db, 'categories'));
+    await setDoc(ref, input);
+    primeCatalogCaches();
+    return { id: ref.id, ...input };
+  },
+
+  async update(categoryId: string, updates: Partial<Omit<Category, 'id'>>): Promise<void> {
+    await updateDoc(doc(db, 'categories', categoryId), updates);
+    primeCatalogCaches();
+  },
+
+  /** Refuses if any product still references this category — orphaning category_id silently
+   *  breaks every read site that joins it in, rather than crashing anything. */
+  async remove(categoryId: string): Promise<void> {
+    const inUse = await getDocs(query(collection(db, PRODUCTS_COLLECTION), where('category_id', '==', categoryId), fsLimit(1)));
+    if (!inUse.empty) {
+      throw new Error('This category still has products assigned to it. Reassign or remove those products first.');
+    }
+    await deleteDoc(doc(db, 'categories', categoryId));
+    primeCatalogCaches();
   },
 };
 

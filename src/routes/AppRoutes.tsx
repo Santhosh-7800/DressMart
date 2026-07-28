@@ -21,6 +21,7 @@ const MenHomePage = lazyWithRetry(() => import('@/pages/men/MenHomePage').then((
 const MenCategoryPage = lazyWithRetry(() => import('@/pages/men/MenCategoryPage').then((m) => ({ default: m.MenCategoryPage })));
 const KidsHomePage = lazyWithRetry(() => import('@/pages/kids/KidsHomePage').then((m) => ({ default: m.KidsHomePage })));
 const KidsCategoryPage = lazyWithRetry(() => import('@/pages/kids/KidsCategoryPage').then((m) => ({ default: m.KidsCategoryPage })));
+const CategoriesLandingPage = lazyWithRetry(() => import('@/pages/category/CategoriesLandingPage').then((m) => ({ default: m.CategoriesLandingPage })));
 
 const ProductDetailsPage = lazyWithRetry(() => import('@/pages/product/ProductDetailsPage').then((m) => ({ default: m.ProductDetailsPage })));
 const WishlistPage = lazyWithRetry(() => import('@/pages/wishlist/WishlistPage').then((m) => ({ default: m.WishlistPage })));
@@ -67,6 +68,12 @@ const SellerReportsPage = lazyWithRetry(() => import('@/pages/seller/SellerRepor
 const SellerCouponsPage = lazyWithRetry(() => import('@/pages/seller/SellerCouponsPage').then((m) => ({ default: m.SellerCouponsPage })));
 const SellerPlatformSettingsPage = lazyWithRetry(() => import('@/pages/seller/SellerPlatformSettingsPage').then((m) => ({ default: m.SellerPlatformSettingsPage })));
 const SellerApplyPage = lazyWithRetry(() => import('@/pages/seller/SellerApplyPage').then((m) => ({ default: m.SellerApplyPage })));
+const SellerLoginPage = lazyWithRetry(() => import('@/pages/seller/SellerLoginPage').then((m) => ({ default: m.SellerLoginPage })));
+const HeadSellerSetupPage = lazyWithRetry(() => import('@/pages/seller/HeadSellerSetupPage').then((m) => ({ default: m.HeadSellerSetupPage })));
+const SellerCategoriesPage = lazyWithRetry(() => import('@/pages/seller/SellerCategoriesPage').then((m) => ({ default: m.SellerCategoriesPage })));
+const SellerBannersPage = lazyWithRetry(() => import('@/pages/seller/SellerBannersPage').then((m) => ({ default: m.SellerBannersPage })));
+const SellerReviewsPage = lazyWithRetry(() => import('@/pages/seller/SellerReviewsPage').then((m) => ({ default: m.SellerReviewsPage })));
+const SellerNotificationsPage = lazyWithRetry(() => import('@/pages/seller/SellerNotificationsPage').then((m) => ({ default: m.SellerNotificationsPage })));
 
 function RouteFallback() {
   return (
@@ -88,6 +95,7 @@ export function AppRoutes() {
           <Route path="/new-arrivals" element={<NewArrivalsPage />} />
           <Route path="/best-sellers" element={<BestSellersPage />} />
 
+          <Route path="/categories" element={<CategoriesLandingPage />} />
           <Route path="/men" element={<MenHomePage />} />
           <Route path="/men/:categorySlug" element={<MenCategoryPage />} />
           <Route path="/kids" element={<KidsHomePage />} />
@@ -126,6 +134,8 @@ export function AppRoutes() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/verify-otp" element={<OtpVerificationPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/seller/login" element={<SellerLoginPage />} />
+          <Route path="/seller/setup" element={<HeadSellerSetupPage />} />
         </Route>
 
         {/* Seller Dashboard Routes */}
@@ -140,6 +150,8 @@ export function AppRoutes() {
             <Route path="/seller/returns" element={<SellerReturnsPage />} />
             <Route path="/seller/exchanges" element={<SellerExchangesPage />} />
             <Route path="/seller/settings" element={<SellerSettingsPage />} />
+            <Route path="/seller/reviews" element={<SellerReviewsPage />} />
+            <Route path="/seller/notifications" element={<SellerNotificationsPage />} />
 
             {/* Head Seller (Admin) only routes */}
             <Route element={<RequireHeadSeller />}>
@@ -148,6 +160,8 @@ export function AppRoutes() {
               <Route path="/seller/analytics" element={<SellerAnalyticsPage />} />
               <Route path="/seller/reports" element={<SellerReportsPage />} />
               <Route path="/seller/coupons" element={<SellerCouponsPage />} />
+              <Route path="/seller/categories" element={<SellerCategoriesPage />} />
+              <Route path="/seller/banners" element={<SellerBannersPage />} />
               <Route path="/seller/platform-settings" element={<SellerPlatformSettingsPage />} />
             </Route>
           </Route>

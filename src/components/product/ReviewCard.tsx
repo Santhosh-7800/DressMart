@@ -22,6 +22,12 @@ export function ReviewCard({ review }: { review: Review }) {
               ))}
             </div>
           )}
+          {review.seller_reply && (
+            <div className="mt-3 rounded-lg bg-primary-50 p-3 dark:bg-primary-800">
+              <p className="text-xs font-semibold text-primary-700 dark:text-primary-200">Seller response</p>
+              <p className="text-sm text-primary-600 dark:text-primary-300">{review.seller_reply.text}</p>
+            </div>
+          )}
           <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-primary-400">
             <span className="font-medium text-primary-600 dark:text-primary-300">{review.user_name}</span>
             <span>{formatDate(review.created_at)}</span>

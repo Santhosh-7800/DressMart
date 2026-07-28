@@ -6,8 +6,9 @@ import { Seo } from '@/components/common/Seo';
 import { ProductGrid } from '@/components/product/ProductGrid';
 import { ProductFilters } from '@/components/product/ProductFilters';
 import { SortDropdown } from '@/components/product/SortDropdown';
-import { Pagination } from '@/components/ui/Pagination';
-import { useProductFacets, useProductList } from '@/hooks/useProducts';
+import { InfiniteScrollSentinel } from '@/components/product/InfiniteScrollSentinel';
+import { useProductFacets } from '@/hooks/useProducts';
+import { useInfiniteProductListing } from '@/hooks/useInfiniteProductListing';
 import { useCategoryHistory } from '@/hooks/useCategoryHistory';
 import { filtersFromSearchParams, applyFiltersToSearchParams } from '@/lib/filterUrlSync';
 
@@ -16,12 +17,13 @@ interface ProductListingPageProps {
 }
 
 /**
- * Filters/sort/pagination live in the URL query string (see lib/filterUrlSync.ts), not plain
- * useState — that's what makes them survive Back navigation: opening a product and returning
- * restores this exact URL (filters and all) instead of remounting to a reset default state.
- * Filter/sort/page changes use `replace` so tweaking a filter doesn't pile up history entries —
- * Back from the listing page should return to wherever you came from, not step through every
- * filter tweak one at a time.
+ * Filters/sort live in the URL query string (see lib/filterUrlSync.ts), not plain useState —
+ * that's what makes them survive Back navigation: opening a product and returning restores this
+ * exact URL (filters and all) instead of remounting to a reset default state. The `page` param's
+ * meaning is repurposed for infinite scroll: it now tracks "how many pages have been loaded" (see
+ * useInfiniteProductListing) rather than "which single page is showing". Filter/sort changes use
+ * `replace` so tweaking a filter doesn't pile up history entries — Back from the listing page
+ * should return to wherever you came from, not step through every filter tweak one at a time.
  */
 export function ProductListingPage({ gender }: ProductListingPageProps) {
   const { categorySlug } = useParams<{ categorySlug: string }>();
@@ -42,7 +44,11 @@ export function ProductListingPage({ gender }: ProductListingPageProps) {
     setSearchParams(applyFiltersToSearchParams(searchParams, next), { replace: true });
   };
 
-  const productsQuery = useProductList(filters);
+  const persistLoadedPages = (loadedPages: number) => {
+    setSearchParams(applyFiltersToSearchParams(searchParams, { ...filtersFromSearchParams(searchParams), page: loadedPages }), { replace: true });
+  };
+
+  const productsQuery = useInfiniteProductListing(filters, persistLoadedPages);
   const facetsQuery = useProductFacets(gender, categorySlug);
   const { recordCategoryView } = useCategoryHistory();
 
@@ -50,8 +56,6 @@ export function ProductListingPage({ gender }: ProductListingPageProps) {
     if (categorySlug) recordCategoryView(categorySlug);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categorySlug]);
-
-  const totalPages = useMemo(() => Math.ceil((productsQuery.data?.total ?? 0) / (filters.pageSize ?? 24)), [productsQuery.data, filters.pageSize]);
 
   const categoryLabel = categorySlug
     ? categorySlug
@@ -69,7 +73,7 @@ export function ProductListingPage({ gender }: ProductListingPageProps) {
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold sm:text-2xl">{categoryLabel}</h1>
-          <p className="text-sm text-primary-400">{productsQuery.data?.total ?? 0} products</p>
+          <p className="text-sm text-primary-400">{productsQuery.total} products</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setIsMobileFiltersOpen(true)} className="btn-outline lg:hidden">
@@ -101,12 +105,17 @@ export function ProductListingPage({ gender }: ProductListingPageProps) {
 
         <div>
           <ProductGrid
-            products={productsQuery.data?.items ?? []}
+            products={productsQuery.products}
             isLoading={productsQuery.isLoading}
             isError={productsQuery.isError}
             onRetry={() => productsQuery.refetch()}
           />
-          <Pagination page={filters.page ?? 1} totalPages={totalPages} onChange={(page) => updateFilters({ ...filters, page })} />
+          <InfiniteScrollSentinel
+            sentinelRef={productsQuery.sentinelRef}
+            hasNextPage={productsQuery.hasNextPage}
+            isFetchingNextPage={productsQuery.isFetchingNextPage}
+            hasResults={productsQuery.products.length > 0}
+          />
         </div>
       </div>
     </div>

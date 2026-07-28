@@ -86,6 +86,15 @@
   }
 }
 
+/* Safe-area padding for fixed bars on notched/gesture-nav Android & iOS devices — requires
+   viewport-fit=cover in index.html's viewport meta tag, otherwise env() resolves to 0 (harmless). */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+
 /* thin scrollbars for carousels/filters */
 .scrollbar-thin {
   scrollbar-width: thin;

@@ -1,14 +1,16 @@
-import { memo, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { memo, useCallback, useMemo } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Heart } from 'lucide-react';
+import { Heart, ShoppingCart } from 'lucide-react';
 import type { Product } from '@/types';
 import { PriceTag } from '@/components/ui/PriceTag';
 import { Rating } from '@/components/ui/Rating';
 import { ProductImage } from '@/components/ui/ProductImage';
 import { useWishlist } from '@/hooks/useWishlist';
 import { useInventory } from '@/hooks/useInventory';
+import { useCart } from '@/hooks/useCart';
+import { useAuth } from '@/contexts/AuthContext';
 import { productService } from '@/services/productService';
 import { queryKeys } from '@/lib/queryClient';
 import { cn } from '@/lib/utils';
@@ -27,6 +29,20 @@ function ProductCardImpl({ product, className }: ProductCardProps) {
   // inventory is treated as "in stock" rather than blocking the card on an extra round-trip.
   const { data: inventory } = useInventory(product.id);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+  const { addItem } = useCart();
+
+  // Quick-add from the card skips color/size selection — it grabs the first variant that's
+  // actually in stock (falling back to the first variant while inventory is still loading, same
+  // "assume in stock" convention as the stock badge below) rather than opening the PDP just to
+  // pick a size for a single-variant product. Shoppers who DO need to pick color/size still tap
+  // through to the PDP as normal; this button is a shortcut, not a replacement.
+  const quickAddVariant = useMemo(() => {
+    if (product.variants.length === 0) return undefined;
+    if (!inventory) return product.variants[0];
+    return product.variants.find((v) => (inventory.variant_stock[v.id] ?? 0) > 0);
+  }, [product.variants, inventory]);
   // coverImage (first image, denormalized) is the fast-path thumbnail source; fall back to the
   // pre-existing chain for older seed data that never got a coverImage populated.
   const primaryImage = product.coverImage || product.thumbnailUrl || product.imageUrl || product.images[0]?.url;
@@ -45,6 +61,19 @@ function ProductCardImpl({ product, className }: ProductCardProps) {
       queryFn: () => productService.getBySlug(product.slug),
     });
   }, [queryClient, product.slug]);
+
+  const handleQuickAdd = async (e: React.MouseEvent) => {
+    // Nested inside the card's <Link> — without stopping propagation, the click would also bubble
+    // up to the anchor and navigate to the PDP at the same time as adding to cart.
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isAuthenticated) {
+      navigate('/login', { state: { from: `/product/${product.slug}` } });
+      return;
+    }
+    if (!quickAddVariant) return;
+    await addItem({ productId: product.id, variantId: quickAddVariant.id });
+  };
 
   return (
     <motion.div
@@ -81,6 +110,17 @@ function ProductCardImpl({ product, className }: ProductCardProps) {
             <div className="absolute inset-0 flex items-center justify-center bg-primary-950/40">
               <span className="rounded-full bg-primary-950/80 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">Out of Stock</span>
             </div>
+          )}
+          {!isOutOfStock && (
+            <button
+              onClick={handleQuickAdd}
+              disabled={!quickAddVariant}
+              className="absolute bottom-2 right-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-accent text-primary-900 shadow-sm transition-transform hover:scale-110 disabled:opacity-40"
+              aria-label="Add to cart"
+              title="Add to cart"
+            >
+              <ShoppingCart size={14} />
+            </button>
           )}
         </div>
         <div className="space-y-1 p-3">

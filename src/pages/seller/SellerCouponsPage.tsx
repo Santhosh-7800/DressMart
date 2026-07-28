@@ -11,10 +11,6 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { cn, formatDate } from '@/lib/utils';
 import { queryKeys } from '@/lib/queryClient';
-// NOTE: the Account/Coupon-owning agent is (re)building src/services/couponService.ts against this
-// exact named-export interface for the post-Firebase-migration Coupon shape (types/database.ts).
-// The file currently on disk still targets the pre-migration Supabase schema, so these imports won't
-// resolve until that agent finishes — see the "known gaps" note in this workstream's final report.
 import { createCoupon, updateCoupon, setCouponActive, listAllCoupons } from '@/services/couponService';
 import type { Coupon } from '@/types';
 

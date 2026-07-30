@@ -10,6 +10,9 @@ import {
   updatePassword,
   reauthenticateWithCredential,
   EmailAuthProvider,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence,
   signOut as firebaseSignOut,
   updateProfile as updateFirebaseProfile,
   type ConfirmationResult,
@@ -67,7 +70,12 @@ export const authService = {
     return ensureProfileDoc(cred.user, { full_name: input.fullName, phone: input.phone ?? null });
   },
 
-  async signIn(email: string, password: string): Promise<Profile> {
+  /** `rememberMe` (default true, matching every existing call site) picks between Firebase Auth's
+   *  two web persistence modes — local (survives closing the browser, the SDK's own default) vs
+   *  session-only (cleared when the tab/browser closes). Set right before signing in since
+   *  Firebase applies whatever persistence was last configured to the resulting session. */
+  async signIn(email: string, password: string, rememberMe = true): Promise<Profile> {
+    await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
     const cred = await signInWithEmailAndPassword(auth, email, password);
     const profile = await ensureProfileDoc(cred.user);
     if (profile.seller_status === 'suspended') {

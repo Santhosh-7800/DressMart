@@ -14,6 +14,14 @@ import { debugLog } from '@/lib/debugLog';
  * the scroll position this exact history entry (`location.key`) had when it was last left, saved in
  * the module-level map below, and restores it — the actual fix for "Back drops you at the top of a
  * page you'd scrolled down on" / "lost scroll position after returning from a product".
+ *
+ * One escape hatch: a REPLACE navigation whose `location.state.preserveScroll` is true skips the
+ * reset-to-top entirely. Every REPLACE generates a brand-new `location.key` (React Router mints one
+ * per push AND replace), so infinite-scroll list pages silently persisting "how many pages are
+ * loaded" via a background replace (see useInfiniteProductListing) would otherwise fight the
+ * shopper's own scrolling — each persisted page count yanking them back to the top mid-scroll. A
+ * deliberate filter/sort change (a REAL reason to jump to the top of the new result set) doesn't
+ * set this flag, so it keeps resetting to top as before.
  */
 const scrollPositionByKey = new Map<string, number>();
 
@@ -26,8 +34,10 @@ export function getSavedScrollY(key: string): number | undefined {
 }
 
 export function ScrollToTop() {
-  const { key } = useLocation();
+  const location = useLocation();
+  const { key } = location;
   const navigationType = useNavigationType();
+  const preserveScroll = (location.state as { preserveScroll?: boolean } | null)?.preserveScroll === true;
 
   useLayoutEffect(() => {
     if (typeof window !== 'undefined' && 'scrollRestoration' in window.history) {
@@ -36,11 +46,11 @@ export function ScrollToTop() {
   }, []);
 
   useLayoutEffect(() => {
-    debugLog('route-transition', navigationType, window.location.pathname, 'key=', key);
+    debugLog('route-transition', navigationType, window.location.pathname, 'key=', key, 'preserveScroll=', preserveScroll);
     if (navigationType === 'POP') {
       const saved = scrollPositionByKey.get(key);
       window.scrollTo({ top: saved ?? 0, left: 0, behavior: 'instant' as ScrollBehavior });
-    } else {
+    } else if (!preserveScroll) {
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
     }
 
@@ -49,7 +59,7 @@ export function ScrollToTop() {
     return () => {
       scrollPositionByKey.set(key, window.scrollY);
     };
-  }, [key, navigationType]);
+  }, [key, navigationType, preserveScroll]);
 
   return null;
 }

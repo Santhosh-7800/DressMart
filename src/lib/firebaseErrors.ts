@@ -35,11 +35,15 @@ const FRIENDLY_MESSAGES: Record<string, string> = {
 };
 
 /** Extracts a bare Firebase error code (e.g. "auth/invalid-credential", "permission-denied") from
- *  whatever shape the SDK threw — FirebaseError, a callable's HttpsError-shaped error, or a plain Error. */
-function extractCode(error: unknown): string | null {
-  if (error instanceof FirebaseError) return error.code.replace(/^functions\//, '');
+ *  whatever shape the SDK threw — FirebaseError, a callable's HttpsError-shaped error, or a plain
+ *  Error — plus whether it came from a Cloud Function callable specifically (`functions/` prefix). */
+function extractCode(error: unknown): { code: string; isCallable: boolean } | null {
+  if (error instanceof FirebaseError) {
+    const isCallable = error.code.startsWith('functions/');
+    return { code: error.code.replace(/^functions\//, ''), isCallable };
+  }
   if (error && typeof error === 'object' && 'code' in error && typeof (error as { code: unknown }).code === 'string') {
-    return (error as { code: string }).code;
+    return { code: (error as { code: string }).code, isCallable: false };
   }
   return null;
 }
@@ -47,8 +51,14 @@ function extractCode(error: unknown): string | null {
 /** Friendly message for any Firebase-originated error, with a caller-supplied fallback for anything unrecognized. */
 export function getFriendlyErrorMessage(error: unknown, fallback = 'Something went wrong. Please try again.'): string {
   if (!navigator.onLine) return "You're offline — check your connection and try again.";
-  const code = extractCode(error);
-  if (code && FRIENDLY_MESSAGES[code]) return FRIENDLY_MESSAGES[code];
-  if (error instanceof Error && error.message && !code) return error.message; // non-Firebase errors (e.g. our own thrown validation messages) pass through as-is
+  const extracted = extractCode(error);
+  // Cloud Function callables (functions/*) throw HttpsError with a message the function author
+  // wrote specifically for end users (e.g. `Insufficient stock for "Red Shirt, size M".`) — prefer
+  // that actual message over the generic per-code mapping below, which would otherwise discard a
+  // deliberately human-authored, specific message in favor of a vague one sharing the same code
+  // (e.g. many different callables throw 'failed-precondition' for very different reasons).
+  if (extracted?.isCallable && error instanceof Error && error.message) return error.message;
+  if (extracted && FRIENDLY_MESSAGES[extracted.code]) return FRIENDLY_MESSAGES[extracted.code];
+  if (error instanceof Error && error.message && !extracted) return error.message; // non-Firebase errors (e.g. our own thrown validation messages) pass through as-is
   return fallback;
 }

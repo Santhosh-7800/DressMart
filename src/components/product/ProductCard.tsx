@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Heart, ShoppingCart } from 'lucide-react';
-import type { Product } from '@/types';
+import type { Product, Inventory } from '@/types';
 import { PriceTag } from '@/components/ui/PriceTag';
 import { Rating } from '@/components/ui/Rating';
 import { ProductImage } from '@/components/ui/ProductImage';
@@ -19,15 +19,24 @@ import { debugLog } from '@/lib/debugLog';
 interface ProductCardProps {
   product: Product;
   className?: string;
+  /** Pre-fetched inventory from a parent's batched query (ProductGrid/ProductCarousel fetch stock
+   *  for every visible product in one call rather than each card fetching its own). When
+   *  `skipOwnFetch` is true, this card trusts the parent entirely and never fires its own read —
+   *  `undefined` here then just means "parent's batch hasn't resolved yet", same as the existing
+   *  loading semantics below. Callers that render a card outside such a container (Wishlist,
+   *  Profile previews, etc.) omit both props and get the original one-card-one-fetch behavior. */
+  inventory?: Inventory | null;
+  skipOwnFetch?: boolean;
 }
 
-function ProductCardImpl({ product, className }: ProductCardProps) {
+function ProductCardImpl({ product, className, inventory: inventoryProp, skipOwnFetch }: ProductCardProps) {
   debugLog('ProductCard', 'render', product.id, product.slug);
   const { isWishlisted, toggle } = useWishlist();
   const wishlisted = isWishlisted(product.id);
   // Stock lives in its own inventory doc, not on Product — see types/database.ts. Loading/missing
   // inventory is treated as "in stock" rather than blocking the card on an extra round-trip.
-  const { data: inventory } = useInventory(product.id);
+  const { data: fetchedInventory } = useInventory(product.id, !skipOwnFetch);
+  const inventory = skipOwnFetch ? inventoryProp : fetchedInventory;
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
@@ -87,7 +96,7 @@ function ProductCardImpl({ product, className }: ProductCardProps) {
           e.preventDefault();
           toggle(product.id);
         }}
-        className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-sm backdrop-blur transition-transform hover:scale-110 dark:bg-primary-800/90"
+        className="tap-target-48 absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-sm backdrop-blur transition-transform hover:scale-110 dark:bg-primary-800/90"
         aria-label={wishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
       >
         <Heart size={15} className={cn(wishlisted ? 'fill-red-500 text-red-500' : 'text-primary-400')} />
@@ -115,7 +124,7 @@ function ProductCardImpl({ product, className }: ProductCardProps) {
             <button
               onClick={handleQuickAdd}
               disabled={!quickAddVariant}
-              className="absolute bottom-2 right-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-accent text-primary-900 shadow-sm transition-transform hover:scale-110 disabled:opacity-40"
+              className="tap-target-48 absolute bottom-2 right-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-accent text-primary-900 shadow-sm transition-transform hover:scale-110 disabled:opacity-40"
               aria-label="Add to cart"
               title="Add to cart"
             >

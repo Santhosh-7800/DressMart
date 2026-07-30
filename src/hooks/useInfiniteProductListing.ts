@@ -44,12 +44,19 @@ export function useInfiniteProductListing(filters: ProductFilters, onPersistLoad
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadedPageCount, query.isFetchingNextPage, query.hasNextPage]);
 
+  // Only ever a candidate for correction when the URL already encoded more than one loaded page AT
+  // MOUNT — i.e. we're genuinely restoring state a prior visit persisted, not a fresh single-page
+  // visit. Without this, a fresh visit's navigationType (React Router classifies the very first
+  // load as 'POP', same as a real Back navigation) combined with a stale StrictMode-double-invoke
+  // scroll-position artifact for that entry would "correct" the shopper's scroll back to 0 the
+  // instant page 2 finishes loading — yanking them to the top mid-scroll on an ordinary first visit.
+  const isRestoringPriorVisit = initialLoadedPagesRef.current > 1;
   const hasCaughtUp = loadedPageCount >= initialLoadedPagesRef.current && !query.isFetchingNextPage;
   useEffect(() => {
-    if (navigationType !== 'POP' || !hasCaughtUp) return;
+    if (!isRestoringPriorVisit || navigationType !== 'POP' || !hasCaughtUp) return;
     const saved = getSavedScrollY(location.key);
     if (saved !== undefined) window.scrollTo({ top: saved, left: 0, behavior: 'instant' as ScrollBehavior });
-  }, [hasCaughtUp, navigationType, location.key]);
+  }, [isRestoringPriorVisit, hasCaughtUp, navigationType, location.key]);
 
   const sentinelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {

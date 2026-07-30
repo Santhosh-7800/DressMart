@@ -14,12 +14,21 @@
     "seed": "tsx scripts/seedFirestore.ts",
     "seed:curated-formal-shirts": "tsx scripts/seedCuratedFormalShirts.ts",
     "seed:curated-checked-shirts": "tsx scripts/seedCuratedCheckedShirts.ts",
+    "seed:curated-shirts-tshirts": "tsx scripts/seedCuratedShirtsTshirts.ts",
+    "seed:curated-apparel": "tsx scripts/seedCuratedApparel.ts",
     "validate:checked-shirts": "tsx scripts/validateCheckedShirtImages.ts",
+    "validate:shirts-tshirts": "tsx scripts/validateShirtsTshirtsImages.ts",
+    "validate:apparel": "tsx scripts/validateApparelImages.ts",
     "typecheck": "tsc -b --noEmit",
     "images:scan": "tsx scripts/generateImageManifest.ts",
     "emulators": "firebase emulators:start --import=./.emulator-data --export-on-exit=./.emulator-data"
   },
   "dependencies": {
+    "@capacitor/android": "^8.4.2",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/core": "^8.4.2",
+    "@capacitor/push-notifications": "^8.1.2",
+    "@capacitor/status-bar": "^8.0.3",
     "@hookform/resolvers": "^3.9.1",
     "@tanstack/react-query": "^5.62.7",
     "@tanstack/react-query-devtools": "^5.62.7",
@@ -37,6 +46,8 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.4.2",
     "@eslint/js": "^9.17.0",
     "@types/node": "^22.10.5",
     "@types/react": "^19.0.2",

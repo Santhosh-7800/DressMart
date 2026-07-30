@@ -8,6 +8,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Pagination } from '@/components/ui/Pagination';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Card } from '@/components/ui/Card';
 import { useAllSellerProducts, useSetProductStatus, useSetProductFeatured, useSetProductDealOfDay, useDeleteProduct } from '@/hooks/useSellerProducts';
 import { formatCurrency, cn } from '@/lib/utils';
 import type { Product, ProductStatus } from '@/types';
@@ -35,6 +36,47 @@ const STATUS_LABEL: Record<ProductStatus, string> = {
   out_of_stock: 'Out of Stock',
   hidden: 'Hidden',
 };
+
+/** The Feature/Deal-of-Day toggles — shared between the desktop table row and the mobile card. */
+function ProductBadgeToggles({ product, onToggleFeatured, onToggleDeal }: { product: Product; onToggleFeatured: () => void; onToggleDeal: () => void }) {
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        onClick={onToggleFeatured}
+        className={cn('tap-target-48 flex items-center gap-1 rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700', product.is_featured && 'text-amber-500')}
+        title={product.is_featured ? 'Unfeature' : 'Feature'}
+        aria-label={product.is_featured ? 'Unfeature product' : 'Feature product'}
+      >
+        <Star size={15} fill={product.is_featured ? 'currentColor' : 'none'} />
+      </button>
+      <button
+        onClick={onToggleDeal}
+        className={cn('tap-target-48 flex items-center gap-1 rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700', product.is_deal_of_day && 'text-accent')}
+        title={product.is_deal_of_day ? 'Remove from Deal of the Day' : 'Add to Deal of the Day'}
+        aria-label={product.is_deal_of_day ? 'Remove from Deal of the Day' : 'Add to Deal of the Day'}
+      >
+        <Zap size={15} fill={product.is_deal_of_day ? 'currentColor' : 'none'} />
+      </button>
+    </div>
+  );
+}
+
+/** Edit/Hide-Unhide/Delete — shared between the desktop table row and the mobile card. */
+function ProductRowActions({ product, onToggleHidden, onDelete }: { product: Product; onToggleHidden: () => void; onDelete: () => void }) {
+  return (
+    <div className="flex items-center justify-end gap-1">
+      <Link to={`/seller/products/${product.id}/edit`} className="tap-target-48 rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700" title="Edit" aria-label="Edit product">
+        <Pencil size={15} />
+      </Link>
+      <button onClick={onToggleHidden} className="tap-target-48 rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700" title={product.status === 'hidden' ? 'Unhide' : 'Hide'} aria-label={product.status === 'hidden' ? 'Unhide product' : 'Hide product'}>
+        {product.status === 'hidden' ? <Eye size={15} /> : <EyeOff size={15} />}
+      </button>
+      <button onClick={onDelete} className="tap-target-48 rounded-lg p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20" title="Delete" aria-label="Delete product">
+        <Trash2 size={15} />
+      </button>
+    </div>
+  );
+}
 
 /**
  * Head-Seller-only view of every product across every seller — mirrors SellerProductsPage's
@@ -159,110 +201,122 @@ export function SellerAllProductsPage() {
       ) : allProducts.length === 0 ? (
         <EmptyState icon={Layers} title="No products yet" description="Products created by any seller will show up here." />
       ) : (
-        <div className="admin-table-wrap scrollbar-thin overflow-x-auto">
-          <table className="w-full min-w-[1000px] text-sm">
-            <thead>
-              <tr className="border-b border-primary-100 text-left text-xs uppercase tracking-wide text-primary-400 dark:border-primary-700">
-                <th className="p-3">Product</th>
-                <th className="p-3">Seller</th>
-                <th className="p-3">SKU</th>
-                <th className="p-3">Price</th>
-                <th className="p-3">Status</th>
-                <th className="p-3">Featured</th>
-                <th className="p-3">Deal</th>
-                <th className="p-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((product) => (
-                <tr key={product.id} className="border-b border-primary-100 last:border-0 dark:border-primary-700">
-                  <td className="p-3">
-                    <div className="flex items-center gap-2.5">
-                      <img
-                        src={product.coverImage || product.images[0]?.url}
-                        alt=""
-                        className="h-11 w-10 shrink-0 rounded-[16px] object-cover shadow-sm ring-1 ring-admin-border transition-transform duration-200 hover:scale-105"
-                      />
-                      <span className="line-clamp-2 max-w-[220px] font-medium">{product.name}</span>
-                    </div>
-                  </td>
-                  <td className="p-3 text-primary-500">{product.seller_name}</td>
-                  <td className="p-3 text-primary-500">{product.sku}</td>
-                  <td className="p-3">{formatCurrency(product.price)}</td>
-                  <td className="p-3">
-                    <span className={STATUS_BADGE_CLASS[product.status]}>{STATUS_LABEL[product.status]}</span>
-                  </td>
-                  <td className="p-3">
-                    <button
-                      onClick={() => setFeatured.mutate({ productId: product.id, featured: !product.is_featured })}
-                      className={cn(
-                        'flex items-center gap-1 rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700',
-                        product.is_featured && 'text-amber-500',
-                      )}
-                      title={product.is_featured ? 'Unfeature' : 'Feature'}
-                    >
-                      <Star size={15} fill={product.is_featured ? 'currentColor' : 'none'} />
-                    </button>
-                  </td>
-                  <td className="p-3">
-                    <button
-                      onClick={() => handleToggleDeal(product)}
-                      className={cn(
-                        'flex items-center gap-1 rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700',
-                        product.is_deal_of_day && 'text-accent',
-                      )}
-                      title={product.is_deal_of_day ? 'Remove from Deal of the Day' : 'Add to Deal of the Day'}
-                    >
-                      <Zap size={15} fill={product.is_deal_of_day ? 'currentColor' : 'none'} />
-                    </button>
-                  </td>
-                  <td className="p-3">
-                    <div className="flex items-center justify-end gap-1">
-                      <Link
-                        to={`/seller/products/${product.id}/edit`}
-                        className="rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700"
-                        title="Edit"
-                      >
-                        <Pencil size={15} />
-                      </Link>
-                      {product.status === 'hidden' ? (
-                        <button
-                          onClick={() => setStatus.mutate({ productId: product.id, status: 'active' })}
-                          className="rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700"
-                          title="Unhide"
-                        >
-                          <Eye size={15} />
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => setStatus.mutate({ productId: product.id, status: 'hidden' })}
-                          className="rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700"
-                          title="Hide"
-                        >
-                          <EyeOff size={15} />
-                        </button>
-                      )}
+        <>
+          {/* Desktop/tablet: dense data table. */}
+          <div className="admin-table-wrap scrollbar-thin hidden overflow-x-auto md:block">
+            <table className="w-full min-w-[1000px] text-sm">
+              <thead>
+                <tr className="border-b border-primary-100 text-left text-xs uppercase tracking-wide text-primary-400 dark:border-primary-700">
+                  <th className="p-3">Product</th>
+                  <th className="p-3">Seller</th>
+                  <th className="p-3">SKU</th>
+                  <th className="p-3">Price</th>
+                  <th className="p-3">Status</th>
+                  <th className="p-3">Featured</th>
+                  <th className="p-3">Deal</th>
+                  <th className="p-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((product) => (
+                  <tr key={product.id} className="border-b border-primary-100 last:border-0 dark:border-primary-700">
+                    <td className="p-3">
+                      <div className="flex items-center gap-2.5">
+                        <img
+                          src={product.coverImage || product.images[0]?.url}
+                          alt=""
+                          className="h-11 w-10 shrink-0 rounded-[16px] object-cover shadow-sm ring-1 ring-admin-border transition-transform duration-200 hover:scale-105"
+                        />
+                        <span className="line-clamp-2 max-w-[220px] font-medium">{product.name}</span>
+                      </div>
+                    </td>
+                    <td className="p-3 text-primary-500">{product.seller_name}</td>
+                    <td className="p-3 text-primary-500">{product.sku}</td>
+                    <td className="p-3">{formatCurrency(product.price)}</td>
+                    <td className="p-3">
+                      <span className={STATUS_BADGE_CLASS[product.status]}>{STATUS_LABEL[product.status]}</span>
+                    </td>
+                    <td className="p-3">
                       <button
-                        onClick={() => handleDelete(product.id, product.name)}
-                        className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
-                        title="Delete"
+                        onClick={() => setFeatured.mutate({ productId: product.id, featured: !product.is_featured })}
+                        className={cn(
+                          'flex items-center gap-1 rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700',
+                          product.is_featured && 'text-amber-500',
+                        )}
+                        title={product.is_featured ? 'Unfeature' : 'Feature'}
                       >
-                        <Trash2 size={15} />
+                        <Star size={15} fill={product.is_featured ? 'currentColor' : 'none'} />
                       </button>
+                    </td>
+                    <td className="p-3">
+                      <button
+                        onClick={() => handleToggleDeal(product)}
+                        className={cn(
+                          'flex items-center gap-1 rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700',
+                          product.is_deal_of_day && 'text-accent',
+                        )}
+                        title={product.is_deal_of_day ? 'Remove from Deal of the Day' : 'Add to Deal of the Day'}
+                      >
+                        <Zap size={15} fill={product.is_deal_of_day ? 'currentColor' : 'none'} />
+                      </button>
+                    </td>
+                    <td className="p-3">
+                      <ProductRowActions
+                        product={product}
+                        onToggleHidden={() => setStatus.mutate({ productId: product.id, status: product.status === 'hidden' ? 'active' : 'hidden' })}
+                        onDelete={() => handleDelete(product.id, product.name)}
+                      />
+                    </td>
+                  </tr>
+                ))}
+                {items.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="p-8 text-center text-primary-400">
+                      No products match your search.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile: cards — same data/actions as the table above, one product per card. */}
+          <div className="space-y-3 md:hidden">
+            {items.length === 0 ? (
+              <p className="py-8 text-center text-sm text-primary-400">No products match your search.</p>
+            ) : (
+              items.map((product) => (
+                <Card key={product.id} hover={false} className="p-3">
+                  <div className="flex gap-3">
+                    <img src={product.coverImage || product.images[0]?.url} alt="" className="h-16 w-14 shrink-0 rounded-2xl object-cover shadow-sm" />
+                    <div className="min-w-0 flex-1">
+                      <p className="line-clamp-2 text-sm font-medium">{product.name}</p>
+                      <p className="text-xs text-primary-400">
+                        {product.seller_name} · SKU: {product.sku}
+                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                        <span className="font-semibold">{formatCurrency(product.price)}</span>
+                        <span className={STATUS_BADGE_CLASS[product.status]}>{STATUS_LABEL[product.status]}</span>
+                      </div>
                     </div>
-                  </td>
-                </tr>
-              ))}
-              {items.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="p-8 text-center text-primary-400">
-                    No products match your search.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between border-t border-primary-100 pt-2 dark:border-primary-700">
+                    <ProductBadgeToggles
+                      product={product}
+                      onToggleFeatured={() => setFeatured.mutate({ productId: product.id, featured: !product.is_featured })}
+                      onToggleDeal={() => handleToggleDeal(product)}
+                    />
+                    <ProductRowActions
+                      product={product}
+                      onToggleHidden={() => setStatus.mutate({ productId: product.id, status: product.status === 'hidden' ? 'active' : 'hidden' })}
+                      onDelete={() => handleDelete(product.id, product.name)}
+                    />
+                  </div>
+                </Card>
+              ))
+            )}
+          </div>
+        </>
       )}
 
       <Pagination page={page} totalPages={totalPages} onChange={setPage} />

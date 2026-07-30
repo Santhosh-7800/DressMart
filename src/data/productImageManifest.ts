@@ -5,9 +5,194 @@
  */
 export const PRODUCT_IMAGE_MANIFEST: Record<string, Record<string, Record<string, string[]>>> = {
   "men": {
+    "Belts": {
+      "BL001": [
+        "BL001-1.jpg",
+        "BL001-2.jpg",
+        "BL001-3.jpg"
+      ],
+      "BL002": [
+        "BL002-1.jpg",
+        "BL002-2.jpg"
+      ],
+      "BL003": [
+        "BL003-1.jpg",
+        "BL003-2.jpg"
+      ],
+      "BL004": [
+        "BL004-1.jpg",
+        "BL004-2.jpg",
+        "BL004-3.jpg"
+      ]
+    },
+    "Blazers": {
+      "BZ001": [
+        "BZ001-1.jpg",
+        "BZ001-2.jpg",
+        "BZ001-3.jpg",
+        "BZ001-4.jpg",
+        "BZ001-5.jpg",
+        "BZ001-6.jpg"
+      ],
+      "BZ002": [
+        "BZ002-1.jpg",
+        "BZ002-2.jpg",
+        "BZ002-3.jpg",
+        "BZ002-4.jpg",
+        "BZ002-5.jpg"
+      ],
+      "BZ003": [
+        "BZ003-1.jpg",
+        "BZ003-2.jpg",
+        "BZ003-3.jpg",
+        "BZ003-4.jpg",
+        "BZ003-5.jpg",
+        "BZ003-6.jpg"
+      ],
+      "BZ004": [
+        "BZ004-1.jpg",
+        "BZ004-2.jpg",
+        "BZ004-3.jpg"
+      ],
+      "BZ005": [
+        "BZ005-1.jpg",
+        "BZ005-2.jpg",
+        "BZ005-3.jpg",
+        "BZ005-4.jpg",
+        "BZ005-5.jpg"
+      ],
+      "BZ006": [
+        "BZ006-1.jpg",
+        "BZ006-2.jpg",
+        "BZ006-3.jpg",
+        "BZ006-4.jpg",
+        "BZ006-5.jpg",
+        "BZ006-6.jpg"
+      ]
+    },
+    "Cargo Pants": {
+      "CP001": [
+        "CP001-1.jpg",
+        "CP001-2.jpg",
+        "CP001-3.jpg",
+        "CP001-4.jpg",
+        "CP001-5.jpg",
+        "CP001-6.jpg"
+      ],
+      "CP002": [
+        "CP002-1.jpg",
+        "CP002-2.jpg",
+        "CP002-3.jpg"
+      ],
+      "CP003": [
+        "CP003-1.jpg",
+        "CP003-2.jpg",
+        "CP003-3.jpg",
+        "CP003-4.jpg",
+        "CP003-5.jpg"
+      ],
+      "CP004": [
+        "CP004-1.jpg",
+        "CP004-2.jpg",
+        "CP004-3.jpg",
+        "CP004-4.jpg",
+        "CP004-5.jpg"
+      ],
+      "CP005": [
+        "CP005-1.jpg",
+        "CP005-2.jpg",
+        "CP005-3.jpg",
+        "CP005-4.jpg",
+        "CP005-5.jpg"
+      ],
+      "CP006": [
+        "CP006-1.jpg",
+        "CP006-2.jpg",
+        "CP006-3.jpg",
+        "CP006-4.jpg",
+        "CP006-5.jpg",
+        "CP006-6.jpg"
+      ],
+      "CP007": [
+        "CP007-1.jpg",
+        "CP007-2.jpg",
+        "CP007-3.jpg",
+        "CP007-4.jpg"
+      ],
+      "CP008": [
+        "CP008-1.jpg",
+        "CP008-2.jpg",
+        "CP008-3.jpg",
+        "CP008-4.jpg",
+        "CP008-5.jpg",
+        "CP008-6.jpg"
+      ],
+      "CP009": [
+        "CP009-1.jpg",
+        "CP009-2.jpg",
+        "CP009-3.jpg",
+        "CP009-4.jpg",
+        "CP009-5.jpg",
+        "CP009-6.jpg"
+      ],
+      "CP010": [
+        "CP010-1.jpg",
+        "CP010-2.jpg",
+        "CP010-3.jpg",
+        "CP010-4.jpg",
+        "CP010-5.jpg",
+        "CP010-6.jpg"
+      ]
+    },
     "casual-shirts": {
       "CS001": [
-        "CS001.webp"
+        "CS001-1.jpg",
+        "CS001-2.jpg",
+        "CS001-3.jpg",
+        "CS001-4.jpg"
+      ],
+      "CS002": [
+        "CS002-1.jpg",
+        "CS002-2.jpg",
+        "CS002-3.jpg",
+        "CS002-4.jpg",
+        "CS002-5.jpg",
+        "CS002-6.jpg"
+      ],
+      "CS003": [
+        "CS003-1.jpg",
+        "CS003-2.jpg",
+        "CS003-3.jpg",
+        "CS003-4.jpg",
+        "CS003-5.jpg"
+      ],
+      "CS004": [
+        "CS004-1.jpg",
+        "CS004-2.jpg",
+        "CS004-3.jpg",
+        "CS004-4.jpg",
+        "CS004-5.jpg"
+      ],
+      "CS005": [
+        "CS005-1.jpg",
+        "CS005-2.jpg",
+        "CS005-3.jpg",
+        "CS005-4.jpg",
+        "CS005-5.jpg"
+      ],
+      "CS006": [
+        "CS006-1.jpg",
+        "CS006-2.jpg",
+        "CS006-3.jpg",
+        "CS006-4.jpg"
+      ],
+      "CS007": [
+        "CS007-1.jpg",
+        "CS007-2.jpg",
+        "CS007-3.jpg",
+        "CS007-4.jpg",
+        "CS007-5.jpg",
+        "CS007-6.jpg"
       ]
     },
     "checked-shirts": {
@@ -225,6 +410,121 @@ export const PRODUCT_IMAGE_MANIFEST: Record<string, Record<string, Record<string
       "CHS030": [
         "CHS030-1.jpg",
         "CHS030-2.jpg"
+      ]
+    },
+    "Cotton-Shirts": {
+      "CT001": [
+        "CT001-1.jpg",
+        "CT001-2.jpg",
+        "CT001-3.jpg",
+        "CT001-4.jpg",
+        "CT001-5.jpg"
+      ],
+      "CT002": [
+        "CT002-1.jpg",
+        "CT002-2.jpg",
+        "CT002-3.jpg",
+        "CT002-4.jpg",
+        "CT002-5.jpg",
+        "CT002-6.jpg"
+      ],
+      "CT003": [
+        "CT003-1.jpg",
+        "CT003-2.jpg",
+        "CT003-3.jpg",
+        "CT003-4.jpg"
+      ],
+      "CT004": [
+        "CT004-1.jpg",
+        "CT004-2.jpg",
+        "CT004-3.jpg",
+        "CT004-4.jpg",
+        "CT004-5.jpg"
+      ],
+      "CT005": [
+        "CT005-1.jpg",
+        "CT005-2.jpg",
+        "CT005-3.jpg",
+        "CT005-4.jpg",
+        "CT005-5.jpg"
+      ]
+    },
+    "Formal Pants": {
+      "FP001": [
+        "FP001-1.jpg",
+        "FP001-2.jpg",
+        "FP001-3.jpg",
+        "FP001-4.jpg"
+      ],
+      "FP002": [
+        "FP002-1.jpg",
+        "FP002-2.jpg",
+        "FP002-3.jpg",
+        "FP002-4.jpg",
+        "FP002-5.jpg"
+      ],
+      "FP003": [
+        "FP003-1.jpg",
+        "FP003-2.jpg",
+        "FP003-3.jpg",
+        "FP003-4.jpg"
+      ],
+      "FP004": [
+        "FP004-1.jpg",
+        "FP004-2.jpg",
+        "FP004-3.jpg",
+        "FP004-4.jpg"
+      ],
+      "FP005": [
+        "FP005-1.jpg",
+        "FP005-2.jpg",
+        "FP005-3.jpg",
+        "FP005-4.jpg",
+        "FP005-5.jpg"
+      ],
+      "FP006": [
+        "FP006-1.jpg",
+        "FP006-2.jpg",
+        "FP006-3.jpg",
+        "FP006-4.jpg",
+        "FP006-5.jpg"
+      ],
+      "FP007": [
+        "FP007-1.jpg",
+        "FP007-2.jpg",
+        "FP007-3.jpg",
+        "FP007-4.jpg"
+      ],
+      "FP008": [
+        "FP008-1.jpg",
+        "FP008-2.jpg",
+        "FP008-3.jpg",
+        "FP008-4.jpg"
+      ],
+      "FP009": [
+        "FP009-1.jpg",
+        "FP009-2.jpg",
+        "FP009-3.jpg",
+        "FP009-4.jpg"
+      ],
+      "FP010": [
+        "FP010-1.jpg",
+        "FP010-2.jpg",
+        "FP010-3.jpg",
+        "FP010-4.jpg"
+      ],
+      "FP011": [
+        "FP011-1.jpg",
+        "FP011-2.jpg",
+        "FP011-3.jpg",
+        "FP011-4.jpg"
+      ],
+      "FP012": [
+        "FP012-1.jpg",
+        "FP012-2.jpg",
+        "FP012-3.jpg",
+        "FP012-4.jpg",
+        "FP012-5.jpg"
       ]
     },
     "formal-shirts": {
@@ -703,14 +1003,140 @@ export const PRODUCT_IMAGE_MANIFEST: Record<string, Record<string, Record<string
         "FS073-6.jpg"
       ]
     },
+    "Henley T-Shirts": {
+      "HT001": [
+        "HT001-1.jpg",
+        "HT001-2.jpg",
+        "HT001-3.jpg",
+        "HT001-4.jpg",
+        "HT001-5.jpg"
+      ],
+      "HT002": [
+        "HT002-1.jpg",
+        "HT002-2.jpg",
+        "HT002-3.jpg",
+        "HT002-4.jpg",
+        "HT002-5.jpg",
+        "HT002-6.jpg"
+      ],
+      "HT003": [
+        "HT003-1.jpg",
+        "HT003-2.jpg",
+        "HT003-3.jpg",
+        "HT003-4.jpg",
+        "HT003-5.jpg"
+      ],
+      "HT004": [
+        "HT004-1.jpg",
+        "HT004-2.jpg",
+        "HT004-3.jpg",
+        "HT004-4.jpg",
+        "HT004-5.jpg",
+        "HT004-6.jpg"
+      ],
+      "HT005": [
+        "HT005-1.jpg",
+        "HT005-2.jpg",
+        "HT005-3.jpg",
+        "HT005-4.jpg",
+        "HT005-5.jpg"
+      ],
+      "HT006": [
+        "HT006-1.jpg",
+        "HT006-2.jpg",
+        "HT006-3.jpg",
+        "HT006-4.jpg",
+        "HT006-5.jpg"
+      ]
+    },
     "hoodies": {
       "HD001": [
-        "HD001.webp"
+        "HD001-1.jpg",
+        "HD001.webp",
+        "HD001-2.jpg",
+        "HD001-3.jpg",
+        "HD001-4.jpg",
+        "HD001-5.jpg"
+      ],
+      "HD002": [
+        "HD002-1.jpg",
+        "HD002-2.jpg",
+        "HD002-3.jpg",
+        "HD002-4.jpg",
+        "HD002-5.jpg"
+      ],
+      "HD003": [
+        "HD003-1.jpg",
+        "HD003-2.jpg",
+        "HD003-3.jpg"
+      ],
+      "HD004": [
+        "HD004-1.jpg",
+        "HD004-2.jpg",
+        "HD004-3.jpg"
+      ],
+      "HD005": [
+        "HD005-1.jpg",
+        "HD005-2.jpg",
+        "HD005-3.jpg",
+        "HD005-4.jpg",
+        "HD005-5.jpg"
+      ],
+      "HD006": [
+        "HD006-1.jpg",
+        "HD006-2.jpg",
+        "HD006-3.jpg",
+        "HD006-4.jpg"
+      ]
+    },
+    "Innerwear": {
+      "IW001": [
+        "IW001-1.jpg",
+        "IW001-2.jpg"
+      ],
+      "IW002": [
+        "IW002-1.jpg",
+        "IW002-2.jpg"
+      ],
+      "IW003": [
+        "IW003-1.jpg",
+        "IW003-2.jpg"
       ]
     },
     "jackets": {
       "JK001": [
-        "JK001.webp"
+        "JK001-1.jpg",
+        "JK001-2.jpg",
+        "JK001-3.jpg",
+        "JK001-4.jpg",
+        "JK001-5.jpg"
+      ],
+      "JK002": [
+        "JK002-1.jpg",
+        "JK002-2.jpg",
+        "JK002-3.jpg",
+        "JK002-4.jpg"
+      ],
+      "JK003": [
+        "JK003-1.jpg",
+        "JK003-2.jpg",
+        "JK003-3.jpg",
+        "JK003-4.jpg"
+      ],
+      "JK004": [
+        "JK004-1.jpg",
+        "JK004-2.jpg",
+        "JK004-3.jpg"
+      ],
+      "JK005": [
+        "JK005-1.jpg",
+        "JK005-2.jpg",
+        "JK005-3.jpg",
+        "JK005-4.jpg"
+      ],
+      "JK006": [
+        "JK006-1.jpg",
+        "JK006-2.jpg"
       ]
     },
     "jeans": {
@@ -718,9 +1144,699 @@ export const PRODUCT_IMAGE_MANIFEST: Record<string, Record<string, Record<string
         "JN001.webp"
       ]
     },
+    "Joggers": {
+      "JG001": [
+        "JG001-1.jpg",
+        "JG001-2.jpg",
+        "JG001-3.jpg",
+        "JG001-4.jpg",
+        "JG001-5.jpg"
+      ],
+      "JG002": [
+        "JG002-1.jpg",
+        "JG002-2.jpg",
+        "JG002-3.jpg",
+        "JG002-4.jpg"
+      ],
+      "JG003": [
+        "JG003-1.jpg",
+        "JG003-2.jpg",
+        "JG003-3.jpg",
+        "JG003-4.jpg",
+        "JG003-5.jpg"
+      ],
+      "JG004": [
+        "JG004-1.jpg",
+        "JG004-2.jpg",
+        "JG004-3.jpg",
+        "JG004-4.jpg",
+        "JG004-5.jpg",
+        "JG004-6.jpg"
+      ],
+      "JG005": [
+        "JG005-1.jpg",
+        "JG005-2.jpg",
+        "JG005-3.jpg",
+        "JG005-4.jpg",
+        "JG005-5.jpg",
+        "JG005-6.jpg"
+      ]
+    },
+    "Kurta": {
+      "KT001": [
+        "KT001-1.jpg",
+        "KT001-2.jpg",
+        "KT001-3.jpg",
+        "KT001-4.jpg",
+        "KT001-5.jpg"
+      ],
+      "KT002": [
+        "KT002-1.jpg",
+        "KT002-2.jpg",
+        "KT002-3.jpg",
+        "KT002-4.jpg"
+      ],
+      "KT003": [
+        "KT003-1.jpg",
+        "KT003-2.jpg",
+        "KT003-3.jpg",
+        "KT003-4.jpg",
+        "KT003-5.jpg"
+      ],
+      "KT004": [
+        "KT004-1.jpg",
+        "KT004-2.jpg",
+        "KT004-3.jpg",
+        "KT004-4.jpg"
+      ],
+      "KT005": [
+        "KT005-1.jpg",
+        "KT005-2.jpg",
+        "KT005-3.jpg",
+        "KT005-4.jpg"
+      ],
+      "KT006": [
+        "KT006-1.jpg",
+        "KT006-2.jpg",
+        "KT006-3.jpg",
+        "KT006-4.jpg"
+      ],
+      "KT007": [
+        "KT007-1.jpg",
+        "KT007-2.jpg",
+        "KT007-3.jpg",
+        "KT007-4.jpg",
+        "KT007-5.jpg"
+      ],
+      "KT008": [
+        "KT008-1.jpg",
+        "KT008-2.jpg",
+        "KT008-3.jpg",
+        "KT008-4.jpg",
+        "KT008-5.jpg"
+      ]
+    },
+    "Oversized T-Shirts": {
+      "OS001": [
+        "OS001-1.jpg",
+        "OS001-2.jpg",
+        "OS001-3.jpg",
+        "OS001-4.jpg"
+      ],
+      "OS002": [
+        "OS002-1.jpg",
+        "OS002-2.jpg",
+        "OS002-3.jpg",
+        "OS002-4.jpg",
+        "OS002-5.jpg"
+      ],
+      "OS003": [
+        "OS003-1.jpg",
+        "OS003-2.jpg",
+        "OS003-3.jpg",
+        "OS003-4.jpg"
+      ],
+      "OS004": [
+        "OS004-1.jpg",
+        "OS004-2.jpg",
+        "OS004-3.jpg",
+        "OS004-4.jpg"
+      ],
+      "OS005": [
+        "OS005-1.jpg",
+        "OS005-2.jpg",
+        "OS005-3.jpg",
+        "OS005-4.jpg",
+        "OS005-5.jpg"
+      ],
+      "OS006": [
+        "OS006-1.jpg",
+        "OS006-2.jpg",
+        "OS006-3.jpg"
+      ],
+      "OS007": [
+        "OS007-1.jpg",
+        "OS007-2.jpg",
+        "OS007-3.jpg",
+        "OS007-4.jpg",
+        "OS007-5.jpg",
+        "OS007-6.jpg"
+      ],
+      "OS008": [
+        "OS008-1.jpg",
+        "OS008-2.jpg",
+        "OS008-3.jpg",
+        "OS008-4.jpg",
+        "OS008-5.jpg",
+        "OS008-6.jpg"
+      ]
+    },
     "polo-tshirts": {
       "PT001": [
-        "PT001.webp"
+        "PT001-1.jpg",
+        "PT001-2.jpg",
+        "PT001-3.jpg",
+        "PT001-4.jpg",
+        "PT001-5.jpg"
+      ],
+      "PT002": [
+        "PT002-1.jpg",
+        "PT002-2.jpg",
+        "PT002-3.jpg",
+        "PT002-4.jpg"
+      ],
+      "PT003": [
+        "PT003-1.jpg",
+        "PT003-2.jpg",
+        "PT003-3.jpg",
+        "PT003-4.jpg",
+        "PT003-5.jpg",
+        "PT003-6.jpg"
+      ],
+      "PT004": [
+        "PT004-1.jpg",
+        "PT004-2.jpg",
+        "PT004-3.jpg",
+        "PT004-4.jpg",
+        "PT004-5.jpg"
+      ],
+      "PT005": [
+        "PT005-1.jpg",
+        "PT005-2.jpg",
+        "PT005-3.jpg",
+        "PT005-4.jpg",
+        "PT005-5.jpg"
+      ],
+      "PT006": [
+        "PT006-1.jpg",
+        "PT006-2.jpg",
+        "PT006-3.jpg",
+        "PT006-4.jpg",
+        "PT006-5.jpg",
+        "PT006-6.jpg"
+      ],
+      "PT007": [
+        "PT007-1.jpg",
+        "PT007-2.jpg",
+        "PT007-3.jpg",
+        "PT007-4.jpg",
+        "PT007-5.jpg",
+        "PT007-6.jpg",
+        "PT007-7.jpg"
+      ],
+      "PT008": [
+        "PT008-1.jpg",
+        "PT008-2.jpg",
+        "PT008-3.jpg",
+        "PT008-4.jpg",
+        "PT008-5.jpg",
+        "PT008-6.jpg"
+      ],
+      "PT009": [
+        "PT009-1.jpg",
+        "PT009-2.jpg",
+        "PT009-3.jpg",
+        "PT009-4.jpg",
+        "PT009-5.jpg"
+      ],
+      "PT010": [
+        "PT010-1.jpg",
+        "PT010-2.jpg",
+        "PT010-3.jpg",
+        "PT010-4.jpg"
+      ]
+    },
+    "Printed-Shirts": {
+      "PS001": [
+        "PS001-1.jpg",
+        "PS001-2.jpg",
+        "PS001-3.jpg",
+        "PS001-4.jpg",
+        "PS001-6.jpg"
+      ],
+      "PS002": [
+        "PS002-1.jpg",
+        "PS002-2.jpg",
+        "PS002-3.jpg",
+        "PS002-4.jpg"
+      ],
+      "PS003": [
+        "PS003-1.jpg",
+        "PS003-2.jpg",
+        "PS003-3.jpg",
+        "PS003-4.jpg",
+        "PS003-5.jpg"
+      ],
+      "PS004": [
+        "PS004-1.jpg",
+        "PS004-2.jpg",
+        "PS004-3.jpg",
+        "PS004-4.jpg",
+        "PS004-5.jpg",
+        "PS004-6.jpg"
+      ],
+      "PS005": [
+        "PS005-1.jpg",
+        "PS005-2.jpg",
+        "PS005-3.jpg",
+        "PS005-4.jpg",
+        "PS005-5.jpg"
+      ],
+      "PS006": [
+        "PS006-1.jpg",
+        "PS006-2.jpg",
+        "PS006-3.jpg",
+        "PS006-4.jpg",
+        "PS006-5.jpg",
+        "PS006-6.jpg"
+      ],
+      "PS007": [
+        "PS007-1.jpg",
+        "PS007-2.jpg",
+        "PS007-3.jpg",
+        "PS007-4.jpg",
+        "PS007-5.jpg",
+        "PS007-6.jpg",
+        "PS007-7.jpg"
+      ]
+    },
+    "Regular Jeans": {
+      "RJ001": [
+        "RJ001-1.jpg",
+        "RJ001-2.jpg",
+        "RJ001-3.jpg",
+        "RJ001-4.jpg",
+        "RJ001-5.jpg",
+        "RJ001-6.jpg"
+      ],
+      "RJ002": [
+        "RJ002-1.jpg",
+        "RJ002-2.jpg",
+        "RJ002-3.jpg",
+        "RJ002-4.jpg",
+        "RJ002-5.jpg",
+        "RJ002-6.jpg"
+      ],
+      "RJ003": [
+        "RJ003-1.jpg",
+        "RJ003-2.jpg",
+        "RJ003-3.jpg",
+        "RJ003-4.jpg",
+        "RJ003-5.jpg",
+        "RJ003-6.jpg"
+      ],
+      "RJ004": [
+        "RJ004-1.jpg",
+        "RJ004-2.jpg",
+        "RJ004-3.jpg",
+        "RJ004-4.jpg",
+        "RJ004-5.jpg",
+        "RJ004-6.jpg"
+      ],
+      "RJ005": [
+        "RJ005-1.jpg",
+        "RJ005-2.jpg",
+        "RJ005-3.jpg",
+        "RJ005-4.jpg",
+        "RJ005-5.jpg",
+        "RJ005-6.jpg"
+      ],
+      "RJ006": [
+        "RJ006-1.jpg",
+        "RJ006-2.jpg",
+        "RJ006-3.jpg",
+        "RJ006-4.jpg",
+        "RJ006-5.jpg",
+        "RJ006-6.jpg"
+      ],
+      "RJ007": [
+        "RJ007-1.jpg",
+        "RJ007-2.jpg",
+        "RJ007-3.jpg",
+        "RJ007-4.jpg",
+        "RJ007-5.jpg"
+      ],
+      "RJ008": [
+        "RJ008-1.jpg",
+        "RJ008-2.jpg",
+        "RJ008-3.jpg",
+        "RJ008-4.jpg",
+        "RJ008-5.jpg",
+        "RJ008-6.jpg"
+      ]
+    },
+    "Round Neck T-Shirts": {
+      "RN001": [
+        "RN001-1.jpg",
+        "RN001-2.jpg",
+        "RN001-3.jpg",
+        "RN001-4.jpg",
+        "RN001-5.jpg"
+      ],
+      "RN002": [
+        "RN002-1.jpg",
+        "RN002-2.jpg",
+        "RN002-3.jpg",
+        "RN002-4.jpg",
+        "RN002-5.jpg",
+        "RN002-6.jpg"
+      ],
+      "RN003": [
+        "RN003-1.jpg",
+        "RN003-2.jpg",
+        "RN003-3.jpg",
+        "RN003-4.jpg"
+      ],
+      "RN004": [
+        "RN004-1.jpg",
+        "RN004-2.jpg",
+        "RN004-3.jpg",
+        "RN004-4.jpg"
+      ],
+      "RN005": [
+        "RN005-1.jpg",
+        "RN005-2.jpg",
+        "RN005-3.jpg",
+        "RN005-4.jpg",
+        "RN005-5.jpg"
+      ],
+      "RN006": [
+        "RN006-1.jpg",
+        "RN006-2.jpg",
+        "RN006-3.jpg",
+        "RN006-4.jpg",
+        "RN006-5.jpg"
+      ],
+      "RN007": [
+        "RN007-1.jpg",
+        "RN007-2.jpg",
+        "RN007-3.jpg",
+        "RN007-4.jpg",
+        "RN007-5.jpg",
+        "RN007-6.jpg"
+      ],
+      "RN008": [
+        "RN008-1.jpg",
+        "RN008-2.jpg"
+      ]
+    },
+    "Sherwani": {
+      "SHW001": [
+        "SHW001-1.jpg",
+        "SHW001-2.jpg",
+        "SHW001-3.jpg"
+      ],
+      "SHW002": [
+        "SHW002-1.jpg",
+        "SHW002-2.jpg",
+        "SHW002-3.jpg"
+      ],
+      "SHW003": [
+        "SHW003-1.jpg",
+        "SHW003-2.jpg",
+        "SHW003-3.jpg",
+        "SHW003-4.jpg"
+      ],
+      "SHW004": [
+        "SHW004-1.jpg",
+        "SHW004-2.jpg",
+        "SHW004-3.jpg",
+        "SHW004-4.jpg"
+      ],
+      "SHW005": [
+        "SHW005-1.jpg",
+        "SHW005-2.jpg",
+        "SHW005-3.jpg",
+        "SHW005-4.jpg"
+      ],
+      "SHW006": [
+        "SHW006-1.jpg",
+        "SHW006-2.jpg",
+        "SHW006-3.jpg",
+        "SHW006-4.jpg"
+      ]
+    },
+    "Shorts": {
+      "SH001": [
+        "SH001-1.jpg",
+        "SH001-2.jpg",
+        "SH001-3.jpg",
+        "SH001-4.jpg",
+        "SH001-5.jpg",
+        "SH001-6.jpg"
+      ],
+      "SH002": [
+        "SH002-1.jpg",
+        "SH002-2.jpg",
+        "SH002-3.jpg",
+        "SH002-4.jpg",
+        "SH002-5.jpg",
+        "SH002-6.jpg"
+      ],
+      "SH003": [
+        "SH003-1.jpg",
+        "SH003-2.jpg",
+        "SH003-3.jpg",
+        "SH003-4.jpg",
+        "SH003-5.jpg"
+      ],
+      "SH004": [
+        "SH004-1.jpg",
+        "SH004-2.jpg",
+        "SH004-3.jpg",
+        "SH004-4.jpg",
+        "SH004-5.jpg",
+        "SH004-6.jpg"
+      ],
+      "SH005": [
+        "SH005-1.jpg",
+        "SH005-2.jpg",
+        "SH005-3.jpg",
+        "SH005-4.jpg",
+        "SH005-5.jpg",
+        "SH005-6.jpg"
+      ],
+      "SH006": [
+        "SH006-1.jpg",
+        "SH006-2.jpg",
+        "SH006-3.jpg",
+        "SH006-4.jpg",
+        "SH006-5.jpg",
+        "SH006-6.jpg"
+      ],
+      "SH007": [
+        "SH007-1.jpg",
+        "SH007-2.jpg",
+        "SH007-3.jpg",
+        "SH007-4.jpg",
+        "SH007-5.jpg",
+        "SH007-6.jpg"
+      ],
+      "SH008": [
+        "SH008-1.jpg",
+        "SH008-2.jpg",
+        "SH008-3.jpg",
+        "SH008-4.jpg"
+      ],
+      "SH009": [
+        "SH009-1.jpg",
+        "SH009-2.jpg",
+        "SH009-3.jpg",
+        "SH009-4.jpg",
+        "SH009-5.jpg",
+        "SH009-6.jpg"
+      ],
+      "SH010": [
+        "SH010-1.jpg",
+        "SH010-2.jpg",
+        "SH010-3.jpg",
+        "SH010-4.jpg",
+        "SH010-5.jpg"
+      ]
+    },
+    "Slim Jeans": {
+      "SJ001": [
+        "SJ001-1.jpg",
+        "SJ001-2.jpg",
+        "SJ001-3.jpg",
+        "SJ001-4.jpg",
+        "SJ001-5.jpg"
+      ],
+      "SJ002": [
+        "SJ002-1.png",
+        "SJ002-2.png",
+        "SJ002-3.png",
+        "SJ002-4.png"
+      ],
+      "SJ003": [
+        "SJ003-1.webp",
+        "SJ003-2.webp",
+        "SJ003-3.webp",
+        "SJ003-4.webp",
+        "SJ003-5.webp",
+        "SJ003-6.webp",
+        "SJ003-7.webp"
+      ],
+      "SJ004": [
+        "SJ004-1.avif",
+        "SJ004-2.avif",
+        "SJ004-3.avif",
+        "SJ004-4.avif",
+        "SJ004-5.avif"
+      ],
+      "SJ005": [
+        "SJ005-1.avif",
+        "SJ005-1.jpg",
+        "SJ005-2.avif",
+        "SJ005-2.jpg",
+        "SJ005-3.avif",
+        "SJ005-3.jpg",
+        "SJ005-4.avif",
+        "SJ005-4.jpg",
+        "SJ005-5.avif",
+        "SJ005-5.jpg",
+        "SJ005-6.jpg"
+      ],
+      "SJ006": [
+        "SJ006-1.jpg",
+        "SJ006-2.jpg",
+        "SJ006-3.jpg",
+        "SJ006-4.jpg",
+        "SJ006-5.jpg",
+        "SJ006-6.jpg"
+      ],
+      "SJ007": [
+        "SJ007-1.jpg",
+        "SJ007-2.jpg",
+        "SJ007-3.jpg",
+        "SJ007-4.jpg",
+        "SJ007-5.jpg",
+        "SJ007-6.jpg"
+      ],
+      "SJ008": [
+        "SJ008-1.jpg",
+        "SJ008-2.jpg",
+        "SJ008-3.jpg",
+        "SJ008-4.jpg"
+      ],
+      "SJ009": [
+        "SJ009-1.jpg",
+        "SJ009-2.jpg",
+        "SJ009-3.jpg",
+        "SJ009-4.jpg",
+        "SJ009-5.jpg",
+        "SJ009-6.jpg",
+        "SJ009-7.jpg"
+      ],
+      "SJ010": [
+        "SJ010-1.jpg",
+        "SJ010-2.jpg",
+        "SJ010-3.jpg",
+        "SJ010-4.jpg"
+      ],
+      "SJ011": [
+        "SJ011-1.png",
+        "SJ011-2.png",
+        "SJ011-3.png",
+        "SJ011-4.png"
+      ],
+      "SJ012": [
+        "SJ012-1.png",
+        "SJ012-2.png",
+        "SJ012-3.png",
+        "SJ012-4.png",
+        "SJ012-5.png",
+        "SJ012-6.png"
+      ],
+      "SJ013": [
+        "SJ013-1.png",
+        "SJ013-2.png",
+        "SJ013-3.png",
+        "SJ013-4.png",
+        "SJ013-5.png"
+      ]
+    },
+    "Solid-Shirts": {
+      "SS001": [
+        "SS001-1.jpg",
+        "SS001-2.jpg",
+        "SS001-3.jpg",
+        "SS001-4.jpg",
+        "SS001-5.jpg",
+        "SS001-6.jpg"
+      ],
+      "SS002": [
+        "SS002-1.jpg",
+        "SS002-2.jpg",
+        "SS002-3.jpg",
+        "SS002-4.jpg",
+        "SS002-5.jpg"
+      ],
+      "SS003": [
+        "SS003-1.jpg",
+        "SS003-2.jpg",
+        "SS003-3.jpg",
+        "SS003-4.jpg",
+        "SS003-5.jpg"
+      ],
+      "SS004": [
+        "SS004-1.jpg",
+        "SS004-2.jpg",
+        "SS004-3.jpg",
+        "SS004-4.jpg",
+        "SS004-5.jpg"
+      ],
+      "SS005": [
+        "SS005-1.jpg",
+        "SS005-2.jpg",
+        "SS005-3.jpg",
+        "SS005-4.jpg",
+        "SS005-5.jpg",
+        "SS005-6.jpg"
+      ],
+      "SS006": [
+        "SS006-1.jpg",
+        "SS006-2.jpg",
+        "SS006-3.jpg",
+        "SS006-4.jpg",
+        "SS006-5.jpg",
+        "SS006-6.jpg"
+      ]
+    },
+    "Sweatshirts": {
+      "SW001": [
+        "SW001-1.jpg",
+        "SW001-2.jpg"
+      ],
+      "SW002": [
+        "SW002-1.jpg",
+        "SW002-2.jpg",
+        "SW002-3.jpg"
+      ],
+      "SW003": [
+        "SW003-1.jpg",
+        "SW003-2.jpg",
+        "SW003-3.jpg",
+        "SW003-4.jpg"
+      ],
+      "SW004": [
+        "SW004-1.jpg",
+        "SW004-2.jpg",
+        "SW004-3.jpg",
+        "SW004-4.jpg"
+      ],
+      "SW005": [
+        "SW005-1.jpg",
+        "SW005-2.jpg",
+        "SW005-3.jpg",
+        "SW005-4.jpg"
+      ],
+      "SW006": [
+        "SW006-1.jpg",
+        "SW006-2.jpg",
+        "SW006-3.jpg",
+        "SW006-4.jpg",
+        "SW006-5.jpg"
       ]
     },
     "tshirts": {
@@ -729,6 +1845,25 @@ export const PRODUCT_IMAGE_MANIFEST: Record<string, Record<string, Record<string
       ],
       "TS002": [
         "TS002.webp"
+      ]
+    },
+    "Vests": {
+      "VS001": [
+        "VS001-1.jpg",
+        "VS001-2.jpg"
+      ],
+      "VS002": [
+        "VS002-1.jpg",
+        "VS002-2.jpg"
+      ],
+      "VS003": [
+        "VS003.jpg"
+      ],
+      "VS004": [
+        "VS004.jpg"
+      ],
+      "VS005": [
+        "VS005.jpg"
       ]
     }
   }

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { orderService, type AdvanceStatusInput } from '@/services/orderService';
 import { queryKeys } from '@/lib/queryClient';
+import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 import { useAuth } from '@/contexts/AuthContext';
 import { isHeadSeller } from '@/lib/roles';
 import type { Order } from '@/types';
@@ -96,7 +97,7 @@ export function useCancelOrder() {
       queryClient.invalidateQueries({ queryKey: [...queryKeys.orders.all, user?.id] });
       toast.success('Order cancelled');
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error)),
   });
 }
 
@@ -134,6 +135,6 @@ export function useAdvanceOrderStatus() {
       queryClient.invalidateQueries({ queryKey: ['orders', 'number'] });
       toast.success('Order updated');
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error)),
   });
 }

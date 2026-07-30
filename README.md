@@ -96,7 +96,8 @@ Under `functions/` (separate TypeScript project, deployed independently — see 
 - **`CatalogHealthGate`** (`src/components/common/CatalogHealthGate.tsx`, wraps the router in `App.tsx`) — a one-time, app-boot check (not a per-page concern) that distinguishes "genuinely offline/unreachable" from "connected but empty", showing a `Preparing product catalog...` state, a distinct empty-catalog message (with a dev-mode hint pointing at `npm run emulators`), or an offline message — each with a Retry button — instead of every page silently rendering blank grids.
 - **Offline persistence** — Firestore is initialized with `persistentLocalCache`/`persistentMultipleTabManager` (`src/lib/firebase.ts`), so previously-loaded products/cart/orders stay browsable offline and queued writes sync automatically once connectivity returns.
 - **Realtime everywhere it matters** — Products, Inventory, Cart, Orders, Returns, and Exchanges all use Firestore `onSnapshot` listeners (see `subscribeTo*`/`subscribeFor*` in the respective `services/*.ts`), not polling or manual refresh. A seller updating stock, price, or an order/return/exchange status is reflected on the buyer's screen live.
-- **Friendly error messages** — `src/lib/firebaseErrors.ts` maps common Firebase error codes (auth failures, `permission-denied`, `unavailable`, offline) to plain-language messages instead of raw SDK output; wired into every auth page so far. Extending it to more call sites is a good, low-risk follow-up (see "Known limitations" below).
+- **Friendly error messages** — `src/lib/firebaseErrors.ts` maps common Firebase error codes (auth failures, `permission-denied`, `unavailable`, offline) to plain-language messages instead of raw SDK output. Wired into auth pages, checkout/payment, the seller dashboard's product/order/return/exchange/coupon/category/banner/settings mutations, and image-upload flows (avatar, shop logo/banner). Cloud Function callable errors (`functions/*` codes) are treated specially — a callable's own thrown message (e.g. `Insufficient stock for "Red Shirt, size M".`) is shown as-is rather than replaced by the generic per-code text, since Cloud Function authors write those messages specifically for end users.
+- **Offline mode** — two layers: `CatalogHealthGate` (below) is a one-time boot check; `OfflineBanner` (`src/components/common/OfflineBanner.tsx`, mounted app-wide in `App.tsx`) is a live, non-blocking "No Internet Connection" strip with a Retry button that appears/disappears as `navigator.onLine` changes mid-session, and auto-refetches every active query on reconnect. Cached pages/products stay fully browsable underneath it either way (Firestore's own offline persistence, see below).
 
 ---
 
@@ -128,13 +129,91 @@ firestore.rules / firestore.indexes.json / storage.rules / firebase.json
 
 ---
 
+## Android / Play Store release readiness
+
+- **Signing**: `android/app/build.gradle` reads `android/keystore.properties` (gitignored, along with the `.jks` it points at) to sign release builds. A local upload keystore already exists at `android/app/dressmart-upload-key.jks` — **back it up securely** (e.g. a password manager or encrypted storage) along with `keystore.properties`; losing both means you can never update this app under the same Play Store listing again. Enroll in [Google Play App Signing](https://support.google.com/googleplay/android-developer/answer/9842756) so Google holds the actual app signing key and this becomes just your upload key. Once backed up, run `cd android && ./gradlew bundleRelease` to produce a signed `.aab`.
+- **Push notifications are scaffolded but inert** — `@capacitor/push-notifications` is installed and wired (`src/lib/pushNotifications.ts`, called from `initCapacitorNative`): it creates a default Android notification channel, requests permission, and registers for a token, with listeners for registration/receipt/tap already in place. `POST_NOTIFICATIONS` is declared in `AndroidManifest.xml`. None of it can actually reach a real device yet because there's no `google-services.json` — without it, the native FCM SDK has no project to register against, so registration fails safely (logged, not thrown) rather than crashing. See "Push Notification Setup (future)" below for the remaining steps once a real project exists.
+- **Deep linking**: a custom `dressmart://` scheme is wired (manifest intent-filter in `AndroidManifest.xml`, resolved via `src/lib/deepLinks.ts` and bridged into React Router by `useDeepLinkNavigation` in `AppRoutes.tsx`) — supports `dressmart://product/{slug}`, `dressmart://orders/{id}`, `dressmart://men[/{slug}]`, `dressmart://kids[/{slug}]`, `dressmart://cart`, `dressmart://wishlist`. Android App Links (`https://` + a verified domain) can be added later once a real production domain exists — that's additive, not a replacement.
+- **Google Sign-In** (`authService.ts`'s `signInWithGoogle`) uses `signInWithPopup`, a browser-popup flow — this should be functionally tested on a real Android device/emulator inside the Capacitor WebView, since OAuth popups can behave differently there than in a normal browser tab. If it's unreliable, the fix is a native Google Sign-In plugin, not a code change to this doc's scope.
+- **Version bump**: `versionCode`/`versionName` in `android/app/build.gradle` are still Capacitor's defaults (`1` / `"1.0"`) — fine for a first upload, remember to increment `versionCode` on every subsequent release.
+
+### Environment Variables
+
+All in `.env` (copy from `.env.example`, gitignored). Nothing Firebase-related is hardcoded in source — `src/lib/firebase.ts` throws a clear startup error if `VITE_USE_FIREBASE_EMULATOR` isn't `'true'` and real credentials are still missing, rather than silently falling back to a demo project.
+
+| Variable | Purpose |
+|---|---|
+| `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FIREBASE_APP_ID` | Firebase Web app config — Project Settings → General → "Your apps". |
+| `VITE_FIREBASE_VAPID_KEY` | Web Push certificate key, for browser/PWA push — Project Settings → Cloud Messaging. |
+| `VITE_RAZORPAY_KEY_ID` | Razorpay publishable Key ID (safe for the client). The Key **Secret** lives only in Cloud Functions config (`functions/README.md`), never in this file. |
+| `VITE_USE_FIREBASE_EMULATOR` | `true` to force the local emulator suite even if real credentials are present; otherwise defaults to emulator mode only when credentials are missing/placeholder. |
+| `VITE_SITE_URL` | Base URL used in password-reset email redirect links. |
+
+### Android Build Instructions
+
+```bash
+npm run build          # type-check + production web build → dist/
+npx cap sync android    # copy dist/ + plugin config into the native project
+cd android
+./gradlew assembleDebug   # unsigned debug APK — for local device/emulator testing
+./gradlew bundleRelease   # signed release .aab — requires keystore.properties, see Signing above
+```
+
+Run on a connected device/emulator directly with `npx cap run android`, or open `android/` in Android Studio for a full IDE (`npx cap open android`).
+
+### Play Store Release Process
+
+1. Confirm `versionCode` was bumped from the last upload (`android/app/build.gradle`).
+2. `npm run build && npx cap sync android && cd android && ./gradlew bundleRelease`.
+3. Upload `android/app/build/outputs/bundle/release/app-release.aab` to Play Console → your app → Production (or a testing track first).
+4. First-ever upload only: enroll in [Google Play App Signing](https://support.google.com/googleplay/android-developer/answer/9842756) when prompted — Google then re-signs the app for distribution using its own key, and `dressmart-upload-key.jks` becomes just your upload key, not the final signing key.
+5. Fill in the Play Console listing (screenshots, description, privacy policy URL, data-safety form) — outside this repo's scope.
+
+### Production Checklist
+
+- [ ] Real Firebase project created; `.env` filled in with real `VITE_FIREBASE_*` values; `VITE_USE_FIREBASE_EMULATOR=false`.
+- [ ] `firebase deploy --only firestore:rules,firestore:indexes,storage` run against the real project.
+- [ ] Razorpay Cloud Functions config set (live keys, not test keys) — see `functions/README.md`.
+- [ ] Exactly one Head Seller account promoted by hand in the Firestore console.
+- [ ] `versionCode`/`versionName` bumped for this release.
+- [ ] `android/app/dressmart-upload-key.jks` + `android/keystore.properties` backed up securely outside this repo.
+- [ ] `./gradlew bundleRelease` produces a signed `.aab` (verify with `jarsigner -verify`).
+- [ ] Physical-device testing checklist below completed at least once.
+- [ ] `google-services.json` added and push notifications tested end-to-end, if launching with push enabled (otherwise: ship without it, add later — see below).
+
+### Push Notification Setup (future)
+
+Everything client-side is already scaffolded and inert (see above). To turn it on:
+
+1. In the real Firebase project's console, add an **Android app** with package name `com.dressmart.app`, download `google-services.json`, and place it at `android/app/google-services.json`. `android/app/build.gradle` already conditionally applies the `google-services` Gradle plugin only when this file exists — no Gradle changes needed.
+2. Add a dedicated small monochrome notification icon (Android design guideline: transparent + white silhouette only) — without one, Android falls back to the app's full-color launcher icon, which renders poorly in the status bar on some OEM skins.
+3. Rebuild (`npx cap sync android`) — `src/lib/pushNotifications.ts`'s `initPushNotifications()` will start actually registering devices and receiving tokens with no further code changes.
+4. Persist each device's token (from the `'registration'` listener) to that user's `users/{uid}` Firestore doc — there's a `TODO(production)` comment marking exactly where in `pushNotifications.ts`.
+5. Add a Cloud Function (`functions/src`) that reads those tokens and calls `admin.messaging().send(...)` when an order/return/exchange status changes, reusing the existing Firestore-trigger notification pipeline described above.
+6. Test on a physical device — the Android emulator's Google Play Services support for FCM can be unreliable depending on the system image.
+
+### Physical Device Testing Checklist
+
+The Android emulator in a sandboxed/CI environment can hit host-level GPU rendering issues (SwiftShader software rendering under resource pressure) that look like app bugs but aren't — real hardware is the actual verification of record for the items below:
+
+- [ ] Splash screen shows the branded image (not a flash of white) and transitions cleanly to the app.
+- [ ] Status bar color/style matches the app's navy theme.
+- [ ] Safe-area insets (notch/gesture-nav) — bottom nav, sticky Add-to-Cart/Buy Now bar, and sticky checkout bar don't overlap system gesture areas.
+- [ ] Hardware Back button: closes open drawers/modals first, then navigates back through app history, then exits at the root.
+- [ ] Keyboard: focusing the search bar or any form input doesn't hide the field behind the on-screen keyboard.
+- [ ] Pull-to-refresh on Home actually refetches (not just a visual spinner).
+- [ ] Deep link: `adb shell am start -a android.intent.action.VIEW -d "dressmart://product/<a-real-product-slug>"` opens directly to that product's PDP from a cold start.
+- [ ] Google Sign-In popup flow completes successfully inside the WebView (flagged above as the one auth method most likely to need a native plugin instead).
+- [ ] Airplane mode mid-session: `OfflineBanner` appears, cached pages stay browsable, banner disappears and queries refetch automatically on reconnect.
+- [ ] Razorpay checkout (UPI/card/wallet/netbanking, whichever your test merchant account has enabled) and COD both complete an order successfully.
+
 ## Known limitations / next steps
 
 - **Search** is a client-side substring filter over a bounded fetch of active products — fine at this scale, but a dedicated search service (Algolia/Typesense) would be the next step for a larger catalog.
 - **Order pricing is server-recomputed** for the actual charge (`placeCodOrder`/`verifyAndPlaceOrder` read live product/inventory docs), but the Checkout page's on-screen estimate is still client-computed for responsiveness — they should agree, but the server total is always the source of truth.
 - **`product.rating`/`rating_count`** are plain fields, not yet kept in sync with the `reviews` collection via a Cloud Function trigger — reviews are computed live instead; fine for correctness, a bit more reads than a denormalized counter.
 - **One Head Seller, bootstrapped manually** — there's no UI to create the first Head Seller account; promote it by hand in Firestore after your first sign-up.
-- **Friendly error messages** currently cover the auth pages (`src/lib/firebaseErrors.ts`) — a full sweep of every `toast.error(...)` call site to use it is a reasonable, separate follow-up rather than a blind mass-edit.
+- **A handful of `toast.error(...)` call sites may still show raw text** — the sweep covered auth, checkout/payment, the seller dashboard, and image uploads (the highest-traffic flows); any newly-added mutation should route its error through `getFriendlyErrorMessage` (`src/lib/firebaseErrors.ts`) rather than `error.message` directly.
 - **Performance**: no virtualized lists or list-level code-splitting beyond route-level lazy loading yet — fine at this catalog's scale (hundreds of products), worth revisiting as a dedicated pass if the catalog grows substantially.
 - **No automated dead-code sweep** has been run — "remove unused code" is safest as its own reviewed pass (with a real usage-analysis tool) rather than a speculative delete alongside unrelated changes.
 

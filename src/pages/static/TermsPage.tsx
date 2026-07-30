@@ -16,7 +16,7 @@ export function TermsPage() {
   return (
     <div className="container-app max-w-3xl py-8">
       <Seo title="Terms & Conditions" description="DressMart's terms and conditions of use." />
-      <h1 className="mb-2 text-2xl font-bold">Terms &amp; Conditions</h1>
+      <h1 className="mb-2 hidden text-2xl font-bold md:block">Terms &amp; Conditions</h1>
       <p className="mb-8 text-sm text-primary-400">Last updated: January 2026</p>
       <div className="space-y-6">
         {SECTIONS.map((section) => (

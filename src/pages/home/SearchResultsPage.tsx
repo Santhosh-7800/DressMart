@@ -20,7 +20,10 @@ export function SearchResultsPage() {
   }, [searchParams]);
 
   const setSort = (nextSort: SortOption) => setSearchParams(applyFiltersToSearchParams(searchParams, { sort: nextSort, page: 1 }), { replace: true });
-  const persistLoadedPages = (loadedPages: number) => setSearchParams(applyFiltersToSearchParams(searchParams, { sort, page: loadedPages }), { replace: true });
+  // preserveScroll: true — see ProductListingPage's identical comment; this fires mid-scroll, not
+  // on a deliberate navigation, so it must skip ScrollToTop's normal reset-to-top for REPLACE.
+  const persistLoadedPages = (loadedPages: number) =>
+    setSearchParams(applyFiltersToSearchParams(searchParams, { sort, page: loadedPages }), { replace: true, state: { preserveScroll: true } });
 
   const productsQuery = useInfiniteProductListing({ search: query, sort, page, pageSize: 24 }, persistLoadedPages);
 

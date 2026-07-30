@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { slugify } from '@/lib/utils';
 import { queryKeys } from '@/lib/queryClient';
 import { categoryService } from '@/services/productService';
+import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 import type { Category, Gender } from '@/types';
 
 type CategoryFormState = {
@@ -63,7 +64,7 @@ export function SellerCategoriesPage() {
       invalidate();
       setIsFormOpen(false);
     },
-    onError: (error: Error) => toast.error(error.message || 'Could not create category.'),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error, 'Could not create category.')),
   });
 
   const updateMutation = useMutation({
@@ -84,7 +85,7 @@ export function SellerCategoriesPage() {
       setIsFormOpen(false);
       setEditingCategory(null);
     },
-    onError: (error: Error) => toast.error(error.message || 'Could not update category.'),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error, 'Could not update category.')),
   });
 
   const removeMutation = useMutation({
@@ -93,7 +94,7 @@ export function SellerCategoriesPage() {
       toast.success('Category deleted');
       invalidate();
     },
-    onError: (error: Error) => toast.error(error.message || 'Could not delete category.'),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error, 'Could not delete category.')),
   });
 
   const openCreate = () => {

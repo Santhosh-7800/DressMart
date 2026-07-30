@@ -36,8 +36,19 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { BRAND_DEFS, MEN_CATEGORY_DEFS, KIDS_CATEGORY_DEFS, SIZE_SETS, COLOR_PALETTE, MATERIALS, FITS, PATTERNS, OCCASIONS, ADJECTIVES, type CategoryDef } from '../src/data/catalogSource';
 import { SeededRng } from '../src/lib/seededRandom';
 import { slugify, calculateDiscount } from '../src/lib/utils';
-import { getImageFolder, PLACEHOLDER_IMAGE_PATH, getVerifiedColorForCode } from '../src/lib/productImages';
+import { getImageFolder, resolveProductImagePath, PLACEHOLDER_IMAGE_PATH, getVerifiedColorForCode } from '../src/lib/productImages';
 import { PRODUCT_IMAGE_MANIFEST } from '../src/data/productImageManifest';
+import { CURATED_SHIRTS_TSHIRTS } from './curatedShirtsTshirtsData';
+import { CURATED_APPAREL } from './curatedApparelData';
+
+/** Codes already dedicated to a curated batch's own product, keyed by folder — excluded from this
+ *  generic seeder's round-robin pool so a filler product never reuses a curated SKU's real photos. */
+const CLAIMED_CODES_BY_FOLDER = new Map<string, Set<string>>();
+[...CURATED_SHIRTS_TSHIRTS, ...CURATED_APPAREL].forEach((item) => {
+  const set = CLAIMED_CODES_BY_FOLDER.get(item.folderKey) ?? new Set<string>();
+  set.add(item.sku);
+  CLAIMED_CODES_BY_FOLDER.set(item.folderKey, set);
+});
 
 const SEED = 20260722;
 const CATEGORY_PRODUCT_CAP = 18;
@@ -104,7 +115,9 @@ function eligibleBrands(gender: 'men' | 'kids'): typeof BRAND_DEFS {
 function realPhotoSetsFor(gender: 'men' | 'kids', categorySlug: string): string[][] {
   const folder = getImageFolder(categorySlug);
   const byCode = PRODUCT_IMAGE_MANIFEST[gender]?.[folder] ?? {};
-  return Object.values(byCode);
+  const claimed = CLAIMED_CODES_BY_FOLDER.get(folder);
+  const entries = claimed ? Object.entries(byCode).filter(([code]) => !claimed.has(code)) : Object.entries(byCode);
+  return entries.map(([, files]) => files);
 }
 
 interface GeneratedVariant {
@@ -226,7 +239,7 @@ export async function main() {
       const images = photoSet
         ? photoSet.map((filename, idx) => ({
             id: `${ref.id}-img-${idx}`,
-            url: `/images/products/${def.gender}/${getImageFolder(def.slug)}/${filename}`,
+            url: resolveProductImagePath(def.gender, def.slug, filename),
             alt: `${name} — photo ${idx + 1}`,
             color: colors[0].name,
             sort_order: idx,

@@ -7,6 +7,7 @@ import { Product360Viewer } from './Product360Viewer';
 import { resolveSwipeDirection } from '@/lib/gesture';
 import { cn, clamp } from '@/lib/utils';
 import { ProductImage, FALLBACK_IMAGE_SRC } from '@/components/ui/ProductImage';
+import { useBackButtonDismiss } from '@/hooks/useBackButtonDismiss';
 
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 4;
@@ -36,6 +37,9 @@ export function ProductGalleryLightbox({ items, index, onIndexChange, onClose, p
   const [erroredIds, setErroredIds] = useState<Set<string>>(new Set());
   const stageRef = useRef<HTMLDivElement>(null);
   const activeItem = items[index];
+  // Mounted only while open (the parent conditionally renders this component rather than toggling
+  // a prop), so "open" here is just "mounted" — Back should close the viewer, not navigate the PDP.
+  useBackButtonDismiss(true, onClose);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';

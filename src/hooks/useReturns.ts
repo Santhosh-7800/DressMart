@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { returnService } from '@/services/returnService';
 import { queryKeys } from '@/lib/queryClient';
+import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 import { useAuth } from '@/contexts/AuthContext';
 import { isHeadSeller } from '@/lib/roles';
 import type { Order, ReturnRequest, ReturnStatus } from '@/types';
@@ -68,7 +69,7 @@ export function useRequestReturn() {
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
       toast.success('Return request submitted');
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error)),
   });
 }
 
@@ -82,6 +83,6 @@ export function useAdvanceReturnStatus() {
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
       toast.success('Return updated');
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error)),
   });
 }

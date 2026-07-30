@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { Moon, Sun, Lock, AlertTriangle, Bell, BellOff, BellRing } from 'lucide-react';
+import { Moon, Sun, Monitor, Lock, AlertTriangle, Bell, BellOff, BellRing } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 
 export function SettingsPage() {
   const { user } = useAuth();
-  const { theme, setTheme } = useTheme();
+  const { themePreference, setThemePreference } = useTheme();
   const { permission, enablePush, isRegistering, isSupported } = useFcmToken();
 
   const [currentPassword, setCurrentPassword] = useState('');
@@ -55,28 +55,37 @@ export function SettingsPage() {
   return (
     <div className="space-y-6">
       <Seo title="Settings" />
-      <h1 className="text-2xl font-bold text-acc-text dark:text-white">Settings</h1>
+      <h1 className="hidden text-2xl font-bold text-acc-text dark:text-white md:block">Settings</h1>
 
       <Card hover={false}>
         <h2 className="mb-4 text-base font-bold text-acc-text dark:text-white">Appearance</h2>
         <div className="flex gap-3">
           <button
-            onClick={() => setTheme('light')}
+            onClick={() => setThemePreference('light')}
             className={cn(
               'flex flex-1 items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-medium transition-colors',
-              theme === 'light' ? 'border-acc-primary bg-acc-primary/10 text-acc-primary' : 'border-acc-border text-acc-text-secondary dark:border-primary-700',
+              themePreference === 'light' ? 'border-acc-primary bg-acc-primary/10 text-acc-primary' : 'border-acc-border text-acc-text-secondary dark:border-primary-700',
             )}
           >
             <Sun size={16} /> Light
           </button>
           <button
-            onClick={() => setTheme('dark')}
+            onClick={() => setThemePreference('dark')}
             className={cn(
               'flex flex-1 items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-medium transition-colors',
-              theme === 'dark' ? 'border-acc-primary bg-acc-primary/10 text-acc-primary' : 'border-acc-border text-acc-text-secondary dark:border-primary-700',
+              themePreference === 'dark' ? 'border-acc-primary bg-acc-primary/10 text-acc-primary' : 'border-acc-border text-acc-text-secondary dark:border-primary-700',
             )}
           >
             <Moon size={16} /> Dark
+          </button>
+          <button
+            onClick={() => setThemePreference('system')}
+            className={cn(
+              'flex flex-1 items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-medium transition-colors',
+              themePreference === 'system' ? 'border-acc-primary bg-acc-primary/10 text-acc-primary' : 'border-acc-border text-acc-text-secondary dark:border-primary-700',
+            )}
+          >
+            <Monitor size={16} /> System
           </button>
         </div>
       </Card>

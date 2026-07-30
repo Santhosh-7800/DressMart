@@ -1,5 +1,5 @@
-import { Suspense } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Suspense, useEffect } from 'react';
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { MainLayout } from '@/layouts/MainLayout';
 import { AuthLayout } from '@/layouts/AuthLayout';
@@ -9,6 +9,7 @@ import { ProtectedRoute } from './ProtectedRoute';
 import { RequireSeller } from './RequireSeller';
 import { RequireHeadSeller } from './RequireHeadSeller';
 import { lazyWithRetry } from '@/lib/lazyWithRetry';
+import { DEEP_LINK_EVENT } from '@/lib/deepLinks';
 
 const HomePage = lazyWithRetry(() => import('@/pages/home/HomePage').then((m) => ({ default: m.HomePage })));
 const SearchResultsPage = lazyWithRetry(() => import('@/pages/home/SearchResultsPage').then((m) => ({ default: m.SearchResultsPage })));
@@ -45,6 +46,7 @@ const ProfilePage = lazyWithRetry(() => import('@/pages/profile/ProfilePage').th
 const AddressesPage = lazyWithRetry(() => import('@/pages/profile/AddressesPage').then((m) => ({ default: m.AddressesPage })));
 const NotificationsPage = lazyWithRetry(() => import('@/pages/profile/NotificationsPage').then((m) => ({ default: m.NotificationsPage })));
 const CouponsPage = lazyWithRetry(() => import('@/pages/profile/CouponsPage').then((m) => ({ default: m.CouponsPage })));
+const PaymentsPage = lazyWithRetry(() => import('@/pages/profile/PaymentsPage').then((m) => ({ default: m.PaymentsPage })));
 const SettingsPage = lazyWithRetry(() => import('@/pages/profile/SettingsPage').then((m) => ({ default: m.SettingsPage })));
 
 const HelpCenterPage = lazyWithRetry(() => import('@/pages/static/HelpCenterPage').then((m) => ({ default: m.HelpCenterPage })));
@@ -83,7 +85,24 @@ function RouteFallback() {
   );
 }
 
+/** Bridges native deep-link events (dispatched by initCapacitorNative, outside the React tree)
+ *  into a real client-side navigation. No-op on the web — the event is only ever dispatched from
+ *  the native appUrlOpen listener, which itself only runs on Capacitor's native platform. */
+function useDeepLinkNavigation() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const path = (e as CustomEvent<string>).detail;
+      if (path) navigate(path);
+    };
+    window.addEventListener(DEEP_LINK_EVENT, handler);
+    return () => window.removeEventListener(DEEP_LINK_EVENT, handler);
+  }, [navigate]);
+}
+
 export function AppRoutes() {
+  useDeepLinkNavigation();
+
   return (
     <Suspense fallback={<RouteFallback />}>
       <Routes>
@@ -116,13 +135,18 @@ export function AppRoutes() {
             <Route path="/track-order" element={<TrackOrderPage />} />
             <Route path="/sell" element={<SellerApplyPage />} />
 
+            {/* Standalone — not nested under AccountLayout. Orders is its own top-level
+                BottomNavBar destination (see BottomNavBar.tsx), so it renders as a plain full-width
+                page like Wishlist/Cart rather than opening inside the "My Account" sidebar shell. */}
+            <Route path="/orders" element={<OrdersPage />} />
+            <Route path="/orders/:orderId" element={<OrderDetailsPage />} />
+
             <Route element={<AccountLayout />}>
               <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/orders" element={<OrdersPage />} />
-              <Route path="/orders/:orderId" element={<OrderDetailsPage />} />
               <Route path="/addresses" element={<AddressesPage />} />
               <Route path="/notifications" element={<NotificationsPage />} />
               <Route path="/coupons" element={<CouponsPage />} />
+              <Route path="/payments" element={<PaymentsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Route>
           </Route>

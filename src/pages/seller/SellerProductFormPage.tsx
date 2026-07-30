@@ -191,10 +191,10 @@ function ColorCard({
 
   return (
     <div className="rounded-2xl border border-primary-200 p-4 dark:border-primary-700">
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-        <div className="flex flex-wrap items-end gap-3">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
           <Field label="Color Name" required>
-            <Input value={color.name} onChange={(e) => onChange({ name: e.target.value })} placeholder="e.g. Navy Blue" className="w-44" />
+            <Input value={color.name} onChange={(e) => onChange({ name: e.target.value })} placeholder="e.g. Navy Blue" className="w-full sm:w-44" />
           </Field>
           <Field label="Color Code">
             <div className="flex items-center gap-2">
@@ -204,12 +204,12 @@ function ColorCard({
                 onChange={(e) => onChange({ hex: e.target.value })}
                 className="h-10 w-10 shrink-0 cursor-pointer rounded-lg border border-primary-200 dark:border-primary-600"
               />
-              <Input value={color.hex} onChange={(e) => onChange({ hex: e.target.value })} className="w-28 text-sm" />
+              <Input value={color.hex} onChange={(e) => onChange({ hex: e.target.value })} className="w-full flex-1 text-sm sm:w-28" />
             </div>
           </Field>
           <Field label="Quick Pick">
             <select
-              className="input-field w-40"
+              className="input-field w-full sm:w-40"
               value=""
               onChange={(e) => {
                 const preset = COLOR_PALETTE.find((c) => c.name === e.target.value);

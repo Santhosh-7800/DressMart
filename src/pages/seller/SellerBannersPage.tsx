@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { cn } from '@/lib/utils';
 import { queryKeys } from '@/lib/queryClient';
 import { bannerService } from '@/services/bannerService';
+import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 import { uploadBannerImage, isAcceptedImageFile } from '@/services/storageService';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Banner } from '@/types';
@@ -70,7 +71,7 @@ export function SellerBannersPage() {
       invalidate();
       setIsFormOpen(false);
     },
-    onError: (error: Error) => toast.error(error.message || 'Could not create banner.'),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error, 'Could not create banner.')),
   });
 
   const updateMutation = useMutation({
@@ -91,13 +92,13 @@ export function SellerBannersPage() {
       setIsFormOpen(false);
       setEditingBanner(null);
     },
-    onError: (error: Error) => toast.error(error.message || 'Could not update banner.'),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error, 'Could not update banner.')),
   });
 
   const toggleActiveMutation = useMutation({
     mutationFn: ({ banner, isActive }: { banner: Banner; isActive: boolean }) => bannerService.update(banner.id, { is_active: isActive }),
     onSuccess: () => invalidate(),
-    onError: (error: Error) => toast.error(error.message || 'Could not update banner status.'),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error, 'Could not update banner status.')),
   });
 
   const removeMutation = useMutation({
@@ -106,7 +107,7 @@ export function SellerBannersPage() {
       toast.success('Banner deleted');
       invalidate();
     },
-    onError: (error: Error) => toast.error(error.message || 'Could not delete banner.'),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error, 'Could not delete banner.')),
   });
 
   const openCreate = () => {
@@ -144,7 +145,7 @@ export function SellerBannersPage() {
       const url = await uploadBannerImage(file, user.id);
       setForm((f) => ({ ...f, image_url: url }));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Image upload failed.');
+      toast.error(getFriendlyErrorMessage(error, 'Image upload failed.'));
     } finally {
       setIsUploading(false);
     }

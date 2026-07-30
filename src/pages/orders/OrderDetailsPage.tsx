@@ -24,7 +24,7 @@ export function OrderDetailsPage() {
 
   if (isLoading || !order) {
     return (
-      <div className="space-y-4">
+      <div className="container-app space-y-4 py-8">
         <Skeleton className="h-8 w-1/3" />
         <Skeleton className="h-40 w-full" />
       </div>
@@ -35,7 +35,7 @@ export function OrderDetailsPage() {
   const isDelivered = order.status === 'delivered';
 
   return (
-    <div>
+    <div className="container-app py-8">
       <Seo title={`Order ${order.order_number}`} />
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>

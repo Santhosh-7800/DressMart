@@ -111,7 +111,8 @@ function matchesRemainingFilters(p: Product, filters: ProductFilters): boolean {
   if (filters.search) {
     const q = filters.search.trim().toLowerCase();
     if (q) {
-      const haystack = `${p.name} ${p.brand?.name ?? ''} ${p.tags.join(' ')}`.toLowerCase();
+      const colors = p.variants.map((v) => v.color).join(' ');
+      const haystack = `${p.name} ${p.sku} ${p.brand?.name ?? ''} ${p.category?.name ?? ''} ${p.subcategory ?? ''} ${colors} ${p.tags.join(' ')}`.toLowerCase();
       if (!haystack.includes(q)) return false;
     }
   }

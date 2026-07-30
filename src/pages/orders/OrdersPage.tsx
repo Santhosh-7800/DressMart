@@ -130,20 +130,20 @@ export function OrdersPage() {
   const isLoadingActive = activeTab === 'returns' ? isLoadingReturns : activeTab === 'exchanges' ? isLoadingExchanges : isLoading;
 
   return (
-    <div>
+    <div className="container-app py-8">
       <Seo title="My Orders" />
-      <h1 className="mb-4 text-2xl font-bold">My Orders</h1>
+      <h1 className="mb-4 hidden text-2xl font-bold md:block">My Orders</h1>
 
-      <div className="mb-4 flex gap-1 overflow-x-auto border-b border-primary-100 dark:border-primary-700">
+      <div className="scrollbar-none -mx-4 mb-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1">
         {TABS.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
             className={cn(
-              'shrink-0 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors',
+              'shrink-0 snap-start whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors active:scale-95',
               activeTab === tab.key
-                ? 'border-accent-600 text-accent-600'
-                : 'border-transparent text-primary-400 hover:text-primary-700 dark:hover:text-primary-200',
+                ? 'bg-accent text-primary-900'
+                : 'bg-primary-50 text-primary-500 hover:bg-primary-100 dark:bg-primary-800 dark:text-primary-300 dark:hover:bg-primary-700',
             )}
           >
             {tab.label}

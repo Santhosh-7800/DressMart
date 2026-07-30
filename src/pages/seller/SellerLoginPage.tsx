@@ -31,6 +31,7 @@ export function SellerLoginPage() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<'password' | 'phone'>('password');
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
 
   const {
     register,
@@ -52,7 +53,7 @@ export function SellerLoginPage() {
 
   const onSubmit = async (values: FormValues) => {
     try {
-      const profile = await signIn(values.email, values.password);
+      const profile = await signIn(values.email, values.password, rememberMe);
       await routeAfterLogin(profile);
     } catch (error) {
       toast.error(getFriendlyErrorMessage(error, 'Login failed'));
@@ -99,7 +100,16 @@ export function SellerLoginPage() {
           <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
             <Input label="Email Address" type="email" placeholder="you@example.com" leftIcon={<Mail size={16} />} error={errors.email?.message} {...register('email')} />
             <Input label="Password" type="password" placeholder="••••••••" leftIcon={<Lock size={16} />} error={errors.password?.message} {...register('password')} />
-            <div className="flex justify-end">
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 text-sm text-primary-500 dark:text-primary-300">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="h-4 w-4 rounded border-primary-300 text-accent focus:ring-accent"
+                />
+                Remember me
+              </label>
               <Link to="/forgot-password" className="text-sm text-accent-600 hover:underline">
                 Forgot password?
               </Link>

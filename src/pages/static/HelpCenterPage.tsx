@@ -18,7 +18,7 @@ export function HelpCenterPage() {
   return (
     <div className="container-app py-8">
       <Seo title="Help Center" description="Get answers to common questions about orders, returns, payments and more." />
-      <h1 className="mb-2 text-2xl font-bold">Help Center</h1>
+      <h1 className="mb-2 hidden text-2xl font-bold md:block">Help Center</h1>
       <p className="mb-8 text-sm text-primary-400">We're here to help. Find answers below or reach out to our support team.</p>
 
       <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">

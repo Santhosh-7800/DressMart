@@ -10,33 +10,39 @@ const CATEGORY_FOLDER_MAP: Record<string, string> = {
   // Men — shirts
   'formal-shirts': 'formal-shirts',
   'casual-shirts': 'casual-shirts',
-  'printed-shirts': 'casual-shirts',
+  // These 6 used to fall back to a shared folder (casual-shirts/tshirts) before each got its own
+  // real, dedicated photography — see scripts/curatedShirtsTshirtsData.ts and productImageManifest.ts.
+  'printed-shirts': 'Printed-Shirts',
   'checked-shirts': 'checked-shirts',
-  'solid-shirts': 'casual-shirts',
+  'solid-shirts': 'Solid-Shirts',
   'linen-shirts': 'casual-shirts',
-  'cotton-shirts': 'casual-shirts',
-  kurtas: 'casual-shirts',
+  'cotton-shirts': 'Cotton-Shirts',
+  // These 11 used to fall back to a shared folder (casual-shirts/tshirts/jeans/jackets/hoodies/
+  // accessories) before each got its own real, dedicated photography — see
+  // scripts/curatedApparelData.ts and productImageManifest.ts.
+  kurtas: 'Kurta',
   // Men — t-shirts
   'polo-tshirts': 'polo-tshirts',
-  'round-neck-tshirts': 'tshirts',
-  'oversized-tshirts': 'tshirts',
-  'henley-tshirts': 'tshirts',
-  innerwear: 'tshirts',
+  'round-neck-tshirts': 'Round Neck T-Shirts',
+  'oversized-tshirts': 'Oversized T-Shirts',
+  'henley-tshirts': 'Henley T-Shirts',
+  innerwear: 'Innerwear',
   // Men — bottomwear
-  'slim-jeans': 'jeans',
-  'regular-jeans': 'jeans',
-  'cargo-pants': 'jeans',
-  joggers: 'jeans',
-  shorts: 'jeans',
-  'formal-pants': 'jeans',
+  'slim-jeans': 'Slim Jeans',
+  'regular-jeans': 'Regular Jeans',
+  'cargo-pants': 'Cargo Pants',
+  joggers: 'Joggers',
+  shorts: 'Shorts',
+  'formal-pants': 'Formal Pants',
   // Men — outerwear
-  blazers: 'jackets',
+  blazers: 'Blazers',
   jackets: 'jackets',
-  sherwanis: 'jackets',
+  sherwanis: 'Sherwani',
   hoodies: 'hoodies',
-  sweatshirts: 'hoodies',
+  sweatshirts: 'Sweatshirts',
   // Men — accessories & footwear
-  belts: 'accessories',
+  belts: 'Belts',
+  vests: 'Vests',
   wallets: 'accessories',
   watches: 'accessories',
   sneakers: 'shoes',
@@ -80,9 +86,14 @@ export function getProductImageBasePath(gender: Gender, categorySlug: string): s
  * Resolves a product image filename to its path under public/images/products/. Nothing is
  * generated here: until a real file is uploaded to that path, the URL simply 404s and
  * <ProductImage>'s error fallback takes over.
+ *
+ * Folder/file segments are URL-encoded individually — some of the newer category folders (e.g.
+ * "Round Neck T-Shirts") contain literal spaces, which must be encoded per-segment (not as one
+ * encoded whole, which would also escape the `/` separators and produce a malformed path).
  */
 export function resolveProductImagePath(gender: Gender, categorySlug: string, filename: string): string {
-  return `/images/products/${getProductImageBasePath(gender, categorySlug)}/${filename}`;
+  const folder = getImageFolder(categorySlug);
+  return `/images/products/${encodeURIComponent(gender)}/${encodeURIComponent(folder)}/${encodeURIComponent(filename)}`;
 }
 
 export interface ProductImageSet {

@@ -49,8 +49,8 @@ export function AddressesPage() {
   return (
     <div>
       <Seo title="My Addresses" />
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">My Addresses</h1>
+      <div className="mb-6 flex items-center justify-end md:justify-between">
+        <h1 className="hidden text-2xl font-bold md:block">My Addresses</h1>
         <Button variant="accent" size="sm" onClick={openAddModal}>
           <Plus size={15} /> Add Address
         </Button>

@@ -13,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { isHeadSeller } from '@/lib/roles';
 import { isAcceptedImageFile, uploadShopBanner, uploadShopLogo } from '@/services/storageService';
 import { resizeAndCompressImage, resizeAndCompressImageToWidth } from '@/lib/imageProcessing';
+import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 import type { ShopAddress } from '@/types';
 
 interface NotificationPrefs {
@@ -87,7 +88,7 @@ export function SellerSettingsPage() {
       });
     },
     onSuccess: () => toast.success('Store profile updated'),
-    onError: (error: Error) => toast.error(error.message || 'Could not save changes.'),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error, 'Could not save changes.')),
   });
 
   const savePrefsMutation = useMutation({
@@ -95,7 +96,7 @@ export function SellerSettingsPage() {
       if (!user) throw new Error('You must be signed in.');
       await updateDoc(doc(db, 'users', user.id), { notification_prefs: next, updated_at: new Date().toISOString() });
     },
-    onError: (error: Error) => toast.error(error.message || 'Could not save preferences.'),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error, 'Could not save preferences.')),
   });
 
   const saveAddressesMutation = useMutation({
@@ -108,7 +109,7 @@ export function SellerSettingsPage() {
       });
     },
     onSuccess: () => toast.success('Addresses updated'),
-    onError: (error: Error) => toast.error(error.message || 'Could not save addresses.'),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error, 'Could not save addresses.')),
   });
 
   const saveBankDetailsMutation = useMutation({
@@ -122,7 +123,7 @@ export function SellerSettingsPage() {
       });
     },
     onSuccess: () => toast.success('Bank details updated'),
-    onError: (error: Error) => toast.error(error.message || 'Could not save bank details.'),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error, 'Could not save bank details.')),
   });
 
   const saveCodMutation = useMutation({
@@ -130,7 +131,7 @@ export function SellerSettingsPage() {
       if (!user) throw new Error('You must be signed in.');
       await updateDoc(doc(db, 'users', user.id), { shop_cod_available: next, updated_at: new Date().toISOString() });
     },
-    onError: (error: Error) => toast.error(error.message || 'Could not save preference.'),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error, 'Could not save preference.')),
   });
 
   const togglePref = (key: keyof NotificationPrefs) => {
@@ -157,7 +158,7 @@ export function SellerSettingsPage() {
       setLogoUrl(url);
       toast.success('Shop logo updated');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Logo upload failed.');
+      toast.error(getFriendlyErrorMessage(error, 'Logo upload failed.'));
     } finally {
       setIsUploadingLogo(false);
     }
@@ -175,7 +176,7 @@ export function SellerSettingsPage() {
       setBannerUrl(url);
       toast.success('Shop banner updated');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Banner upload failed.');
+      toast.error(getFriendlyErrorMessage(error, 'Banner upload failed.'));
     } finally {
       setIsUploadingBanner(false);
     }

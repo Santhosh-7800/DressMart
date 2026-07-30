@@ -2,6 +2,7 @@ import { useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { authService } from '@/services/authService';
+import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 import type { Profile } from '@/types';
 
 type ProfileUpdate = Partial<Pick<Profile, 'full_name' | 'phone' | 'avatar_url'>>;
@@ -21,7 +22,7 @@ export function useProfile() {
       if (!user) throw new Error('You must be signed in to update your profile.');
       return authService.updateProfile(user.id, updates);
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error)),
   });
 
   return {

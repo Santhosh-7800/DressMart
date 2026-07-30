@@ -30,6 +30,20 @@ export const BRAND_DEFS: BrandDef[] = [
   { name: 'Tiny Trailblazers', slug: 'tiny-trailblazers', description: 'Adventure-ready outfits for active kids.', isFeatured: false, focus: 'kids' },
   { name: 'Cloudstep Kids', slug: 'cloudstep-kids', description: 'Lightweight, breathable kidswear.', isFeatured: false, focus: 'kids' },
   { name: 'Winterhaven Jr.', slug: 'winterhaven-jr', description: 'Warm winter layers built for play.', isFeatured: false, focus: 'kids' },
+
+  // Named brands used by the curated Shirts catalog (real marketplace-listing names, matching the
+  // real product photography sourced for those SKUs — kept distinct from the fictional roster above).
+  { name: 'DressMart Collection', slug: 'dressmart-collection', description: "DressMart's own in-house shirt label.", isFeatured: true, focus: 'men' },
+  { name: 'The Indian Garage Co', slug: 'the-indian-garage-co', description: 'Slim-fit casualwear with a modern edge.', isFeatured: false, focus: 'men' },
+  { name: 'Thomas Scott', slug: 'thomas-scott', description: 'Contemporary printed and casual shirting.', isFeatured: false, focus: 'men' },
+  { name: 'DHRUVI TRENDZ', slug: 'dhruvi-trendz', description: 'Vacation and resort-ready prints.', isFeatured: false, focus: 'men' },
+  { name: 'ZEROYAA', slug: 'zeroyaa', description: 'Bold party and going-out shirting.', isFeatured: false, focus: 'men' },
+  { name: 'StitchX', slug: 'stitchx', description: 'Knitted and mandarin-collar everyday shirts.', isFeatured: false, focus: 'men' },
+  { name: 'Urbano Fashion', slug: 'urbano-fashion', description: 'Regular-fit cotton casual shirting.', isFeatured: false, focus: 'men' },
+  { name: 'Peter England', slug: 'peter-england', description: 'Everyday formal and semi-formal shirting.', isFeatured: false, focus: 'men' },
+  { name: 'Diverse', slug: 'diverse', description: 'Poly-cotton shirting for daily wear.', isFeatured: false, focus: 'men' },
+  { name: 'Symbol', slug: 'symbol', description: 'Cotton formal and casual shirt essentials.', isFeatured: false, focus: 'men' },
+  { name: 'Axe & Hammer', slug: 'axe-hammer', description: 'Everyday cotton innerwear essentials.', isFeatured: false, focus: 'men' },
 ];
 
 export interface CategoryDef {
@@ -67,6 +81,7 @@ export const MEN_CATEGORY_DEFS: CategoryDef[] = [
   { name: 'Sherwanis', slug: 'sherwanis', gender: 'men', productCount: 10, sizeSet: 'apparel', garmentType: 'jacket' },
   { name: 'Innerwear', slug: 'innerwear', gender: 'men', productCount: 30, sizeSet: 'apparel', garmentType: 'tshirt' },
   { name: 'Belts', slug: 'belts', gender: 'men', productCount: 20, sizeSet: 'belt', garmentType: 'default' },
+  { name: 'Vests', slug: 'vests', gender: 'men', productCount: 15, sizeSet: 'apparel', garmentType: 'tshirt' },
   { name: 'Wallets', slug: 'wallets', gender: 'men', productCount: 20, sizeSet: 'onesize', garmentType: 'default' },
   { name: 'Sneakers', slug: 'sneakers', gender: 'men', productCount: 40, sizeSet: 'shoes', garmentType: 'shoe' },
   { name: 'Loafers', slug: 'loafers', gender: 'men', productCount: 20, sizeSet: 'shoes', garmentType: 'shoe' },

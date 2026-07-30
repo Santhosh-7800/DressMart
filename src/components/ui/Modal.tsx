@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useBackButtonDismiss } from '@/hooks/useBackButtonDismiss';
 
 interface ModalProps {
   isOpen: boolean;
@@ -13,6 +14,8 @@ interface ModalProps {
 }
 
 export function Modal({ isOpen, onClose, title, children, className }: ModalProps) {
+  useBackButtonDismiss(isOpen, onClose);
+
   useEffect(() => {
     if (!isOpen) return;
     document.body.style.overflow = 'hidden';

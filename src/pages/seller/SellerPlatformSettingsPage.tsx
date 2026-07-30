@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { queryKeys } from '@/lib/queryClient';
 import { platformSettingsService } from '@/services/platformSettingsService';
+import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 import type { PlatformSettings } from '@/types';
 
 type FormState = Omit<PlatformSettings, 'id' | 'updated_at'>;
@@ -33,7 +34,7 @@ export function SellerPlatformSettingsPage() {
       toast.success('Platform settings saved');
       queryClient.invalidateQueries({ queryKey: queryKeys.seller.platformSettings });
     },
-    onError: (error: Error) => toast.error(error.message || 'Could not save settings.'),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error, 'Could not save settings.')),
   });
 
   if (settingsQuery.isLoading || !form) {

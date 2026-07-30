@@ -45,7 +45,13 @@ export function ProductListingPage({ gender }: ProductListingPageProps) {
   };
 
   const persistLoadedPages = (loadedPages: number) => {
-    setSearchParams(applyFiltersToSearchParams(searchParams, { ...filtersFromSearchParams(searchParams), page: loadedPages }), { replace: true });
+    // preserveScroll: true — this fires while the shopper is mid-scroll loading more pages, not on
+    // a deliberate navigation, so it must not trigger ScrollToTop's normal reset-to-top for REPLACE
+    // navigations (see that file's docstring).
+    setSearchParams(applyFiltersToSearchParams(searchParams, { ...filtersFromSearchParams(searchParams), page: loadedPages }), {
+      replace: true,
+      state: { preserveScroll: true },
+    });
   };
 
   const productsQuery = useInfiniteProductListing(filters, persistLoadedPages);

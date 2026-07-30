@@ -4,8 +4,10 @@
  * Runs automatically before `npm run dev` (see package.json's "predev"). Checks whether the
  * `products` collection already has data; if it's empty (e.g. the Firestore emulator was restarted
  * and lost its in-memory state before it could export), it re-runs the full seed pipeline —
- * scripts/seedFirestore.ts's generic catalog, then scripts/seedCuratedFormalShirts.ts's curated
- * FS031-073 batch — automatically, with no manual `npm run seed` step required.
+ * scripts/seedFirestore.ts's generic catalog, scripts/seedCuratedFormalShirts.ts's curated
+ * FS031-073 batch, scripts/seedCuratedShirtsTshirts.ts's curated Shirts/T-Shirts batch, and
+ * scripts/seedCuratedApparel.ts's curated Bottom Wear/Outerwear/Ethnic Wear/Innerwear/Belts/Vests
+ * batch — automatically, with no manual `npm run seed` step required.
  *
  * Deliberately NOT wired into `npm run build`/`preview`, and deliberately does NOT run against a
  * real production project: seeding a live marketplace with synthetic demo data automatically would
@@ -51,14 +53,16 @@ async function main() {
   }
 
   console.log('⚠ Products collection is empty — auto-seeding the catalog now (this only happens once)...\n');
-  const [{ main: seedCatalog }, { main: seedCuratedFormalShirts }, { main: seedCuratedCheckedShirts }] = await Promise.all([
+  const [{ main: seedCatalog }, { main: seedCuratedFormalShirts }, { main: seedCuratedShirtsTshirts }, { main: seedCuratedApparel }] = await Promise.all([
     import('./seedFirestore.js'),
     import('./seedCuratedFormalShirts.js'),
-    import('./seedCuratedCheckedShirts.js'),
+    import('./seedCuratedShirtsTshirts.js'),
+    import('./seedCuratedApparel.js'),
   ]);
   await seedCatalog();
   await seedCuratedFormalShirts();
-  await seedCuratedCheckedShirts();
+  await seedCuratedShirtsTshirts();
+  await seedCuratedApparel();
   console.log('\n✔ Auto-seed complete — the catalog is ready.');
 }
 

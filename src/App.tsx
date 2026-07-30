@@ -7,6 +7,7 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { ScrollToTop } from '@/components/common/ScrollToTop';
 import { CatalogHealthGate } from '@/components/common/CatalogHealthGate';
+import { OfflineBanner } from '@/components/common/OfflineBanner';
 import { AppRoutes } from '@/routes/AppRoutes';
 
 export function App() {
@@ -15,8 +16,11 @@ export function App() {
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
           <AuthProvider>
-            <BrowserRouter>
+            {/* BASE_URL is Vite's resolved `base` config ('/' everywhere except a GitHub Pages
+                project-site deploy, which serves from '/<repo-name>/' — see vite.config.ts). */}
+            <BrowserRouter basename={import.meta.env.BASE_URL}>
               <ScrollToTop />
+              <OfflineBanner />
               <CatalogHealthGate>
                 <AppRoutes />
               </CatalogHealthGate>

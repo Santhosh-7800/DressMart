@@ -1,19 +1,26 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Clock, Sparkles, Zap } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
+import { PullToRefresh } from '@/components/common/PullToRefresh';
 import { ProductCarousel } from '@/components/product/ProductCarousel';
 import { FlashSaleProductCard } from '@/components/product/FlashSaleProductCard';
 import { CountdownTimer } from '@/components/product/CountdownTimer';
-import { useBanners, useCategories, useDealsOfTheDay, useFeaturedBrands, useFeaturedCollections, useFlashSales, useNewArrivals, useTopRated, useBestSellers, useTrendingProducts } from '@/hooks/useProducts';
+import { useBanners, useCategories, useDealsOfTheDay, useFeaturedCollections, useFlashSales, useNewArrivals, useTopRated, useBestSellers, useTrendingProducts } from '@/hooks/useProducts';
 import { useRecentlyViewed } from '@/hooks/useRecentlyViewed';
 import { usePersonalizedRecommendations } from '@/hooks/usePersonalizedRecommendations';
 import { Skeleton, ProductCardSkeleton } from '@/components/ui/Skeleton';
 import { ProductImage } from '@/components/ui/ProductImage';
+import { queryKeys } from '@/lib/queryClient';
 
 function BannerSlider() {
   const { data: banners, isLoading, isError } = useBanners();
   const [index, setIndex] = useState(0);
+  // Tracks banner ids whose image_url failed to load — falls back to the gradient background
+  // (already always rendered on the outer div) instead of a broken-image icon, since there's no
+  // dedicated "banner placeholder" asset the way products have one.
+  const [failedIds, setFailedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!banners?.length) return;
@@ -27,12 +34,20 @@ function BannerSlider() {
   if (isError || !banners?.length) return null;
 
   const banner = banners[index];
+  const showImage = Boolean(banner.image_url) && !failedIds.has(banner.id);
 
   return (
     <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary-800 to-primary-900 text-white">
-      {banner.image_url && (
+      {showImage && (
         <>
-          <img src={banner.image_url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          <img
+            src={banner.image_url ?? undefined}
+            alt=""
+            loading="eager"
+            decoding="async"
+            className="absolute inset-0 h-full w-full object-cover"
+            onError={() => setFailedIds((prev) => new Set(prev).add(banner.id))}
+          />
           <div className="absolute inset-0 bg-gradient-to-r from-primary-950/80 via-primary-950/40 to-transparent" />
         </>
       )}
@@ -167,25 +182,6 @@ function CategoryShowcase() {
   );
 }
 
-function FeaturedBrandsStrip() {
-  const { data: brands } = useFeaturedBrands();
-  if (!brands?.length) return null;
-
-  return (
-    <section className="container-app py-6 sm:py-8">
-      <h2 className="mb-4 text-xl font-bold">Featured Brands</h2>
-      <div className="scrollbar-thin flex gap-4 overflow-x-auto pb-2">
-        {brands.map((brand) => (
-          <div key={brand.id} className="card-surface flex w-56 shrink-0 flex-col items-start gap-1 p-4">
-            <p className="font-semibold">{brand.name}</p>
-            <p className="text-xs text-primary-400">{brand.description}</p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 function DealsCountdown({ dealEndsAt }: { dealEndsAt: string | null | undefined }) {
   if (!dealEndsAt) return null;
   const hours = Math.max(0, Math.round((new Date(dealEndsAt).getTime() - Date.now()) / (1000 * 60 * 60)));
@@ -220,6 +216,7 @@ function FeaturedCollections() {
 }
 
 export function HomePage() {
+  const queryClient = useQueryClient();
   const dealsQuery = useDealsOfTheDay();
   const trendingQuery = useTrendingProducts();
   const newArrivalsQuery = useNewArrivals();
@@ -227,16 +224,55 @@ export function HomePage() {
   const bestSellersQuery = useBestSellers();
   const { recentlyViewed, isLoading: isLoadingRecentlyViewed } = useRecentlyViewed();
 
+  const handleRefresh = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.products.all }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.banners.all }),
+    ]);
+  };
+
   return (
-    <div>
+    <PullToRefresh onRefresh={handleRefresh}>
       <Seo title="Home" description="DressMart — premium online shopping for Men's and Kids' wear. Shop shirts, jeans, jackets, shoes and more." />
       <div className="container-app pt-6">
         <BannerSlider />
       </div>
-      <FlashSaleWidget />
-      <PersonalizedRecommendations />
+
       <CategoryShowcase />
-      <FeaturedBrandsStrip />
+      <FeaturedCollections />
+
+      <ProductCarousel
+        title="New Arrivals"
+        products={newArrivalsQuery.data ?? []}
+        isLoading={newArrivalsQuery.isLoading}
+        isError={newArrivalsQuery.isError}
+        onRetry={() => newArrivalsQuery.refetch()}
+        viewAllHref="/new-arrivals"
+      />
+      <ProductCarousel
+        title="Best Sellers"
+        products={bestSellersQuery.data ?? []}
+        isLoading={bestSellersQuery.isLoading}
+        isError={bestSellersQuery.isError}
+        onRetry={() => bestSellersQuery.refetch()}
+        viewAllHref="/best-sellers"
+      />
+      <ProductCarousel
+        title="Trending Now"
+        products={trendingQuery.data ?? []}
+        isLoading={trendingQuery.isLoading}
+        isError={trendingQuery.isError}
+        onRetry={() => trendingQuery.refetch()}
+      />
+      <ProductCarousel
+        title="Top Rated"
+        products={topRatedQuery.data ?? []}
+        isLoading={topRatedQuery.isLoading}
+        isError={topRatedQuery.isError}
+        onRetry={() => topRatedQuery.refetch()}
+      />
+
+      <FlashSaleWidget />
 
       {/* Each carousel below distinguishes "confirmed empty" from "the query failed" (isError) —
           a fetch error used to be indistinguishable from zero results and silently rendered
@@ -259,42 +295,11 @@ export function HomePage() {
         </div>
       )}
 
-      <ProductCarousel
-        title="Trending Now"
-        products={trendingQuery.data ?? []}
-        isLoading={trendingQuery.isLoading}
-        isError={trendingQuery.isError}
-        onRetry={() => trendingQuery.refetch()}
-      />
-      <ProductCarousel
-        title="New Arrivals"
-        products={newArrivalsQuery.data ?? []}
-        isLoading={newArrivalsQuery.isLoading}
-        isError={newArrivalsQuery.isError}
-        onRetry={() => newArrivalsQuery.refetch()}
-        viewAllHref="/new-arrivals"
-      />
-      <ProductCarousel
-        title="Top Rated"
-        products={topRatedQuery.data ?? []}
-        isLoading={topRatedQuery.isLoading}
-        isError={topRatedQuery.isError}
-        onRetry={() => topRatedQuery.refetch()}
-      />
-      <ProductCarousel
-        title="Best Sellers"
-        products={bestSellersQuery.data ?? []}
-        isLoading={bestSellersQuery.isLoading}
-        isError={bestSellersQuery.isError}
-        onRetry={() => bestSellersQuery.refetch()}
-        viewAllHref="/best-sellers"
-      />
-
-      <FeaturedCollections />
-
       {(isLoadingRecentlyViewed || recentlyViewed.length > 0) && (
         <ProductCarousel title="Recently Viewed" products={recentlyViewed} isLoading={isLoadingRecentlyViewed} />
       )}
-    </div>
+
+      <PersonalizedRecommendations />
+    </PullToRefresh>
   );
 }

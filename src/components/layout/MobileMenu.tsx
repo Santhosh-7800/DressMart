@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Heart, Package, MapPin, Ticket, Bell, HelpCircle, LogOut } from 'lucide-react';
+import { X, User, Heart, Package, MapPin, Ticket, CreditCard, Bell, HelpCircle, LogOut, Percent, Trophy, Zap, Settings } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCategories } from '@/hooks/useProducts';
 import { useAvatar } from '@/hooks/useAvatar';
+import { useBackButtonDismiss } from '@/hooks/useBackButtonDismiss';
 import { Avatar } from '@/components/ui/Avatar';
 
 interface MobileMenuProps {
@@ -11,13 +12,21 @@ interface MobileMenuProps {
   onClose: () => void;
 }
 
+const SHOP_LINKS = [
+  { to: '/deals', label: 'Deals', icon: Percent },
+  { to: '/best-sellers', label: 'Best Sellers', icon: Trophy },
+  { to: '/flash-sales', label: 'Flash Sale', icon: Zap },
+];
+
 const ACCOUNT_LINKS = [
   { to: '/profile', label: 'My Profile', icon: User },
   { to: '/orders', label: 'My Orders', icon: Package },
   { to: '/wishlist', label: 'Wishlist', icon: Heart },
   { to: '/addresses', label: 'Addresses', icon: MapPin },
   { to: '/coupons', label: 'Coupons', icon: Ticket },
+  { to: '/payments', label: 'Payment Methods', icon: CreditCard },
   { to: '/notifications', label: 'Notifications', icon: Bell },
+  { to: '/settings', label: 'Settings', icon: Settings },
   { to: '/help-center', label: 'Help Center', icon: HelpCircle },
 ];
 
@@ -26,6 +35,7 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
   const { data: menCategories } = useCategories('men');
   const { data: kidsCategories } = useCategories('kids');
   const { avatarUrl } = useAvatar();
+  useBackButtonDismiss(isOpen, onClose);
 
   return (
     <AnimatePresence>
@@ -51,16 +61,25 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
                   )}
                 </div>
               </div>
-              <button onClick={onClose} aria-label="Close menu">
+              <button onClick={onClose} aria-label="Close menu" className="relative tap-target-48">
                 <X size={22} />
               </button>
             </div>
 
             <div className="p-4">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-primary-400">Shop</p>
+              <div className="mb-4 flex flex-col gap-1">
+                {SHOP_LINKS.map(({ to, label, icon: Icon }) => (
+                  <Link key={to} to={to} onClick={onClose} className="flex min-h-12 items-center gap-3 rounded-lg px-2 text-sm hover:bg-primary-100 dark:hover:bg-primary-800">
+                    <Icon size={18} className="text-primary-400" />
+                    {label}
+                  </Link>
+                ))}
+              </div>
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-primary-400">Men</p>
               <div className="mb-4 grid grid-cols-2 gap-1">
                 {(menCategories ?? []).slice(0, 10).map((c) => (
-                  <Link key={c.id} to={`/men/${c.slug}`} onClick={onClose} className="rounded-lg px-2 py-1.5 text-sm hover:bg-primary-100 dark:hover:bg-primary-800">
+                  <Link key={c.id} to={`/men/${c.slug}`} onClick={onClose} className="flex min-h-12 items-center rounded-lg px-2 text-sm hover:bg-primary-100 dark:hover:bg-primary-800">
                     {c.name}
                   </Link>
                 ))}
@@ -68,7 +87,7 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-primary-400">Kids</p>
               <div className="mb-4 grid grid-cols-2 gap-1">
                 {(kidsCategories ?? []).slice(0, 10).map((c) => (
-                  <Link key={c.id} to={`/kids/${c.slug}`} onClick={onClose} className="rounded-lg px-2 py-1.5 text-sm hover:bg-primary-100 dark:hover:bg-primary-800">
+                  <Link key={c.id} to={`/kids/${c.slug}`} onClick={onClose} className="flex min-h-12 items-center rounded-lg px-2 text-sm hover:bg-primary-100 dark:hover:bg-primary-800">
                     {c.name}
                   </Link>
                 ))}
@@ -76,7 +95,7 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
 
               <div className="border-t border-primary-100 pt-4 dark:border-primary-700">
                 {ACCOUNT_LINKS.map(({ to, label, icon: Icon }) => (
-                  <Link key={to} to={to} onClick={onClose} className="flex items-center gap-3 rounded-lg px-2 py-2.5 text-sm hover:bg-primary-100 dark:hover:bg-primary-800">
+                  <Link key={to} to={to} onClick={onClose} className="flex min-h-12 items-center gap-3 rounded-lg px-2 text-sm hover:bg-primary-100 dark:hover:bg-primary-800">
                     <Icon size={18} className="text-primary-400" />
                     {label}
                   </Link>
@@ -87,7 +106,7 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
                       signOut();
                       onClose();
                     }}
-                    className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    className="flex min-h-12 w-full items-center gap-3 rounded-lg px-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
                   >
                     <LogOut size={18} />
                     Logout

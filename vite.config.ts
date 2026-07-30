@@ -3,7 +3,14 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'node:path';
 
+// GitHub Pages serves project sites from a /<repo-name>/ subpath, not the domain root — the
+// deploy workflow (.github/workflows/deploy-pages.yml) sets this from the repo name at build
+// time. Every other environment (local dev, Capacitor's bundled assets, a custom-domain
+// deployment) serves from the root, so this defaults to '/' unchanged.
+const base = process.env.VITE_BASE_PATH || '/';
+
 export default defineConfig({
+  base,
   plugins: [
     react(),
     VitePWA({
@@ -20,8 +27,8 @@ export default defineConfig({
         background_color: '#131921',
         display: 'standalone',
         orientation: 'portrait',
-        start_url: '/',
-        scope: '/',
+        start_url: base,
+        scope: base,
         icons: [
           { src: '/icons/icon.svg', sizes: '192x192', type: 'image/svg+xml' },
           { src: '/icons/icon.svg', sizes: '512x512', type: 'image/svg+xml' },

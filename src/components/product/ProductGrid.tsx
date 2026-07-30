@@ -5,6 +5,7 @@ import { ProductGridSkeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PackageSearch, AlertTriangle } from 'lucide-react';
 import { debugLog } from '@/lib/debugLog';
+import { useInventoryBatch } from '@/hooks/useInventory';
 
 interface ProductGridProps {
   products: Product[];
@@ -18,6 +19,9 @@ interface ProductGridProps {
 
 export function ProductGrid({ products, isLoading, isError, onRetry, emptyMessage }: ProductGridProps) {
   debugLog('ProductGrid', 'render', { isLoading, isError, count: products.length });
+  // One batched inventory read for the whole grid instead of each ProductCard firing its own —
+  // see useInventoryBatch's docstring.
+  const { data: inventoryMap } = useInventoryBatch(products.map((p) => p.id));
   if (isLoading) return <ProductGridSkeleton />;
 
   if (isError) {
@@ -52,7 +56,7 @@ export function ProductGrid({ products, isLoading, isError, onRetry, emptyMessag
       className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4"
     >
       {products.map((product) => (
-        <ProductCard key={product.id} product={product} />
+        <ProductCard key={product.id} product={product} inventory={inventoryMap ? (inventoryMap[product.id] ?? null) : undefined} skipOwnFetch />
       ))}
     </motion.div>
   );

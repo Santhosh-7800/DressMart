@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { cn, formatDate } from '@/lib/utils';
 import { queryKeys } from '@/lib/queryClient';
 import { createCoupon, updateCoupon, setCouponActive, listAllCoupons } from '@/services/couponService';
+import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 import type { Coupon } from '@/types';
 
 type CouponFormState = {
@@ -81,7 +82,7 @@ export function SellerCouponsPage() {
       invalidate();
       setIsFormOpen(false);
     },
-    onError: (error: Error) => toast.error(error.message || 'Could not create coupon.'),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error, 'Could not create coupon.')),
   });
 
   const updateMutation = useMutation({
@@ -105,7 +106,7 @@ export function SellerCouponsPage() {
       setIsFormOpen(false);
       setEditingCoupon(null);
     },
-    onError: (error: Error) => toast.error(error.message || 'Could not update coupon.'),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error, 'Could not update coupon.')),
   });
 
   const toggleActiveMutation = useMutation({
@@ -113,7 +114,7 @@ export function SellerCouponsPage() {
     onSuccess: () => {
       invalidate();
     },
-    onError: (error: Error) => toast.error(error.message || 'Could not update coupon status.'),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error, 'Could not update coupon status.')),
   });
 
   const openCreate = () => {

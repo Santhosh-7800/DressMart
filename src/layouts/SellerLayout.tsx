@@ -30,8 +30,11 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAvatar } from '@/hooks/useAvatar';
+import { useBackButtonDismiss } from '@/hooks/useBackButtonDismiss';
+import { useRipple } from '@/hooks/useRipple';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
+import { RippleLayer } from '@/components/ui/RippleLayer';
 import { AnimatedOutlet } from '@/components/common/PageTransition';
 import { isHeadSeller } from '@/lib/roles';
 
@@ -41,6 +44,37 @@ interface NavItem {
   icon: LucideIcon;
   end?: boolean;
 }
+
+function SellerTabLink({ to, label, icon: Icon, end }: NavItem) {
+  const { ripples, addRipple, clearRipple } = useRipple();
+
+  return (
+    <NavLink
+      to={to}
+      end={end}
+      onClick={addRipple}
+      className={({ isActive }) =>
+        cn(
+          'relative flex flex-1 flex-col items-center justify-center gap-0.5 overflow-hidden py-2 text-[11px] font-medium transition-colors active:scale-95',
+          isActive ? 'text-acc-primary' : 'text-acc-text-secondary',
+        )
+      }
+    >
+      <RippleLayer ripples={ripples} onDone={clearRipple} />
+      <Icon size={20} strokeWidth={2.25} />
+      {label}
+    </NavLink>
+  );
+}
+
+/** The 4 highest-frequency destinations, shown as direct tabs on the mobile bottom bar — everything
+ *  else (including all Head Seller-only items) stays reachable via the "More" tab's drawer. */
+const SELLER_TABS: NavItem[] = [
+  { to: '/seller/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/seller/products', label: 'Products', icon: Package },
+  { to: '/seller/orders', label: 'Orders', icon: ShoppingBag },
+  { to: '/seller/inventory', label: 'Inventory', icon: Boxes },
+];
 
 const BASE_NAV_ITEMS: NavItem[] = [
   { to: '/seller/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -185,6 +219,8 @@ export function SellerLayout() {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const { user } = useAuth();
   const { avatarUrl } = useAvatar();
+  useBackButtonDismiss(isMobileNavOpen, () => setIsMobileNavOpen(false));
+  const { ripples: moreRipples, addRipple: addMoreRipple, clearRipple: clearMoreRipple } = useRipple();
 
   if (user?.seller_status === 'suspended') {
     return <SuspendedBlock reason={user.seller_status_reason} />;
@@ -222,19 +258,26 @@ export function SellerLayout() {
         </div>
       </div>
 
-      {/* Mobile: bottom bar that opens a drawer */}
-      <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between border-t border-acc-border bg-white/95 px-4 py-3 backdrop-blur-md md:hidden dark:border-primary-700 dark:bg-card-dark/95">
-        <div>
-          <p className="text-xs text-acc-text-secondary">Seller Dashboard</p>
-          <p className="text-sm font-semibold text-acc-text dark:text-white">Menu</p>
-        </div>
+      {/* Mobile: persistent bottom tab bar for the 4 highest-frequency destinations (mirrors the
+          buyer app's BottomNavBar), plus a "More" tab opening the same full-destination drawer
+          below — the seller nav has too many items (up to 17 for a Head Seller) to fit as direct
+          tabs, so "More" is the catch-all rather than a duplicate nav list. */}
+      <nav className="pb-safe fixed inset-x-0 bottom-0 z-30 flex items-stretch border-t border-acc-border bg-white/95 backdrop-blur-md md:hidden dark:border-primary-700 dark:bg-card-dark/95" aria-label="Seller">
+        {SELLER_TABS.map((tab) => (
+          <SellerTabLink key={tab.to} {...tab} />
+        ))}
         <button
-          onClick={() => setIsMobileNavOpen(true)}
-          className="flex items-center gap-2 rounded-full bg-acc-primary px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_24px_-10px_rgba(255,107,0,0.7)] transition-transform active:scale-95"
+          onClick={(e) => {
+            addMoreRipple(e);
+            setIsMobileNavOpen(true);
+          }}
+          className="relative flex flex-1 flex-col items-center justify-center gap-0.5 overflow-hidden py-2 text-[11px] font-medium text-acc-text-secondary transition-colors active:scale-95"
         >
-          <Menu size={16} /> Menu
+          <RippleLayer ripples={moreRipples} onDone={clearMoreRipple} />
+          <Menu size={20} strokeWidth={2.25} />
+          More
         </button>
-      </div>
+      </nav>
 
       {/* Mobile: bottom-sheet drawer nav */}
       <AnimatePresence>

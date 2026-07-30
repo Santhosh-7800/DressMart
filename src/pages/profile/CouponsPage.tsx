@@ -21,7 +21,7 @@ export function CouponsPage() {
   return (
     <div>
       <Seo title="Coupons" />
-      <h1 className="mb-6 text-2xl font-bold">Coupons &amp; Offers</h1>
+      <h1 className="mb-6 hidden text-2xl font-bold md:block">Coupons &amp; Offers</h1>
 
       {isLoading && <Skeleton className="h-24 w-full" />}
 

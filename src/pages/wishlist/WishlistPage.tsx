@@ -17,7 +17,7 @@ export function WishlistPage() {
   return (
     <div className="container-app py-8">
       <Seo title="Wishlist" description="Your saved items on DressMart." />
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-6 hidden flex-wrap items-center justify-between gap-3 md:flex">
         <div className="flex items-center gap-3">
           {user && <Avatar src={avatarUrl} name={user.full_name} size="sm" />}
           <h1 className="text-2xl font-bold">My Wishlist ({products.length})</h1>

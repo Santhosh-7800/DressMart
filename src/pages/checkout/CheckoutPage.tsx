@@ -8,6 +8,7 @@ import { Seo } from '@/components/common/Seo';
 import { useCheckoutItems } from '@/hooks/useCheckoutItems';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAvatar } from '@/hooks/useAvatar';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { OrderSummary } from '@/components/cart/OrderSummary';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
@@ -59,7 +60,11 @@ export function CheckoutPage() {
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState<AddressFormState>(EMPTY_ADDRESS);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('razorpay');
+  // Pre-selects whatever the shopper last picked as their default on the Payments page (see
+  // PaymentsPage.tsx) — a plain local preference, not a Firestore field. Still fully overridable
+  // per order via the buttons below.
+  const [preferredMethod] = useLocalStorage<PaymentMethod>('dressmart:preferred-payment-method', 'razorpay');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(preferredMethod);
 
   const addressesQuery = useQuery({
     queryKey: ['addresses', userId],
@@ -130,9 +135,9 @@ export function CheckoutPage() {
   }
 
   return (
-    <div className="container-app py-8">
+    <div className="container-app pt-8 pb-24 md:pb-8">
       <Seo title="Checkout" />
-      <div className="mb-6 flex items-center gap-3">
+      <div className="mb-6 hidden items-center gap-3 md:flex">
         {user && <Avatar src={avatarUrl} name={user.full_name} size="sm" />}
         <h1 className="text-2xl font-bold">Checkout</h1>
       </div>
@@ -237,10 +242,27 @@ export function CheckoutPage() {
             </div>
           )}
           <OrderSummary itemCount={totalItems} subtotal={subtotal} discount={totalDiscount} couponDiscount={couponDiscount} shippingFee={shippingFee} tax={tax} total={total}>
-            <Button variant="accent" fullWidth size="lg" className="mt-4" onClick={handleContinue}>
+            <Button variant="accent" fullWidth size="lg" className="mt-4 hidden md:block" onClick={handleContinue}>
               Continue to Payment
             </Button>
           </OrderSummary>
+        </div>
+      </div>
+
+      {/* Mobile sticky bar — BottomNavBar is already hidden on /checkout* routes (see
+          MainLayout), so this sits flush at the bottom instead of stacking above it. pb-safe on
+          the outer element adds clearance below the p-3 content on notched devices, rather than
+          conflicting with it (both setting padding-bottom on the same element would just have one
+          override the other). */}
+      <div className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-primary-100 bg-surface shadow-[0_-4px_12px_rgba(0,0,0,0.06)] md:hidden dark:border-primary-700 dark:bg-surface-dark">
+        <div className="flex items-center gap-3 p-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-primary-400">Total</p>
+            <p className="truncate text-lg font-bold">{formatCurrency(total)}</p>
+          </div>
+          <Button variant="accent" size="md" onClick={handleContinue} className="shrink-0">
+            Continue to Payment
+          </Button>
         </div>
       </div>
 

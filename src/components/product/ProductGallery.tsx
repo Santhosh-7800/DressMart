@@ -71,7 +71,7 @@ export function ProductGallery({ images, videoUrl, spinFrames, activeColor, prod
 
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-[80px_1fr]">
-      <div className="scrollbar-thin order-2 flex gap-2 overflow-x-auto pb-1 sm:order-1 sm:max-h-[560px] sm:flex-col sm:overflow-y-auto sm:overflow-x-visible sm:pb-0">
+      <div className="scrollbar-thin order-2 hidden gap-2 overflow-x-auto pb-1 sm:order-1 sm:flex sm:max-h-[560px] sm:flex-col sm:overflow-y-auto sm:overflow-x-visible sm:pb-0">
         {items.map((item, idx) => (
           <button
             key={item.id}
@@ -144,6 +144,22 @@ export function ProductGallery({ images, videoUrl, spinFrames, activeColor, prod
           </button>
         </div>
       </div>
+
+      {items.length > 1 && (
+        <div className="order-3 flex justify-center gap-1.5 sm:hidden">
+          {items.map((item, idx) => (
+            <button
+              key={item.id}
+              onClick={() => goTo(idx)}
+              aria-label={`View item ${idx + 1} of ${items.length}`}
+              className={cn(
+                'h-1.5 rounded-full transition-all',
+                activeIndex === idx ? 'w-4 bg-accent' : 'w-1.5 bg-primary-200 dark:bg-primary-600',
+              )}
+            />
+          ))}
+        </div>
+      )}
 
       {isLightboxOpen && (
         <ProductGalleryLightbox

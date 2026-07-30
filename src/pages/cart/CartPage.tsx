@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/Button';
 import type { Coupon } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { clearBuyNowItem } from '@/lib/buyNowSession';
+import { formatCurrency } from '@/lib/utils';
 
 const FREE_SHIPPING_THRESHOLD = 999;
 const SHIPPING_FEE = 79;
@@ -51,9 +52,9 @@ export function CartPage() {
   }
 
   return (
-    <div className="container-app py-8">
+    <div className="container-app pt-8 pb-24 md:pb-8">
       <Seo title="Cart" />
-      <h1 className="mb-6 text-2xl font-bold">Shopping Cart</h1>
+      <h1 className="mb-6 hidden text-2xl font-bold md:block">Shopping Cart</h1>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
         <div>
           {items.length > 0 ? (
@@ -103,7 +104,7 @@ export function CartPage() {
                   Some items in your cart exceed available stock. Adjust quantities to continue.
                 </p>
               )}
-              <Button variant="accent" fullWidth size="lg" className="mt-4" onClick={handleCheckout} disabled={hasOutOfStockItems}>
+              <Button variant="accent" fullWidth size="lg" className="mt-4 hidden md:block" onClick={handleCheckout} disabled={hasOutOfStockItems}>
                 Proceed to Checkout
               </Button>
               <Link to="/" className="mt-2 block text-center text-sm text-accent-600 hover:underline">
@@ -113,6 +114,24 @@ export function CartPage() {
           </div>
         )}
       </div>
+
+      {/* Mobile sticky checkout bar — the desktop button above is buried below the cart list on a
+          single-column mobile layout; this keeps the primary action reachable without scrolling.
+          bottom-nav-safe sits just above the global BottomNavBar (still visible on /cart),
+          accounting for its safe-area-inset-bottom padding, not just its 64px base height. */}
+      {items.length > 0 && (
+        <div className="bottom-nav-safe fixed inset-x-0 z-30 border-t border-primary-100 bg-surface p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] md:hidden dark:border-primary-700 dark:bg-surface-dark">
+          <div className="flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs text-primary-400">Total</p>
+              <p className="truncate text-lg font-bold">{formatCurrency(total)}</p>
+            </div>
+            <Button variant="accent" size="md" onClick={handleCheckout} disabled={hasOutOfStockItems} className="shrink-0">
+              Proceed to Checkout
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

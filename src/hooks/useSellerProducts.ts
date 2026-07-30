@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { productService } from '@/services/productService';
 import { queryKeys } from '@/lib/queryClient';
+import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 import { useAuth } from '@/contexts/AuthContext';
 import type { ProductStatus, SellerProductInput } from '@/types';
 
@@ -41,7 +42,7 @@ export function useCreateProduct() {
       queryClient.invalidateQueries({ queryKey: ['products', 'all-sellers'] });
       toast.success('Product created');
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error)),
   });
 }
 
@@ -63,7 +64,7 @@ export function useUpdateProduct() {
       queryClient.invalidateQueries({ queryKey: ['products', 'all-sellers'] });
       toast.success('Product updated');
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error)),
   });
 }
 
@@ -88,7 +89,7 @@ export function useSetProductStatus() {
       queryClient.invalidateQueries({ queryKey: ['products', 'all-sellers'] });
       toast.success(`Product ${STATUS_LABELS[status]}`);
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error)),
   });
 }
 
@@ -102,7 +103,7 @@ export function useSetProductFeatured() {
       queryClient.invalidateQueries({ queryKey: ['products', 'all-sellers'] });
       toast.success(featured ? 'Product featured' : 'Product unfeatured');
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error)),
   });
 }
 
@@ -125,7 +126,7 @@ export function useDeleteProduct() {
       queryClient.invalidateQueries({ queryKey: ['products', 'all-sellers'] });
       toast.success('Product deleted');
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error)),
   });
 }
 
@@ -142,7 +143,7 @@ export function useDuplicateProduct() {
       queryClient.invalidateQueries({ queryKey: ['products', 'all-sellers'] });
       toast.success('Product duplicated as a draft');
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error)),
   });
 }
 
@@ -158,6 +159,6 @@ export function useSetProductDealOfDay() {
       queryClient.invalidateQueries({ queryKey: ['products', 'deals'] });
       toast.success(isDeal ? 'Product added to Deal of the Day' : 'Product removed from Deal of the Day');
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error)),
   });
 }

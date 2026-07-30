@@ -5,7 +5,9 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['dist'] },
+  // 'android' is the native Capacitor project (see capacitor.config.ts) — its build output and
+  // copied runtime JS aren't part of this project's own source and shouldn't be linted with it.
+  { ignores: ['dist', 'android'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{ts,tsx}'],

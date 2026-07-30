@@ -25,8 +25,8 @@ export function NotificationsPage() {
   return (
     <div>
       <Seo title="Notifications" />
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Notifications {unreadCount > 0 && <span className="text-base font-normal text-primary-400">({unreadCount} unread)</span>}</h1>
+      <div className="mb-6 flex items-center justify-end md:justify-between">
+        <h1 className="hidden text-2xl font-bold md:block">Notifications {unreadCount > 0 && <span className="text-base font-normal text-primary-400">({unreadCount} unread)</span>}</h1>
         {unreadCount > 0 && (
           <button onClick={() => markAllRead()} className="text-sm text-accent-600 hover:underline">
             Mark all as read

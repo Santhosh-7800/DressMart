@@ -1,7 +1,8 @@
-import { forwardRef, useState, type ButtonHTMLAttributes, type MouseEvent } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { forwardRef, type ButtonHTMLAttributes, type MouseEvent } from 'react';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useRipple } from '@/hooks/useRipple';
+import { RippleLayer } from './RippleLayer';
 
 type Variant = 'primary' | 'accent' | 'outline' | 'ghost' | 'danger' | 'account';
 type Size = 'sm' | 'md' | 'lg';
@@ -29,23 +30,12 @@ const sizeClasses: Record<Size, string> = {
   lg: 'px-7 py-3.5 text-base',
 };
 
-interface Ripple {
-  id: number;
-  x: number;
-  y: number;
-  size: number;
-}
-
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = 'primary', size = 'md', isLoading, fullWidth, disabled, children, onClick, ...props }, ref) => {
-    const [ripples, setRipples] = useState<Ripple[]>([]);
+    const { ripples, addRipple, clearRipple } = useRipple();
 
     const handleClick = (e: MouseEvent<HTMLButtonElement>) => {
-      if (!disabled && !isLoading) {
-        const rect = e.currentTarget.getBoundingClientRect();
-        const size = Math.max(rect.width, rect.height) * 2;
-        setRipples((prev) => [...prev, { id: Date.now(), x: e.clientX - rect.left - size / 2, y: e.clientY - rect.top - size / 2, size }]);
-      }
+      if (!disabled && !isLoading) addRipple(e);
       onClick?.(e);
     };
 
@@ -57,19 +47,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         onClick={handleClick}
         {...props}
       >
-        <AnimatePresence>
-          {ripples.map((ripple) => (
-            <motion.span
-              key={ripple.id}
-              initial={{ opacity: 0.35, scale: 0 }}
-              animate={{ opacity: 0, scale: 1 }}
-              transition={{ duration: 0.5, ease: 'easeOut' }}
-              onAnimationComplete={() => setRipples((prev) => prev.filter((r) => r.id !== ripple.id))}
-              className="pointer-events-none absolute rounded-full bg-current"
-              style={{ left: ripple.x, top: ripple.y, width: ripple.size, height: ripple.size }}
-            />
-          ))}
-        </AnimatePresence>
+        <RippleLayer ripples={ripples} onDone={clearRipple} />
         {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
         {children}
       </button>

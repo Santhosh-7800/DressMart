@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { exchangeService, type RequestExchangeInput } from '@/services/exchangeService';
 import { queryKeys } from '@/lib/queryClient';
+import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 import { useAuth } from '@/contexts/AuthContext';
 import { isHeadSeller } from '@/lib/roles';
 import type { ExchangeRequest, ExchangeStatus } from '@/types';
@@ -65,7 +66,7 @@ export function useRequestExchange() {
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
       toast.success('Exchange request submitted');
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error)),
   });
 }
 
@@ -79,6 +80,6 @@ export function useAdvanceExchangeStatus() {
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
       toast.success('Exchange updated');
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error)),
   });
 }

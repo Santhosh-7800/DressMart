@@ -15,7 +15,7 @@ export function PrivacyPolicyPage() {
   return (
     <div className="container-app max-w-3xl py-8">
       <Seo title="Privacy Policy" description="DressMart's privacy policy — how we collect, use, and protect your data." />
-      <h1 className="mb-2 text-2xl font-bold">Privacy Policy</h1>
+      <h1 className="mb-2 hidden text-2xl font-bold md:block">Privacy Policy</h1>
       <p className="mb-8 text-sm text-primary-400">Last updated: January 2026</p>
       <div className="space-y-6">
         {SECTIONS.map((section) => (

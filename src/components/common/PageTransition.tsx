@@ -69,7 +69,10 @@ export function AnimatedOutlet({ transitionKey }: AnimatedOutletProps) {
 // Routes nested under AccountLayout (see AppRoutes.tsx) — collapsing them to one key keeps
 // the sidebar from unmounting/re-fading every time the user switches between account pages;
 // AccountLayout's own AnimatedOutlet (keyed by the full pathname) handles that inner transition.
-const ACCOUNT_SECTION_PATHS = ['/profile', '/orders', '/addresses', '/saved-payments', '/notifications', '/coupons', '/settings', '/rewards', '/referrals'];
+// '/orders' deliberately excluded — it's a standalone page (see AppRoutes.tsx), not part of the
+// AccountLayout sidebar shell, so it should get its own normal enter/exit transition like any
+// other top-level page instead of being grouped with the account section.
+const ACCOUNT_SECTION_PATHS = ['/profile', '/addresses', '/payments', '/saved-payments', '/notifications', '/coupons', '/settings', '/rewards', '/referrals'];
 
 export function useOuterTransitionKey(): string {
   const location = useLocation();

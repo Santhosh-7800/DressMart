@@ -10,6 +10,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { paymentService, loadRazorpayScript, type CartLineForOrder } from '@/services/paymentService';
 import { env } from '@/lib/env';
 import { clearBuyNowItem } from '@/lib/buyNowSession';
+import { formatCurrency } from '@/lib/utils';
+import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 import type { Coupon, PaymentMethod } from '@/types';
 
 const FREE_SHIPPING_THRESHOLD = 999;
@@ -96,7 +98,7 @@ export function PaymentPage() {
       const result = await paymentService.placeCodOrder({ addressId, couponCode: coupon?.code, cart: cartPayload });
       goToSuccess(result);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Could not place order. Please try again.');
+      toast.error(getFriendlyErrorMessage(error, 'Could not place order. Please try again.'));
     } finally {
       setIsProcessing(false);
     }
@@ -131,7 +133,7 @@ export function PaymentPage() {
             });
             goToSuccess(result);
           } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Payment verification failed.');
+            toast.error(getFriendlyErrorMessage(error, 'Payment verification failed.'));
           } finally {
             setIsProcessing(false);
           }
@@ -140,7 +142,7 @@ export function PaymentPage() {
       });
       checkout.open();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Payment failed. Please try again.');
+      toast.error(getFriendlyErrorMessage(error, 'Payment failed. Please try again.'));
       setIsProcessing(false);
     }
   };
@@ -151,9 +153,9 @@ export function PaymentPage() {
   };
 
   return (
-    <div className="container-app py-8">
+    <div className="container-app pt-8 pb-24 md:pb-8">
       <Seo title="Payment" />
-      <h1 className="mb-6 text-2xl font-bold">Payment</h1>
+      <h1 className="mb-6 hidden text-2xl font-bold md:block">Payment</h1>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
         <div className="card-surface p-5">
           <div className="grid grid-cols-2 gap-3">
@@ -185,10 +187,25 @@ export function PaymentPage() {
 
         <div className="space-y-4">
           <OrderSummary itemCount={totalItems} subtotal={subtotal} discount={0} couponDiscount={couponDiscount} shippingFee={shippingFee} tax={tax} total={total}>
-            <Button variant="accent" fullWidth size="lg" className="mt-4" onClick={handlePlaceOrder} isLoading={isProcessing}>
+            <Button variant="accent" fullWidth size="lg" className="mt-4 hidden md:block" onClick={handlePlaceOrder} isLoading={isProcessing}>
               {method === 'cod' ? 'Place Order' : 'Pay Now'}
             </Button>
           </OrderSummary>
+        </div>
+      </div>
+
+      {/* Mobile sticky bar — BottomNavBar is already hidden on /checkout* routes (see MainLayout).
+          pb-safe on the outer element adds clearance below the p-3 content rather than
+          conflicting with it (see CheckoutPage's identical bar for the full explanation). */}
+      <div className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-primary-100 bg-surface shadow-[0_-4px_12px_rgba(0,0,0,0.06)] md:hidden dark:border-primary-700 dark:bg-surface-dark">
+        <div className="flex items-center gap-3 p-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-primary-400">Total</p>
+            <p className="truncate text-lg font-bold">{formatCurrency(total)}</p>
+          </div>
+          <Button variant="accent" size="md" onClick={handlePlaceOrder} isLoading={isProcessing} className="shrink-0">
+            {method === 'cod' ? 'Place Order' : 'Pay Now'}
+          </Button>
         </div>
       </div>
     </div>

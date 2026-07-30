@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { cn, formatDate } from '@/lib/utils';
 import { queryKeys } from '@/lib/queryClient';
 import { sellerAdminService } from '@/services/sellerAdminService';
+import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 import { isHeadSeller } from '@/lib/roles';
 import type { SellerRequest, SellerStatus, Profile } from '@/types';
 
@@ -52,7 +53,7 @@ function ApplicationsSection() {
       queryClient.invalidateQueries({ queryKey: queryKeys.seller.sellers });
       queryClient.invalidateQueries({ queryKey: queryKeys.seller.platformOverview });
     },
-    onError: (error: Error) => toast.error(error.message || 'Could not update this application.'),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error, 'Could not update this application.')),
   });
 
   const filtered = useMemo(
@@ -184,12 +185,12 @@ function RosterSection() {
       queryClient.invalidateQueries({ queryKey: queryKeys.seller.sellers });
       queryClient.invalidateQueries({ queryKey: queryKeys.seller.platformOverview });
     },
-    onError: (error: Error) => toast.error(error.message || 'Could not update this seller.'),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error, 'Could not update this seller.')),
   });
 
   const resetPasswordMutation = useMutation({
     mutationFn: sellerAdminService.resetSellerPassword,
-    onError: (error: Error) => toast.error(error.message || "Could not reset this seller's password."),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error, "Could not reset this seller's password.")),
   });
 
   const removeMutation = useMutation({
@@ -198,7 +199,7 @@ function RosterSection() {
       queryClient.invalidateQueries({ queryKey: queryKeys.seller.sellers });
       queryClient.invalidateQueries({ queryKey: queryKeys.seller.platformOverview });
     },
-    onError: (error: Error) => toast.error(error.message || 'Could not remove this seller.'),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error, 'Could not remove this seller.')),
   });
 
   const handleResetPassword = (seller: Profile) => {
@@ -322,7 +323,7 @@ function AddSellerButton() {
       setIsOpen(false);
       setForm(BLANK_ADD_SELLER_FORM);
     },
-    onError: (error: Error) => toast.error(error.message || 'Could not add this seller.'),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error, 'Could not add this seller.')),
   });
 
   const handleSubmit = () => {

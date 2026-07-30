@@ -1,36 +1,62 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-type Theme = 'light' | 'dark';
+type ResolvedTheme = 'light' | 'dark';
+type ThemePreference = ResolvedTheme | 'system';
 
 interface ThemeContextValue {
-  theme: Theme;
+  /** The theme actually applied right now — resolves 'system' to the OS's current preference. */
+  theme: ResolvedTheme;
+  /** The user's stored choice, including 'system' — use this to drive Settings page button state. */
+  themePreference: ThemePreference;
+  setThemePreference: (preference: ThemePreference) => void;
   toggleTheme: () => void;
-  setTheme: (theme: Theme) => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 const STORAGE_KEY = 'dressmart:theme';
+const MEDIA_QUERY = '(prefers-color-scheme: dark)';
 
-function getInitialTheme(): Theme {
+function getSystemTheme(): ResolvedTheme {
   if (typeof window === 'undefined') return 'light';
-  const stored = window.localStorage.getItem(STORAGE_KEY) as Theme | null;
-  if (stored === 'light' || stored === 'dark') return stored;
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  return window.matchMedia(MEDIA_QUERY).matches ? 'dark' : 'light';
+}
+
+function getInitialPreference(): ThemePreference {
+  if (typeof window === 'undefined') return 'system';
+  const stored = window.localStorage.getItem(STORAGE_KEY);
+  if (stored === 'light' || stored === 'dark' || stored === 'system') return stored;
+  return 'system';
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(getInitialTheme);
+  const [themePreference, setThemePreferenceState] = useState<ThemePreference>(getInitialPreference);
+  const [systemTheme, setSystemTheme] = useState<ResolvedTheme>(getSystemTheme);
+
+  // Live-follows OS theme changes while the preference is 'system' — the old implementation only
+  // ever checked matchMedia once (as a one-time default when nothing was stored yet), so switching
+  // the OS theme mid-session had no effect until the user manually re-picked a theme.
+  useEffect(() => {
+    const mql = window.matchMedia(MEDIA_QUERY);
+    const handleChange = (e: MediaQueryListEvent) => setSystemTheme(e.matches ? 'dark' : 'light');
+    mql.addEventListener('change', handleChange);
+    return () => mql.removeEventListener('change', handleChange);
+  }, []);
+
+  const theme: ResolvedTheme = themePreference === 'system' ? systemTheme : themePreference;
 
   useEffect(() => {
     const root = window.document.documentElement;
     root.classList.toggle('dark', theme === 'dark');
-    window.localStorage.setItem(STORAGE_KEY, theme);
-  }, [theme]);
+    window.localStorage.setItem(STORAGE_KEY, themePreference);
+  }, [theme, themePreference]);
 
-  const setTheme = useCallback((next: Theme) => setThemeState(next), []);
-  const toggleTheme = useCallback(() => setThemeState((prev) => (prev === 'light' ? 'dark' : 'light')), []);
+  const setThemePreference = useCallback((next: ThemePreference) => setThemePreferenceState(next), []);
+  const toggleTheme = useCallback(() => setThemePreferenceState((prev) => (prev === 'dark' ? 'light' : 'dark')), []);
 
-  const value = useMemo(() => ({ theme, toggleTheme, setTheme }), [theme, toggleTheme, setTheme]);
+  const value = useMemo(
+    () => ({ theme, themePreference, setThemePreference, toggleTheme }),
+    [theme, themePreference, setThemePreference, toggleTheme],
+  );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

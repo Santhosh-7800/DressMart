@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 interface AvatarProps {
@@ -22,10 +23,15 @@ const SIZE_CLASSES: Record<NonNullable<AvatarProps['size']>, string> = {
  *  those surfaces renders the same avatar, always in sync with `profiles.avatar_url`. */
 export function Avatar({ src, name, size = 'md', className }: AvatarProps) {
   const initial = name.trim() ? name.trim().charAt(0).toUpperCase() : '?';
+  // If the photo URL 404s (deleted file, stale link), fall back to the initials circle already
+  // used when there's no src at all, instead of the browser's native broken-image icon.
+  const [hasError, setHasError] = useState(false);
+  useEffect(() => setHasError(false), [src]);
+  const showImage = Boolean(src) && !hasError;
 
   return (
     <div className={cn('flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent font-bold text-primary-900', SIZE_CLASSES[size], className)}>
-      {src ? <img src={src} alt={name} loading="lazy" className="h-full w-full object-cover" /> : initial}
+      {showImage ? <img src={src!} alt={name} loading="lazy" className="h-full w-full object-cover" onError={() => setHasError(true)} /> : initial}
     </div>
   );
 }

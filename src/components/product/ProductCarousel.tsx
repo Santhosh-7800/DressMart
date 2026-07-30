@@ -6,6 +6,7 @@ import type { Product } from '@/types';
 import { ProductCard } from './ProductCard';
 import { ProductCardSkeleton } from '@/components/ui/Skeleton';
 import { debugLog } from '@/lib/debugLog';
+import { useInventoryBatch } from '@/hooks/useInventory';
 
 interface ProductCarouselProps {
   title: ReactNode;
@@ -24,6 +25,8 @@ interface ProductCarouselProps {
 export function ProductCarousel({ title, products, isLoading, isError, onRetry, viewAllHref }: ProductCarouselProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   debugLog('ProductCarousel', 'render', typeof title === 'string' ? title : '(node)', { isLoading, isError, count: products.length });
+  // One batched inventory read for the whole carousel instead of each ProductCard firing its own.
+  const { data: inventoryMap } = useInventoryBatch(products.map((p) => p.id));
 
   const scroll = (dir: 'left' | 'right') => {
     scrollRef.current?.scrollBy({ left: dir === 'left' ? -320 : 320, behavior: 'smooth' });
@@ -78,7 +81,7 @@ export function ProductCarousel({ title, products, isLoading, isError, onRetry, 
                   transition={{ duration: 0.25, delay: Math.min(index, 6) * 0.03 }}
                   className="w-44 shrink-0 sm:w-52"
                 >
-                  <ProductCard product={product} />
+                  <ProductCard product={product} inventory={inventoryMap ? (inventoryMap[product.id] ?? null) : undefined} skipOwnFetch />
                 </motion.div>
               ))}
         </div>

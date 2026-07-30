@@ -362,8 +362,10 @@ export function ProductDetailsPage() {
       {/* Mobile sticky action bar — mirrors the inline buttons above (hidden on mobile via
           md:flex there) so the primary purchase actions stay reachable without scrolling back up,
           matching every native Android shopping app's PDP pattern. Sits just above the global
-          BottomNavBar (bottom-16 == BottomNavBar's own reserved height, see MainLayout's pb-16). */}
-      <div className="fixed inset-x-0 bottom-16 z-30 border-t border-primary-100 bg-surface p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] md:hidden dark:border-primary-700 dark:bg-surface-dark">
+          BottomNavBar — bottom-nav-safe accounts for the nav's safe-area-inset-bottom padding
+          (see index.css), not just its 64px base height, so this doesn't tuck under a taller nav
+          on gesture-nav/notched devices. */}
+      <div className="bottom-nav-safe fixed inset-x-0 z-30 border-t border-primary-100 bg-surface p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] md:hidden dark:border-primary-700 dark:bg-surface-dark">
         <div className="flex gap-2">
           <button
             onClick={() => toggle(product.id)}

@@ -9,11 +9,12 @@ import { Input } from '@/components/ui/Input';
 import { Pagination } from '@/components/ui/Pagination';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Card } from '@/components/ui/Card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSellerProducts, useSetProductStatus, useDeleteProduct, useDuplicateProduct } from '@/hooks/useSellerProducts';
 import { inventoryService } from '@/services/inventoryService';
 import { formatCurrency, cn } from '@/lib/utils';
-import type { ProductStatus } from '@/types';
+import type { Product, ProductStatus } from '@/types';
 
 const PAGE_SIZE = 20;
 
@@ -38,6 +39,43 @@ const STATUS_LABEL: Record<ProductStatus, string> = {
   out_of_stock: 'Out of Stock',
   hidden: 'Hidden',
 };
+
+/** Shared between the desktop table row and the mobile card below — same 4 actions, same markup,
+ *  just embedded in two different layout containers. */
+function ProductRowActions({
+  product,
+  onSetStatus,
+  onDuplicate,
+  onDelete,
+}: {
+  product: Product;
+  onSetStatus: (status: ProductStatus) => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-end gap-1">
+      <Link to={`/seller/products/${product.id}/edit`} className="tap-target-48 rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700" title="Edit" aria-label="Edit product">
+        <Pencil size={15} />
+      </Link>
+      {product.status === 'active' ? (
+        <button onClick={() => onSetStatus('hidden')} className="tap-target-48 rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700" title="Hide" aria-label="Hide product">
+          <EyeOff size={15} />
+        </button>
+      ) : (
+        <button onClick={() => onSetStatus('active')} className="tap-target-48 rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700" title="Publish" aria-label="Publish product">
+          <Eye size={15} />
+        </button>
+      )}
+      <button onClick={onDuplicate} className="tap-target-48 rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700" title="Duplicate" aria-label="Duplicate product">
+        <Copy size={15} />
+      </button>
+      <button onClick={onDelete} className="tap-target-48 rounded-lg p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20" title="Delete" aria-label="Delete product">
+        <Trash2 size={15} />
+      </button>
+    </div>
+  );
+}
 
 export function SellerProductsPage() {
   const { user } = useAuth();
@@ -115,6 +153,17 @@ export function SellerProductsPage() {
     } finally {
       setIsBulkProcessing(false);
     }
+  };
+
+  const handleDuplicate = (product: Product) => {
+    duplicate.mutate(
+      { productId: product.id, sellerId: product.seller_id, sellerName: product.seller_name },
+      { onSuccess: (created) => navigate(`/seller/products/${created.id}/edit`) },
+    );
+  };
+
+  const handleDelete = (product: Product) => {
+    if (confirm(`Delete "${product.name}"? This cannot be undone.`)) remove.mutate(product.id);
   };
 
   return (
@@ -211,103 +260,111 @@ export function SellerProductsPage() {
           description="Once your seller application is approved, you'll be able to add your first product here."
         />
       ) : (
-        <div className="admin-table-wrap scrollbar-thin overflow-x-auto">
-          <table className="w-full min-w-[900px] text-sm">
-            <thead>
-              <tr className="border-b border-primary-100 text-left text-xs uppercase tracking-wide text-primary-400 dark:border-primary-700">
-                <th className="p-3">
-                  <input type="checkbox" checked={items.length > 0 && selectedIds.size === items.length} onChange={toggleSelectAll} className="h-4 w-4 rounded" />
-                </th>
-                <th className="p-3">Product</th>
-                <th className="p-3">SKU</th>
-                <th className="p-3">Price</th>
-                <th className="p-3">Stock</th>
-                <th className="p-3">Status</th>
-                <th className="p-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((product) => {
-                const stock = inventoryMap[product.id]?.total_stock ?? 0;
-                return (
-                  <tr key={product.id} className="border-b border-primary-100 last:border-0 dark:border-primary-700">
-                    <td className="p-3">
-                      <input type="checkbox" checked={selectedIds.has(product.id)} onChange={() => toggleSelected(product.id)} className="h-4 w-4 rounded" />
-                    </td>
-                    <td className="p-3">
-                      <div className="flex items-center gap-2.5">
-                        <img
-                          src={product.coverImage || product.images[0]?.url}
-                          alt=""
-                          className="h-11 w-10 shrink-0 rounded-[16px] object-cover shadow-sm ring-1 ring-admin-border transition-transform duration-200 hover:scale-105"
+        <>
+          {/* Desktop/tablet: dense data table. */}
+          <div className="admin-table-wrap scrollbar-thin hidden overflow-x-auto md:block">
+            <table className="w-full min-w-[900px] text-sm">
+              <thead>
+                <tr className="border-b border-primary-100 text-left text-xs uppercase tracking-wide text-primary-400 dark:border-primary-700">
+                  <th className="p-3">
+                    <input type="checkbox" checked={items.length > 0 && selectedIds.size === items.length} onChange={toggleSelectAll} className="h-4 w-4 rounded" />
+                  </th>
+                  <th className="p-3">Product</th>
+                  <th className="p-3">SKU</th>
+                  <th className="p-3">Price</th>
+                  <th className="p-3">Stock</th>
+                  <th className="p-3">Status</th>
+                  <th className="p-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((product) => {
+                  const stock = inventoryMap[product.id]?.total_stock ?? 0;
+                  return (
+                    <tr key={product.id} className="border-b border-primary-100 last:border-0 dark:border-primary-700">
+                      <td className="p-3">
+                        <input type="checkbox" checked={selectedIds.has(product.id)} onChange={() => toggleSelected(product.id)} className="h-4 w-4 rounded" />
+                      </td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2.5">
+                          <img
+                            src={product.coverImage || product.images[0]?.url}
+                            alt=""
+                            className="h-11 w-10 shrink-0 rounded-[16px] object-cover shadow-sm ring-1 ring-admin-border transition-transform duration-200 hover:scale-105"
+                          />
+                          <span className="line-clamp-2 max-w-[220px] font-medium">{product.name}</span>
+                        </div>
+                      </td>
+                      <td className="p-3 text-primary-500">{product.sku}</td>
+                      <td className="p-3">{formatCurrency(product.price)}</td>
+                      <td className={cn('p-3', stock <= 0 && 'font-semibold text-red-500')}>{stock}</td>
+                      <td className="p-3">
+                        <span className={STATUS_BADGE_CLASS[product.status]}>{STATUS_LABEL[product.status]}</span>
+                      </td>
+                      <td className="p-3">
+                        <ProductRowActions
+                          product={product}
+                          onSetStatus={(status) => setStatus.mutate({ productId: product.id, status })}
+                          onDuplicate={() => handleDuplicate(product)}
+                          onDelete={() => handleDelete(product)}
                         />
-                        <span className="line-clamp-2 max-w-[220px] font-medium">{product.name}</span>
-                      </div>
-                    </td>
-                    <td className="p-3 text-primary-500">{product.sku}</td>
-                    <td className="p-3">{formatCurrency(product.price)}</td>
-                    <td className={cn('p-3', stock <= 0 && 'font-semibold text-red-500')}>{stock}</td>
-                    <td className="p-3">
-                      <span className={STATUS_BADGE_CLASS[product.status]}>{STATUS_LABEL[product.status]}</span>
-                    </td>
-                    <td className="p-3">
-                      <div className="flex items-center justify-end gap-1">
-                        <Link to={`/seller/products/${product.id}/edit`} className="rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700" title="Edit">
-                          <Pencil size={15} />
-                        </Link>
-                        {product.status === 'active' ? (
-                          <button
-                            onClick={() => setStatus.mutate({ productId: product.id, status: 'hidden' })}
-                            className="rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700"
-                            title="Hide"
-                          >
-                            <EyeOff size={15} />
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => setStatus.mutate({ productId: product.id, status: 'active' })}
-                            className="rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700"
-                            title="Publish"
-                          >
-                            <Eye size={15} />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => {
-                            duplicate.mutate(
-                              { productId: product.id, sellerId: product.seller_id, sellerName: product.seller_name },
-                              { onSuccess: (created) => navigate(`/seller/products/${created.id}/edit`) },
-                            );
-                          }}
-                          className="rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700"
-                          title="Duplicate"
-                        >
-                          <Copy size={15} />
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (confirm(`Delete "${product.name}"? This cannot be undone.`)) remove.mutate(product.id);
-                          }}
-                          className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
-                          title="Delete"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {items.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center text-primary-400">
+                      No products match your search.
                     </td>
                   </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile: cards — same data/actions as the table above, one product per card. */}
+          <div className="space-y-3 md:hidden">
+            {items.length === 0 ? (
+              <p className="py-8 text-center text-sm text-primary-400">No products match your search.</p>
+            ) : (
+              items.map((product) => {
+                const stock = inventoryMap[product.id]?.total_stock ?? 0;
+                return (
+                  <Card key={product.id} hover={false} className="p-3">
+                    <div className="flex gap-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(product.id)}
+                        onChange={() => toggleSelected(product.id)}
+                        className="mt-1 h-4 w-4 shrink-0 rounded"
+                        aria-label={`Select ${product.name}`}
+                      />
+                      <img src={product.coverImage || product.images[0]?.url} alt="" className="h-16 w-14 shrink-0 rounded-2xl object-cover shadow-sm" />
+                      <div className="min-w-0 flex-1">
+                        <p className="line-clamp-2 text-sm font-medium">{product.name}</p>
+                        <p className="text-xs text-primary-400">SKU: {product.sku}</p>
+                        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                          <span className="font-semibold">{formatCurrency(product.price)}</span>
+                          <span className={cn(stock <= 0 && 'font-semibold text-red-500')}>Stock: {stock}</span>
+                          <span className={STATUS_BADGE_CLASS[product.status]}>{STATUS_LABEL[product.status]}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-2 border-t border-primary-100 pt-2 dark:border-primary-700">
+                      <ProductRowActions
+                        product={product}
+                        onSetStatus={(status) => setStatus.mutate({ productId: product.id, status })}
+                        onDuplicate={() => handleDuplicate(product)}
+                        onDelete={() => handleDelete(product)}
+                      />
+                    </div>
+                  </Card>
                 );
-              })}
-              {items.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="p-8 text-center text-primary-400">
-                    No products match your search.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              })
+            )}
+          </div>
+        </>
       )}
 
       <Pagination page={page} totalPages={totalPages} onChange={setPage} />

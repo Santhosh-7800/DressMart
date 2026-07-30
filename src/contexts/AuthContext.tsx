@@ -14,7 +14,7 @@ interface AuthContextValue {
   /** Effective identity used to namespace cart/wishlist — the real user id when signed in, else a stable guest id. */
   identityId: string;
   signUp: (input: SignUpInput) => Promise<Profile>;
-  signIn: (email: string, password: string) => Promise<Profile>;
+  signIn: (email: string, password: string, rememberMe?: boolean) => Promise<Profile>;
   signInWithGoogle: () => Promise<Profile>;
   signOut: () => Promise<void>;
 }
@@ -55,8 +55,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return profile;
   }, []);
 
-  const signIn = useCallback(async (email: string, password: string) => {
-    const profile = await authService.signIn(email, password);
+  const signIn = useCallback(async (email: string, password: string, rememberMe = true) => {
+    const profile = await authService.signIn(email, password, rememberMe);
     toast.success(`Welcome back, ${profile.full_name.split(' ')[0]}!`);
     return profile;
   }, []);

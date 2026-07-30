@@ -5,6 +5,10 @@
 @layer base {
   html {
     @apply scroll-smooth;
+    /* Stops the browser's own native pull-to-refresh (Android Chrome) from firing alongside the
+       hand-rolled one (see usePullToRefresh.ts) — without this, pulling down at the top of the
+       page would trigger both a full page reload AND our custom refresh at the same time. */
+    overscroll-behavior-y: contain;
   }
 
   body {
@@ -95,6 +99,36 @@
   padding-top: env(safe-area-inset-top);
 }
 
+/* Expands a small icon button's tap hit area to the ~48px recommended minimum without changing its
+   visible size — pair with a `relative` button; the hit area is centered on the button itself. */
+.tap-target-48 {
+  position: relative;
+}
+.tap-target-48::before {
+  content: '';
+  position: absolute;
+  inset: 50%;
+  width: 48px;
+  height: 48px;
+  transform: translate(-50%, -50%);
+}
+
+/* Bottom-right FAB clearance above the fixed BottomNavBar (56px tall) + safe-area inset. */
+.fab-above-nav {
+  bottom: calc(4.5rem + env(safe-area-inset-bottom));
+}
+
+/* BottomNavBar's actual on-screen height is its 64px content height PLUS env(safe-area-inset-bottom)
+   (applied via .pb-safe on the nav itself) — on gesture-nav/notched devices that inset is non-zero,
+   so anything using a bare `pb-16`/`bottom-16` to clear the nav under-reserves space by exactly that
+   inset. Use these instead for page bottom-padding / bars stacked flush above the nav. */
+.pb-nav-safe {
+  padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+}
+.bottom-nav-safe {
+  bottom: calc(4rem + env(safe-area-inset-bottom));
+}
+
 /* thin scrollbars for carousels/filters */
 .scrollbar-thin {
   scrollbar-width: thin;
@@ -105,6 +139,15 @@
 }
 .scrollbar-thin::-webkit-scrollbar-thumb {
   @apply rounded-full bg-primary-200 dark:bg-primary-600;
+}
+
+/* fully hidden scrollbar — pill tab bars (e.g. Orders' status tabs) where even a thin scrollbar
+   would look out of place against native-feeling rounded chips */
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
 }
 
 /* ============================================================================

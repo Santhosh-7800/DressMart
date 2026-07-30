@@ -123,7 +123,11 @@ service cloud.firestore {
 
     match /notifications/{notificationId} {
       allow read, update, delete: if isSignedIn() && resource.data.user_id == uid();
-      allow create: if isSignedIn();
+      // Ownership-scoped like every other write below — in practice notifications are created by
+      // Cloud Functions via the Admin SDK (which bypasses rules entirely), so this only closes a
+      // theoretical gap where a signed-in client could otherwise create a notification doc
+      // targeting another user's user_id; it doesn't affect any real notification-creation path.
+      allow create: if isSignedIn() && request.resource.data.user_id == uid();
     }
 
     match /seller_requests/{requestId} {

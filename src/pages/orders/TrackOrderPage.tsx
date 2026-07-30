@@ -16,7 +16,7 @@ export function TrackOrderPage() {
   return (
     <div className="container-app py-8">
       <Seo title="Track Order" />
-      <h1 className="mb-6 text-2xl font-bold">Track Your Order</h1>
+      <h1 className="mb-6 hidden text-2xl font-bold md:block">Track Your Order</h1>
 
       <div className="card-surface mx-auto max-w-lg p-5">
         <label className="mb-1.5 block text-sm font-medium">Order Number</label>

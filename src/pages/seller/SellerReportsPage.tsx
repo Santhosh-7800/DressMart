@@ -121,12 +121,12 @@ export function SellerReportsPage() {
             ) : (
               <div className="space-y-3">
                 {bySeller.map((s) => (
-                  <div key={s.seller_id} className="flex items-center gap-3 text-sm">
-                    <span className="w-40 shrink-0 truncate text-acc-text-secondary">{sellerNameById.get(s.seller_id) ?? s.seller_id}</span>
+                  <div key={s.seller_id} className="flex items-center gap-2 text-xs sm:gap-3 sm:text-sm">
+                    <span className="w-20 shrink-0 truncate text-acc-text-secondary sm:w-40">{sellerNameById.get(s.seller_id) ?? s.seller_id}</span>
                     <div className="h-2 flex-1 overflow-hidden rounded-full bg-primary-100 dark:bg-primary-800">
                       <div className="h-full rounded-full bg-acc-primary" style={{ width: `${Math.max((s.revenue / maxSellerRevenue) * 100, 3)}%` }} />
                     </div>
-                    <span className="w-24 shrink-0 text-right font-semibold text-acc-text dark:text-white">{formatCurrency(s.revenue)}</span>
+                    <span className="w-16 shrink-0 text-right font-semibold text-acc-text dark:text-white sm:w-24">{formatCurrency(s.revenue)}</span>
                   </div>
                 ))}
               </div>

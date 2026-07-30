@@ -3,14 +3,32 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { inventoryService } from '@/services/inventoryService';
 import { queryKeys } from '@/lib/queryClient';
+import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 import type { Inventory } from '@/types';
 
-/** One-shot, cached read — for grids/tables where a live listener per row would be overkill. */
-export function useInventory(productId: string | null | undefined) {
+/** One-shot, cached read — for grids/tables where a live listener per row would be overkill.
+ *  `enabled` lets a batched parent (see useInventoryBatch below) suppress this card's own
+ *  individual fetch once it's already supplying the same data from one batched query. */
+export function useInventory(productId: string | null | undefined, enabled = true) {
   return useQuery({
     queryKey: queryKeys.inventory.detail(productId ?? ''),
     queryFn: () => inventoryService.getInventory(productId as string),
-    enabled: Boolean(productId),
+    enabled: Boolean(productId) && enabled,
+    staleTime: 30 * 1000,
+  });
+}
+
+/**
+ * Batched read for a whole grid/carousel of products — one Firestore batch-get instead of one
+ * independent read per rendered ProductCard (which is what happens if every card just calls
+ * useInventory() on its own for N products on the same page). Pass the resulting map's entries
+ * down to ProductCard's `inventory`/`skipOwnFetch` props.
+ */
+export function useInventoryBatch(productIds: string[]) {
+  return useQuery({
+    queryKey: ['inventory', 'batch', productIds],
+    queryFn: () => inventoryService.getInventoryBatch(productIds),
+    enabled: productIds.length > 0,
     staleTime: 30 * 1000,
   });
 }
@@ -55,6 +73,6 @@ export function useUpdateStock() {
       queryClient.invalidateQueries({ queryKey: ['seller', 'inventory', 'batch'] });
       toast.success('Stock updated');
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error)),
   });
 }

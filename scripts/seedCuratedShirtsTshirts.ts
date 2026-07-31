@@ -11,7 +11,7 @@ import { BRAND_DEFS, MEN_CATEGORY_DEFS } from '../frontend/src/data/catalogSourc
 import { PRODUCT_IMAGE_MANIFEST } from '../frontend/src/data/productImageManifest.js';
 import { SeededRng, hashStringToSeed } from '../frontend/src/lib/seededRandom.js';
 import { slugify, calculateDiscount } from '../frontend/src/lib/utils.js';
-import { resolveProductImagePath, PLACEHOLDER_IMAGE_PATH } from '../frontend/src/lib/productImages.js';
+import { resolveProductImagePath, placeholderImagePathFor } from '../frontend/src/lib/productImages.js';
 import { sellerFor, PRICE_BANDS } from './seedFirestore.js';
 import { CURATED_SHIRTS_TSHIRTS, type CuratedShirtItem } from './curatedShirtsTshirtsData.js';
 import { docGet, docSet } from './lib/firestoreDocStore.js';
@@ -110,7 +110,7 @@ export async function main() {
     });
 
     const images = imagePending
-      ? [{ id: `${docId}-img-0`, url: PLACEHOLDER_IMAGE_PATH, alt: `${item.name} — image pending`, color: item.color, sort_order: 0 }]
+      ? [{ id: `${docId}-img-0`, url: placeholderImagePathFor(item.categorySlug), alt: `${item.name} — image pending`, color: item.color, sort_order: 0 }]
       : photos.map((url, idx) => ({
           id: `${docId}-img-${idx}`,
           url,

@@ -93,6 +93,15 @@ Firebase Cloud Functions **cannot run on Vercel** — Vercel hosts static sites 
 4. Redeploy (push to the branch Vercel watches, or trigger a redeploy from the dashboard) after setting the env vars — Vercel only picks up new environment variables on the *next* build, not retroactively for a build that already ran.
 5. If you skipped Firebase Hosting (step 8 above) entirely, note that `database/firebase.json`'s `hosting` block simply goes unused — that's fine, it costs nothing to leave configured for later.
 
+### Deploying the frontend to GitHub Pages
+
+`.github/workflows/deploy-pages.yml` already builds and deploys on every push to `main` — but it needs the same real Firebase credentials as Vercel, provided as **GitHub Actions secrets** (a build running on GitHub's servers has no access to your local `.env`, which is gitignored on purpose).
+
+1. Repo → **Settings → Secrets and variables → Actions → New repository secret** → add each of: `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FIREBASE_APP_ID`, `VITE_FIREBASE_VAPID_KEY`, `VITE_RAZORPAY_KEY_ID` — same values as your local `.env` / your Vercel project's env vars.
+2. Firebase Console → Authentication → Settings → **Authorized domains** → add `<your-github-username>.github.io` (the domain only — GitHub Pages project sites serve from a `/<repo-name>/` subpath, but Authorized Domains only cares about the domain itself).
+3. Confirm Repo → **Settings → Pages → Source** is set to **GitHub Actions** (not "Deploy from a branch") — that's what lets this workflow publish at all.
+4. Push to `main` (or run the workflow manually from the Actions tab) to trigger a deploy. Watch it under the repo's **Actions** tab; a red ✕ there almost always means a missing/misnamed secret from step 1.
+
 ---
 
 ## Data Model (Firestore)
@@ -258,8 +267,9 @@ Run on a connected device/emulator directly with `cd mobile && npx cap run andro
 - [ ] `firebase --config database/firebase.json deploy --only firestore:rules,firestore:indexes,storage` run against the real project.
 - [ ] Razorpay Cloud Functions config set (live keys, not test keys) — see `backend/functions/README.md`.
 - [ ] Real Firestore seeded (`npm run seed` + all four `seed:curated-*` scripts with `GOOGLE_APPLICATION_CREDENTIALS` set — see "Connecting a real Firebase project" above).
-- [ ] If deploying to Vercel (or any host other than Firebase Hosting): every `VITE_FIREBASE_*`/`VITE_RAZORPAY_KEY_ID`/`VITE_SITE_URL` var set on the host itself — see "Deploying the frontend to Vercel" above.
-- [ ] Deployed domain added to Firebase Console → Authentication → Settings → Authorized domains, or Google/phone sign-in will fail there even with everything else correct.
+- [ ] If deploying to Vercel: every `VITE_FIREBASE_*`/`VITE_RAZORPAY_KEY_ID`/`VITE_SITE_URL` var set in the Vercel project's Environment Variables — see "Deploying the frontend to Vercel" above.
+- [ ] If deploying to GitHub Pages: the same variables added as **GitHub Actions secrets** (not just local `.env` — the CI build can't see that) — see "Deploying the frontend to GitHub Pages" above. Repo → Settings → Pages → Source must be "GitHub Actions".
+- [ ] Every deployed domain (Vercel URL, `*.github.io`, custom domain) added to Firebase Console → Authentication → Settings → Authorized domains, or Google/phone sign-in will fail there even with everything else correct.
 - [ ] Exactly one Head Seller account promoted by hand in the Firestore console.
 - [ ] `versionCode`/`versionName` bumped for this release.
 - [ ] `mobile/android/app/dressmart-upload-key.jks` + `mobile/android/keystore.properties` backed up securely outside this repo.

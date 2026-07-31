@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -30,10 +30,27 @@ jobs:
 
       # GitHub Pages project sites serve from /<repo-name>/, not the domain root — vite.config.ts
       # and src/App.tsx's BrowserRouter both read this at build time (see their comments).
+      #
+      # The VITE_FIREBASE_*/VITE_RAZORPAY_KEY_ID secrets below must be added under this repo's
+      # Settings -> Secrets and variables -> Actions before this workflow can produce a working
+      # build — without them, this is a production build with no real credentials, so (correctly)
+      # it won't fall back to the local emulator; frontend/src/lib/firebase.ts fails loudly instead,
+      # and every visitor sees main.tsx's generic "Something went wrong" screen. Same values as your
+      # local .env / your Vercel project's environment variables — see documentation/README.md's
+      # "Connecting a real Firebase project" section for where each one comes from.
       - name: Build
         run: npm run build
         env:
           VITE_BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
+          VITE_RAZORPAY_KEY_ID: ${{ secrets.VITE_RAZORPAY_KEY_ID }}
+          VITE_SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
 
       - uses: actions/upload-pages-artifact@v3
         with:

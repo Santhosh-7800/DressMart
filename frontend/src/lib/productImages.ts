@@ -104,8 +104,37 @@ export interface ProductImageSet {
   galleryImages: string[];
 }
 
-/** Shown for any product that has no real photography of its own — never another product's photo. */
+/** Generic fallback — shown for any product that has no real photography of its own and isn't one
+ *  of the categories below (never another product's photo). */
 export const PLACEHOLDER_IMAGE_PATH = '/images/placeholder-shirt.webp';
+
+/** A handful of categories have zero on-disk photography at all (no source photos were ever
+ *  provided for them — see the image audit report) and are visually nothing like a shirt, so the
+ *  generic apparel placeholder above looks wrong for them specifically. These get their own
+ *  category-shaped fallback instead — still an honest "no photo available" placeholder, never a
+ *  fabricated product photo. */
+const PLACEHOLDER_BY_CATEGORY_SLUG: Record<string, string> = {
+  sneakers: '/images/placeholder-shoe.svg',
+  loafers: '/images/placeholder-shoe.svg',
+  'sports-shoes': '/images/placeholder-shoe.svg',
+  sandals: '/images/placeholder-shoe.svg',
+  'kids-shoes': '/images/placeholder-shoe.svg',
+  'kids-sandals': '/images/placeholder-shoe.svg',
+  wallets: '/images/placeholder-accessory.svg',
+  watches: '/images/placeholder-accessory.svg',
+};
+
+/** The right "no photo available" placeholder for this category — a shoe/accessory-shaped one for
+ *  the handful of categories with zero real photography (see PLACEHOLDER_BY_CATEGORY_SLUG above),
+ *  the generic apparel one for everything else. */
+export function placeholderImagePathFor(categorySlug: string): string {
+  return PLACEHOLDER_BY_CATEGORY_SLUG[categorySlug] ?? PLACEHOLDER_IMAGE_PATH;
+}
+
+/** Every path a product's image fields are allowed to intentionally point at when it has no real
+ *  photography — used by scripts/auditProductImages.ts to tell "this is a known, deliberate
+ *  placeholder shared by every photo-less product in this category" apart from an actual bug. */
+export const KNOWN_PLACEHOLDER_PATHS: readonly string[] = [PLACEHOLDER_IMAGE_PATH, ...new Set(Object.values(PLACEHOLDER_BY_CATEGORY_SLUG))];
 
 const PLACEHOLDER_IMAGE_SET: ProductImageSet = {
   imageUrl: PLACEHOLDER_IMAGE_PATH,

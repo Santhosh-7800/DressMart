@@ -20,13 +20,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { initializeApp, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { getImageFolder, resolveProductImagePath } from '../frontend/src/lib/productImages.js';
+import { getImageFolder, resolveProductImagePath, KNOWN_PLACEHOLDER_PATHS } from '../frontend/src/lib/productImages.js';
 import { PRODUCT_IMAGE_MANIFEST } from '../frontend/src/data/productImageManifest.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const PUBLIC_DIR = path.join(ROOT, 'frontend', 'public');
-const PLACEHOLDER_PATH = '/images/placeholder-shirt.webp';
+const PLACEHOLDER_PATH = KNOWN_PLACEHOLDER_PATHS[0]; // the generic one — used where a single fallback value is needed
+const isKnownPlaceholder = (url: string): boolean => (KNOWN_PLACEHOLDER_PATHS as string[]).includes(url);
 
 const args = process.argv.slice(2);
 const shouldFix = args.includes('--fix');
@@ -151,7 +152,7 @@ function baseNameNoExt(filename: string): string {
  *  a specific broken-reason plus (when determinable) the corrected URL. Never fabricates a file
  *  that doesn't exist — 'missing_file_no_source' is reported, not silently papered over. */
 function checkImagePath(url: string): { ok: true } | { ok: false; reason: Reason; correctedUrl?: string } {
-  if (url === PLACEHOLDER_PATH) return { ok: true }; // intentional, not a bug
+  if (isKnownPlaceholder(url)) return { ok: true }; // intentional, not a bug
 
   const parsed = parseProductImageUrl(url);
   if (!parsed) return { ok: false, reason: 'unexpected_url_format' };
@@ -239,7 +240,7 @@ async function main() {
     // Duplicate-within-product check (same URL twice in one product's own gallery).
     const seenInThisProduct = new Set<string>();
     images.forEach((img, idx) => {
-      if (img.url === PLACEHOLDER_PATH) return;
+      if (isKnownPlaceholder(img.url)) return;
       if (seenInThisProduct.has(img.url)) {
         findings.push({
           productId: product.id,
@@ -252,6 +253,9 @@ async function main() {
       }
       seenInThisProduct.add(img.url);
 
+      // Known placeholders are *meant* to be shared by every photo-less product in their category
+      // (that's the entire point of a fallback image) — only real photos count for this check.
+      if (isKnownPlaceholder(img.url)) return;
       const ids = urlToProductIds.get(img.url) ?? new Set<string>();
       ids.add(product.id);
       urlToProductIds.set(img.url, ids);

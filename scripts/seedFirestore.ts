@@ -36,7 +36,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { BRAND_DEFS, MEN_CATEGORY_DEFS, KIDS_CATEGORY_DEFS, SIZE_SETS, COLOR_PALETTE, MATERIALS, FITS, PATTERNS, OCCASIONS, ADJECTIVES, type CategoryDef } from '../frontend/src/data/catalogSource';
 import { SeededRng } from '../frontend/src/lib/seededRandom';
 import { slugify, calculateDiscount } from '../frontend/src/lib/utils';
-import { getImageFolder, resolveProductImagePath, PLACEHOLDER_IMAGE_PATH, getVerifiedColorForCode, REAL_PRODUCT_PHOTOGRAPHY } from '../frontend/src/lib/productImages';
+import { getImageFolder, resolveProductImagePath, placeholderImagePathFor, getVerifiedColorForCode, REAL_PRODUCT_PHOTOGRAPHY } from '../frontend/src/lib/productImages';
 import { PRODUCT_IMAGE_MANIFEST } from '../frontend/src/data/productImageManifest';
 import { CURATED_SHIRTS_TSHIRTS } from './curatedShirtsTshirtsData';
 import { CURATED_APPAREL } from './curatedApparelData';
@@ -263,7 +263,7 @@ export async function main() {
             color: colors[0].name,
             sort_order: idx,
           }))
-        : [{ id: `${ref.id}-img-0`, url: PLACEHOLDER_IMAGE_PATH, alt: `${name} — photo 1`, color: colors[0].name, sort_order: 0 }];
+        : [{ id: `${ref.id}-img-0`, url: placeholderImagePathFor(def.slug), alt: `${name} — photo 1`, color: colors[0].name, sort_order: 0 }];
 
       const now = new Date();
       const createdAt = new Date(now.getTime() - rng.int(0, 200) * 24 * 60 * 60 * 1000).toISOString();

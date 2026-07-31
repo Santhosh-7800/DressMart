@@ -5,6 +5,21 @@ const hasRealCredentials = Boolean(
   firebaseApiKey && firebaseProjectId && !firebaseApiKey.includes('your-') && !firebaseProjectId.includes('your-'),
 );
 
+/**
+ * `VITE_USE_FIREBASE_EMULATOR=true` always wins (explicit, intentional). Otherwise: a local dev
+ * server (`npm run dev`, `import.meta.env.DEV`) may fall back to the emulator when no real project
+ * is configured, purely so a fresh contributor checkout works before anyone has filled in `.env` —
+ * see firebase.ts.
+ *
+ * A PRODUCTION build (`vite build` — every deployed target: Vercel, Firebase Hosting, GitHub Pages,
+ * the Capacitor Android shell) must NEVER take that same fallback, because there is no local
+ * emulator reachable from a real visitor's browser or device. Missing/placeholder credentials in a
+ * production build are a deployment misconfiguration (env vars not set on the host), not something
+ * to silently paper over by mimicking a broken local dev setup — see firebase.ts's hard failure for
+ * exactly that case, and its docstring for why it deliberately does NOT reference this constant.
+ */
+const useEmulators = import.meta.env.VITE_USE_FIREBASE_EMULATOR === 'true' || (import.meta.env.DEV && !hasRealCredentials);
+
 export const env = {
   firebase: {
     apiKey: firebaseApiKey ?? '',
@@ -18,6 +33,5 @@ export const env = {
   fcmVapidKey: (import.meta.env.VITE_FIREBASE_VAPID_KEY as string | undefined) ?? '',
   razorpayKeyId: (import.meta.env.VITE_RAZORPAY_KEY_ID as string | undefined) ?? '',
   siteUrl: (import.meta.env.VITE_SITE_URL as string | undefined) ?? 'http://localhost:5173',
-  /** True unless a real Firebase project is configured in `.env` — see firebase.ts, which then talks to the local Firebase emulators instead. */
-  useEmulators: import.meta.env.VITE_USE_FIREBASE_EMULATOR === 'true' || !hasRealCredentials,
+  useEmulators,
 };

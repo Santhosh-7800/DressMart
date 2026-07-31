@@ -15,16 +15,21 @@ import { env } from './env';
 
 // The 'demo-*' values below are ONLY ever used when actually talking to the local Firebase
 // emulator suite (env.useEmulators — see env.ts) — the emulator doesn't validate credentials, so
-// any project id works, and 'demo-dressmart' matches this project's emulator data/scripts. This
-// fallback is deliberately NOT reachable in a real production build: if VITE_USE_FIREBASE_EMULATOR
-// isn't 'true', env.useEmulators is only true when real VITE_FIREBASE_* credentials are missing —
-// which is itself a build misconfiguration, so we fail loudly here instead of silently shipping a
-// bundle that talks to a nonexistent 'demo-dressmart' project or (worse) to no project at all.
+// any project id works, and 'demo-dressmart' matches this project's emulator data/scripts.
+//
+// This fallback is NOT reachable in a production build: env.ts's useEmulators is hard-gated to
+// import.meta.env.DEV (unless VITE_USE_FIREBASE_EMULATOR=true is set explicitly), so a production
+// build with missing/placeholder VITE_FIREBASE_* env vars hits this throw instead of silently
+// falling back to a nonexistent 'demo-dressmart' project that no real visitor's browser can reach —
+// exactly the failure mode this guards against (e.g. deploying to Vercel without setting the
+// project's real Firebase env vars there first). main.tsx's bootstrap() catches this and shows a
+// generic, user-friendly message instead of a blank page; the message below is for whoever reads
+// the browser console while diagnosing the deployment, not the visitor.
 if (!env.useEmulators && !(env.firebase.apiKey && env.firebase.projectId)) {
   throw new Error(
     'Firebase is misconfigured: VITE_FIREBASE_API_KEY / VITE_FIREBASE_PROJECT_ID are missing and ' +
-      'VITE_USE_FIREBASE_EMULATOR is not "true". Set real Firebase project credentials in your ' +
-      'environment (see .env.example) before building for production.',
+      'VITE_USE_FIREBASE_EMULATOR is not "true". Set real Firebase project credentials as environment ' +
+      'variables on your hosting provider (see .env.example) before deploying.',
   );
 }
 

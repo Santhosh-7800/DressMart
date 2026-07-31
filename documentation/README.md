@@ -56,12 +56,42 @@ By default (`VITE_USE_FIREBASE_EMULATOR=true` in `.env`, or simply no real Fireb
 
 1. Create a project at [console.firebase.google.com](https://console.firebase.google.com), then add a **Web app** to it.
 2. Enable **Authentication** providers: Email/Password, Google, Phone.
-3. Copy `.env.example` to `.env` (repo root) and fill in the `VITE_FIREBASE_*` values from Project Settings, plus `VITE_FIREBASE_VAPID_KEY` (Project Settings → Cloud Messaging → Web Push certificates) and `VITE_RAZORPAY_KEY_ID`. Set `VITE_USE_FIREBASE_EMULATOR=false`.
+3. Copy `.env.example` to `.env` (repo root) and fill in the `VITE_FIREBASE_*` values from Project Settings, plus `VITE_FIREBASE_VAPID_KEY` (Project Settings → Cloud Messaging → Web Push certificates) and `VITE_RAZORPAY_KEY_ID`. Set `VITE_USE_FIREBASE_EMULATOR=false` (or just remove the line — `false`/absent behave identically).
 4. Link the CLI to your project: `firebase --config database/firebase.json use --add`.
 5. Deploy security rules and indexes: `firebase --config database/firebase.json deploy --only firestore:rules,firestore:indexes,storage`.
 6. Set the Razorpay Cloud Functions config (see `backend/functions/README.md`), then deploy: `firebase --config database/firebase.json deploy --only functions`.
-7. Deploy the frontend: `npm run build && firebase --config database/firebase.json deploy --only hosting`.
-8. Manually promote your own account's `role` to `'head_seller'` in the Firestore console the first time — there's exactly one Head Seller, and it's bootstrapped by hand, not through the UI.
+7. Seed the real Firestore database — download a service account key (Project Settings → Service Accounts → Generate new private key), then:
+   ```bash
+   GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json npm run seed
+   GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json npm run seed:curated-formal-shirts
+   GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json npm run seed:curated-shirts-tshirts
+   GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json npm run seed:curated-apparel
+   GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json npm run seed:curated-kids
+   ```
+   This writes the full ~962-product catalog (the same one you get for free against the local emulator). Every script upserts by a deterministic ID, so re-running any of them is always safe — it can never create duplicates, and only ever fills in missing products or refreshes existing ones.
+8. Deploy the frontend to Firebase Hosting: `npm run build && firebase --config database/firebase.json deploy --only hosting`. **Deploying to Vercel instead?** See "Deploying the frontend to Vercel" below — skip this step.
+9. Manually promote your own account's `role` to `'head_seller'` in the Firestore console the first time — there's exactly one Head Seller, and it's bootstrapped by hand, not through the UI.
+
+### Deploying the frontend to Vercel
+
+Firebase Cloud Functions **cannot run on Vercel** — Vercel hosts static sites and its own serverless functions, not Firebase's. Deploying to Vercel replaces *only* step 8 above (Firebase Hosting) with a different static host; steps 1–7 and 9 (the real Firebase project, Firestore rules, Cloud Functions deploy, seeding, Head Seller) still all happen against Firebase exactly as described, regardless of where the frontend itself is hosted.
+
+1. Import the GitHub repo into Vercel. `vercel.json` at the repo root already sets `buildCommand: "npm run build"`, `outputDirectory: "dist"`, and a catch-all SPA rewrite to `index.html` (React Router needs that rewrite, or refreshing any non-root route 404s) — leave Vercel's own **Root Directory** project setting at the repo root (not `frontend/`), since the build command runs `npm run build` from there and only descends into `frontend/` via the npm workspace.
+2. In the Vercel project's **Settings → Environment Variables**, set every one of these (Production, and Preview if you want preview deployments to work too) from the real Firebase project you configured above — the exact same values that went into your local `.env`:
+   - `VITE_FIREBASE_API_KEY`
+   - `VITE_FIREBASE_AUTH_DOMAIN`
+   - `VITE_FIREBASE_PROJECT_ID`
+   - `VITE_FIREBASE_STORAGE_BUCKET`
+   - `VITE_FIREBASE_MESSAGING_SENDER_ID`
+   - `VITE_FIREBASE_APP_ID`
+   - `VITE_FIREBASE_VAPID_KEY`
+   - `VITE_RAZORPAY_KEY_ID`
+   - `VITE_SITE_URL` — set to your actual Vercel URL (e.g. `https://your-app.vercel.app`), used in password-reset email links.
+
+   **Do not set `VITE_USE_FIREBASE_EMULATOR` at all** (or set it to `false`) — if it's ever accidentally set to `true` on Vercel, the deployed site will try to reach a local emulator that doesn't exist from a visitor's browser, which is exactly the bug this section exists to prevent. As of this codebase, a production build (which `npm run build` always is) ignores real-vs-placeholder credential detection entirely and simply refuses to fall back to the emulator — so the actual risk here is narrower than it used to be, but the env var is still meaningless to set in a deployed environment either way.
+3. **Firebase Auth won't work on your Vercel domain until you authorize it**: Firebase Console → Authentication → Settings → **Authorized domains** → add your Vercel domain (both the stable production domain, e.g. `your-app.vercel.app`, and any custom domain you attach). Every Vercel *preview* deployment gets its own random subdomain — those won't be authorized and Google/phone sign-in will fail there by design; test auth flows against the stable production domain.
+4. Redeploy (push to the branch Vercel watches, or trigger a redeploy from the dashboard) after setting the env vars — Vercel only picks up new environment variables on the *next* build, not retroactively for a build that already ran.
+5. If you skipped Firebase Hosting (step 8 above) entirely, note that `database/firebase.json`'s `hosting` block simply goes unused — that's fine, it costs nothing to leave configured for later.
 
 ---
 
@@ -227,6 +257,9 @@ Run on a connected device/emulator directly with `cd mobile && npx cap run andro
 - [ ] Real Firebase project created; `.env` filled in with real `VITE_FIREBASE_*` values; `VITE_USE_FIREBASE_EMULATOR=false`.
 - [ ] `firebase --config database/firebase.json deploy --only firestore:rules,firestore:indexes,storage` run against the real project.
 - [ ] Razorpay Cloud Functions config set (live keys, not test keys) — see `backend/functions/README.md`.
+- [ ] Real Firestore seeded (`npm run seed` + all four `seed:curated-*` scripts with `GOOGLE_APPLICATION_CREDENTIALS` set — see "Connecting a real Firebase project" above).
+- [ ] If deploying to Vercel (or any host other than Firebase Hosting): every `VITE_FIREBASE_*`/`VITE_RAZORPAY_KEY_ID`/`VITE_SITE_URL` var set on the host itself — see "Deploying the frontend to Vercel" above.
+- [ ] Deployed domain added to Firebase Console → Authentication → Settings → Authorized domains, or Google/phone sign-in will fail there even with everything else correct.
 - [ ] Exactly one Head Seller account promoted by hand in the Firestore console.
 - [ ] `versionCode`/`versionName` bumped for this release.
 - [ ] `mobile/android/app/dressmart-upload-key.jks` + `mobile/android/keystore.properties` backed up securely outside this repo.

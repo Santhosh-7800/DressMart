@@ -18,102 +18,12 @@ import { slugify, calculateDiscount } from '../frontend/src/lib/utils.js';
 import { resolveProductImagePath, PLACEHOLDER_IMAGE_PATH } from '../frontend/src/lib/productImages.js';
 import { sellerFor, PRICE_BANDS } from './seedFirestore.js';
 import { CURATED_APPAREL, type CuratedApparelItem } from './curatedApparelData.js';
+import { docGet, docSet } from './lib/firestoreDocStore.js';
 import { pathToFileURL } from 'node:url';
 
 const MEN_BRANDS = BRAND_DEFS.filter((b) => b.focus === 'both' || b.focus === 'men');
 const SUBCATEGORY_NAME_BY_SLUG = new Map(MEN_CATEGORY_DEFS.map((def) => [def.slug, def.name]));
 const CATEGORY_DEF_BY_SLUG = new Map(MEN_CATEGORY_DEFS.map((def) => [def.slug, def]));
-
-const EMULATOR_HOST = process.env.FIRESTORE_EMULATOR_HOST;
-const PROJECT_ID = process.env.VITE_FIREBASE_PROJECT_ID || process.env.GCLOUD_PROJECT || 'demo-dressmart';
-
-// --- Firestore REST helpers (same approach/rationale as seedCuratedShirtsTshirts.ts) ----------
-function toFirestoreValue(value: unknown): Record<string, unknown> {
-  if (value === null || value === undefined) return { nullValue: null };
-  if (typeof value === 'string') return { stringValue: value };
-  if (typeof value === 'boolean') return { booleanValue: value };
-  if (typeof value === 'number') {
-    return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
-  }
-  if (Array.isArray(value)) return { arrayValue: { values: value.map(toFirestoreValue) } };
-  if (typeof value === 'object') return { mapValue: { fields: toFirestoreFields(value as Record<string, unknown>) } };
-  throw new Error(`Unsupported value type for Firestore REST write: ${typeof value}`);
-}
-
-function toFirestoreFields(obj: Record<string, unknown>): Record<string, unknown> {
-  const fields: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(obj)) {
-    if (value === undefined) continue;
-    fields[key] = toFirestoreValue(value);
-  }
-  return fields;
-}
-
-function fromFirestoreValue(value: Record<string, unknown>): unknown {
-  if ('nullValue' in value) return null;
-  if ('stringValue' in value) return value.stringValue;
-  if ('booleanValue' in value) return value.booleanValue;
-  if ('integerValue' in value) return Number(value.integerValue);
-  if ('doubleValue' in value) return value.doubleValue;
-  if ('arrayValue' in value) {
-    const arr = (value.arrayValue as { values?: Record<string, unknown>[] }).values ?? [];
-    return arr.map(fromFirestoreValue);
-  }
-  if ('mapValue' in value) {
-    return fromFirestoreFields((value.mapValue as { fields?: Record<string, Record<string, unknown>> }).fields ?? {});
-  }
-  return null;
-}
-
-function fromFirestoreFields(fields: Record<string, Record<string, unknown>>): Record<string, unknown> {
-  const obj: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(fields)) obj[key] = fromFirestoreValue(value);
-  return obj;
-}
-
-function docUrl(collection: string, docId: string): string {
-  if (!EMULATOR_HOST) throw new Error('This script requires FIRESTORE_EMULATOR_HOST to be set.');
-  return `http://${EMULATOR_HOST}/v1/projects/${PROJECT_ID}/databases/(default)/documents/${collection}/${docId}`;
-}
-
-async function fetchWithRetry(url: string, init: RequestInit, attempts = 8, timeoutMs = 10_000): Promise<Response> {
-  for (let attempt = 1; attempt <= attempts; attempt++) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const res = await fetch(url, { ...init, signal: controller.signal });
-      clearTimeout(timer);
-      if (res.status >= 500 || res.status === 409) {
-        if (attempt === attempts) return res;
-        await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
-        continue;
-      }
-      return res;
-    } catch (error) {
-      clearTimeout(timer);
-      if (attempt === attempts) throw error;
-      await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
-    }
-  }
-  throw new Error(`unreachable: fetchWithRetry exhausted attempts for ${url}`);
-}
-
-async function restGet(collection: string, docId: string): Promise<Record<string, unknown> | null> {
-  const res = await fetchWithRetry(docUrl(collection, docId), { headers: { Authorization: 'Bearer owner' } });
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`REST read failed for ${collection}/${docId}: ${res.status} ${await res.text()}`);
-  const json = (await res.json()) as { fields?: Record<string, Record<string, unknown>> };
-  return fromFirestoreFields(json.fields ?? {});
-}
-
-async function restSet(collection: string, docId: string, data: Record<string, unknown>): Promise<void> {
-  const res = await fetchWithRetry(docUrl(collection, docId), {
-    method: 'PATCH',
-    headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fields: toFirestoreFields(data) }),
-  });
-  if (!res.ok) throw new Error(`REST write failed for ${collection}/${docId}: ${res.status} ${await res.text()}`);
-}
 
 /** Matches "SJ001-1.jpg" (index=1) and a bare "HD001.webp" (index defaults to 1) — same convention
  *  as generateImageManifest.ts's own FILENAME_PATTERN, needed here because the manifest's exported
@@ -228,7 +138,7 @@ export async function main() {
     }
 
     const docId = `curated-${item.categorySlug}-${item.sku.toLowerCase()}`;
-    const existingData = await restGet('products', docId);
+    const existingData = await docGet('products', docId);
     const isNew = existingData === null;
 
     const brand = item.brandSlug ? BRAND_DEFS.find((b) => b.slug === item.brandSlug) : undefined;
@@ -323,8 +233,8 @@ export async function main() {
       variants,
     };
 
-    await restSet('products', docId, product);
-    await restSet('inventory', docId, {
+    await docSet('products', docId, product);
+    await docSet('inventory', docId, {
       product_id: docId,
       seller_id: seller.id,
       total_stock: totalStock,

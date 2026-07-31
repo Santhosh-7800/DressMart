@@ -17,7 +17,7 @@ import { CURATED_CHECKED_SHIRTS, type CuratedCheckedShirt } from './curatedCheck
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
-const OUT_ROOT = path.join(ROOT, 'public/images/products/men/checked-shirts');
+const OUT_ROOT = path.join(ROOT, 'frontend/public/images/products/men/checked-shirts');
 
 function escapeXml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

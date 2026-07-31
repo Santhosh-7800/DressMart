@@ -1,0 +1,14 @@
+{
+  "name": "dressmart-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "DressMart frontend — React + TypeScript + Vite web app (npm workspace member; see the repo root package.json for the workspace-wide scripts and the single shared node_modules/).",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "lint": "eslint .",
+    "typecheck": "tsc -b --noEmit"
+  }
+}

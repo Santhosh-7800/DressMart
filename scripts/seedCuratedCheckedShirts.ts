@@ -8,10 +8,10 @@ import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { BRAND_DEFS } from '../src/data/catalogSource.js';
-import { PRODUCT_IMAGE_MANIFEST } from '../src/data/productImageManifest.js';
-import { SeededRng, hashStringToSeed } from '../src/lib/seededRandom.js';
-import { slugify, calculateDiscount } from '../src/lib/utils.js';
+import { BRAND_DEFS } from '../frontend/src/data/catalogSource.js';
+import { PRODUCT_IMAGE_MANIFEST } from '../frontend/src/data/productImageManifest.js';
+import { SeededRng, hashStringToSeed } from '../frontend/src/lib/seededRandom.js';
+import { slugify, calculateDiscount } from '../frontend/src/lib/utils.js';
 import { db, sellerFor, PRICE_BANDS } from './seedFirestore.js';
 import { CURATED_CHECKED_SHIRTS, type CuratedCheckedShirt } from './curatedCheckedShirtsData.js';
 

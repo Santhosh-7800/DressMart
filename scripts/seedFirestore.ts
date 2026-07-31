@@ -33,21 +33,40 @@
 import 'dotenv/config';
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { BRAND_DEFS, MEN_CATEGORY_DEFS, KIDS_CATEGORY_DEFS, SIZE_SETS, COLOR_PALETTE, MATERIALS, FITS, PATTERNS, OCCASIONS, ADJECTIVES, type CategoryDef } from '../src/data/catalogSource';
-import { SeededRng } from '../src/lib/seededRandom';
-import { slugify, calculateDiscount } from '../src/lib/utils';
-import { getImageFolder, resolveProductImagePath, PLACEHOLDER_IMAGE_PATH, getVerifiedColorForCode } from '../src/lib/productImages';
-import { PRODUCT_IMAGE_MANIFEST } from '../src/data/productImageManifest';
+import { BRAND_DEFS, MEN_CATEGORY_DEFS, KIDS_CATEGORY_DEFS, SIZE_SETS, COLOR_PALETTE, MATERIALS, FITS, PATTERNS, OCCASIONS, ADJECTIVES, type CategoryDef } from '../frontend/src/data/catalogSource';
+import { SeededRng } from '../frontend/src/lib/seededRandom';
+import { slugify, calculateDiscount } from '../frontend/src/lib/utils';
+import { getImageFolder, resolveProductImagePath, PLACEHOLDER_IMAGE_PATH, getVerifiedColorForCode, REAL_PRODUCT_PHOTOGRAPHY } from '../frontend/src/lib/productImages';
+import { PRODUCT_IMAGE_MANIFEST } from '../frontend/src/data/productImageManifest';
 import { CURATED_SHIRTS_TSHIRTS } from './curatedShirtsTshirtsData';
 import { CURATED_APPAREL } from './curatedApparelData';
+import { CURATED_KIDS } from './curatedKidsData';
 
 /** Codes already dedicated to a curated batch's own product, keyed by folder — excluded from this
- *  generic seeder's round-robin pool so a filler product never reuses a curated SKU's real photos. */
+ *  generic seeder's round-robin pool so a filler product never reuses a curated SKU's real photos.
+ *  Every curated batch must be represented here, or the generic seeder silently reuses its photos
+ *  for an unrelated random product — this exact gap (missing for scripts/seedCuratedKids.ts and the
+ *  FS031-073 batch) was found by a full image audit; see that audit's report for details. */
 const CLAIMED_CODES_BY_FOLDER = new Map<string, Set<string>>();
-[...CURATED_SHIRTS_TSHIRTS, ...CURATED_APPAREL].forEach((item) => {
+[...CURATED_SHIRTS_TSHIRTS, ...CURATED_APPAREL, ...CURATED_KIDS].forEach((item) => {
   const set = CLAIMED_CODES_BY_FOLDER.get(item.folderKey) ?? new Set<string>();
   set.add(item.sku);
   CLAIMED_CODES_BY_FOLDER.set(item.folderKey, set);
+});
+// scripts/seedCuratedFormalShirts.ts sources its FS031-073 batch from REAL_PRODUCT_PHOTOGRAPHY
+// directly (not a plain data-table module like the others), so its claimed codes are derived here
+// the same way that script itself resolves them: any code in the FS031-073 range referenced by a
+// 'formal-shirts' entry.
+const FORMAL_SHIRTS_CURATED_RANGE = /^FS0(3[1-9]|[4-6]\d|7[0-3])$/;
+Object.values(REAL_PRODUCT_PHOTOGRAPHY).forEach((entry) => {
+  if (entry.categorySlug !== 'formal-shirts') return;
+  const set = CLAIMED_CODES_BY_FOLDER.get('formal-shirts') ?? new Set<string>();
+  entry.photoSetsByColorIndex
+    .flat()
+    .map((file) => file.split('-')[0])
+    .filter((code) => FORMAL_SHIRTS_CURATED_RANGE.test(code))
+    .forEach((code) => set.add(code));
+  CLAIMED_CODES_BY_FOLDER.set('formal-shirts', set);
 });
 
 const SEED = 20260722;
@@ -97,7 +116,7 @@ export const PRICE_BANDS: Record<string, { min: number; max: number }> = {
   watch: { min: 1499, max: 8999 },
   default: { min: 399, max: 1999 },
 };
-const KIDS_PRICE_MULTIPLIER = 0.55;
+export const KIDS_PRICE_MULTIPLIER = 0.55;
 
 export function washCareFor(material: string): string {
   if (material.includes('Wool')) return 'Dry clean only. Do not bleach. Iron on low heat.';

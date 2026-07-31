@@ -9,11 +9,12 @@
   "scripts": {
     "build": "tsc",
     "build:watch": "tsc --watch",
-    "serve": "npm run build && firebase emulators:start --only functions,firestore,auth",
-    "shell": "npm run build && firebase functions:shell",
+    "typecheck": "tsc --noEmit",
+    "serve": "npm run build && firebase --config ../../database/firebase.json emulators:start --only functions,firestore,auth",
+    "shell": "npm run build && firebase --config ../../database/firebase.json functions:shell",
     "start": "npm run shell",
-    "deploy": "firebase deploy --only functions",
-    "logs": "firebase functions:log"
+    "deploy": "firebase --config ../../database/firebase.json deploy --only functions",
+    "logs": "firebase --config ../../database/firebase.json functions:log"
   },
   "dependencies": {
     "firebase-admin": "^12.7.0",

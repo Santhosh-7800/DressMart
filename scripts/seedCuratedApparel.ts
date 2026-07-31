@@ -11,11 +11,11 @@
  *   FIRESTORE_EMULATOR_HOST=localhost:8081 npx tsx scripts/seedCuratedApparel.ts
  */
 import 'dotenv/config';
-import { BRAND_DEFS, MEN_CATEGORY_DEFS, SIZE_SETS, type CategoryDef } from '../src/data/catalogSource.js';
-import { PRODUCT_IMAGE_MANIFEST } from '../src/data/productImageManifest.js';
-import { SeededRng, hashStringToSeed } from '../src/lib/seededRandom.js';
-import { slugify, calculateDiscount } from '../src/lib/utils.js';
-import { resolveProductImagePath, PLACEHOLDER_IMAGE_PATH } from '../src/lib/productImages.js';
+import { BRAND_DEFS, MEN_CATEGORY_DEFS, SIZE_SETS, type CategoryDef } from '../frontend/src/data/catalogSource.js';
+import { PRODUCT_IMAGE_MANIFEST } from '../frontend/src/data/productImageManifest.js';
+import { SeededRng, hashStringToSeed } from '../frontend/src/lib/seededRandom.js';
+import { slugify, calculateDiscount } from '../frontend/src/lib/utils.js';
+import { resolveProductImagePath, PLACEHOLDER_IMAGE_PATH } from '../frontend/src/lib/productImages.js';
 import { sellerFor, PRICE_BANDS } from './seedFirestore.js';
 import { CURATED_APPAREL, type CuratedApparelItem } from './curatedApparelData.js';
 import { pathToFileURL } from 'node:url';

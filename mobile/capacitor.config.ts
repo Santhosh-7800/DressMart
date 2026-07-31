@@ -9,7 +9,9 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'com.dressmart.app',
   appName: 'DressMart',
-  webDir: 'dist',
+  // dist/ stays at the repo root (shared with the GitHub Pages web deploy) — this config now
+  // lives one level down in mobile/, hence '../dist'.
+  webDir: '../dist',
   backgroundColor: '#131921',
   android: {
     backgroundColor: '#131921',

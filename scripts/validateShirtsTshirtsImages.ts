@@ -22,7 +22,7 @@ import { db } from './seedFirestore';
 import { CURATED_SHIRTS_TSHIRTS } from './curatedShirtsTshirtsData';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PUBLIC_DIR = path.resolve(__dirname, '..', 'public');
+const PUBLIC_DIR = path.resolve(__dirname, '..', 'frontend', 'public');
 
 interface Problem {
   productId: string;

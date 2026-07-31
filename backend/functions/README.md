@@ -23,22 +23,23 @@ Two values are needed, read via `firebase-functions/params` (see `src/lib/config
 | `RAZORPAY_KEY_ID` | Not secret — echoed back to the client to init Razorpay Checkout | Public key id |
 | `RAZORPAY_KEY_SECRET` | Secret | Used to create orders server-side and verify payment signatures |
 
-**Local emulator:** copy `.env.example` to `.env` (git-ignored) inside `functions/` and fill in
-your Razorpay **test** keys:
+**Local emulator:** copy `.env.example` to `.env` (git-ignored) inside `backend/functions/` and
+fill in your Razorpay **test** keys:
 
 ```bash
-cp functions/.env.example functions/.env
+# from the repo root
+cp backend/functions/.env.example backend/functions/.env
 ```
 
 **Deployed (production):**
 
 ```bash
 # One-time, or whenever the secret rotates:
-firebase functions:secrets:set RAZORPAY_KEY_SECRET
+firebase --config database/firebase.json functions:secrets:set RAZORPAY_KEY_SECRET
 
 # RAZORPAY_KEY_ID isn't sensitive; set it as a plain deployed param via a project-scoped .env file,
-# e.g. functions/.env.<project-id> (also git-ignored), or export it as a build-time env var:
-#   functions/.env.production-project-id
+# e.g. backend/functions/.env.<project-id> (also git-ignored), or export it as a build-time env var:
+#   backend/functions/.env.production-project-id
 #     RAZORPAY_KEY_ID=rzp_live_xxxxxxxxxxxx
 ```
 
@@ -48,15 +49,15 @@ when they call `.value()`.
 ## Local development
 
 ```bash
-# from the repo root
-firebase emulators:start
-# or, from functions/:
+# from the repo root — starts it automatically (see the root README's "Reliability" section)
+npm run dev
+# or, from backend/functions/:
 npm run serve
 ```
 
-This starts Auth, Firestore, and Functions emulators together (see repo-root `firebase.json`).
+This starts Auth, Firestore, and Functions emulators together (see `database/firebase.json`).
 Point the client's `.env` at the emulators (`VITE_USE_EMULATORS=true` or equivalent — see
-`src/lib/firebase.ts`) to exercise these functions end-to-end locally.
+`frontend/src/lib/firebase.ts`) to exercise these functions end-to-end locally.
 
 ## Build / deploy
 

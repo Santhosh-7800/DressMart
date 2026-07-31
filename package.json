@@ -4,24 +4,31 @@
   "version": "1.0.0",
   "type": "module",
   "description": "DressMart - Premium online shopping for Men's & Kids' wear",
+  "workspaces": [
+    "frontend",
+    "backend/functions"
+  ],
   "scripts": {
-    "predev": "tsx scripts/generateImageManifest.ts && tsx scripts/ensureSeeded.ts",
-    "dev": "vite",
+    "predev": "tsx scripts/generateImageManifest.ts && tsx scripts/ensureEmulatorRunning.ts && tsx scripts/ensureSeeded.ts",
+    "dev": "npm run dev --workspace=frontend",
     "prebuild": "tsx scripts/generateImageManifest.ts",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview",
-    "lint": "eslint .",
+    "build": "npm run build --workspace=frontend && npm run build --workspace=backend/functions",
+    "preview": "npm run preview --workspace=frontend",
+    "lint": "npm run lint --workspace=frontend",
+    "typecheck": "npm run typecheck --workspace=frontend && npm run typecheck --workspace=backend/functions && tsc -p tsconfig.scripts.json --noEmit",
     "seed": "tsx scripts/seedFirestore.ts",
     "seed:curated-formal-shirts": "tsx scripts/seedCuratedFormalShirts.ts",
     "seed:curated-checked-shirts": "tsx scripts/seedCuratedCheckedShirts.ts",
     "seed:curated-shirts-tshirts": "tsx scripts/seedCuratedShirtsTshirts.ts",
     "seed:curated-apparel": "tsx scripts/seedCuratedApparel.ts",
+    "seed:curated-kids": "tsx scripts/seedCuratedKids.ts",
     "validate:checked-shirts": "tsx scripts/validateCheckedShirtImages.ts",
     "validate:shirts-tshirts": "tsx scripts/validateShirtsTshirtsImages.ts",
     "validate:apparel": "tsx scripts/validateApparelImages.ts",
-    "typecheck": "tsc -b --noEmit",
     "images:scan": "tsx scripts/generateImageManifest.ts",
-    "emulators": "firebase emulators:start --import=./.emulator-data --export-on-exit=./.emulator-data"
+    "emulators": "firebase --config database/firebase.json emulators:start --import=./.emulator-data --export-on-exit=./.emulator-data",
+    "cap:sync": "npm run build --workspace=frontend && cd mobile && npx cap sync",
+    "cap:open": "cd mobile && npx cap open android"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.2",

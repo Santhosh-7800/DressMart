@@ -22,7 +22,7 @@
  */
 import 'dotenv/config';
 import { pathToFileURL } from 'node:url';
-import { getVerifiedColorForCode, type VerifiedColor } from '../src/lib/productImages';
+import { getVerifiedColorForCode, type VerifiedColor } from '../frontend/src/lib/productImages';
 import { db } from './seedFirestore';
 
 const CATEGORY_ID = 'cat-formal-shirts';

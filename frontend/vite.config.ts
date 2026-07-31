@@ -2,6 +2,9 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'node:path';
+// scripts/ deliberately stays at the repo root (shared dev tooling, not frontend-specific) —
+// this config now lives one level down in frontend/, hence the extra '../'.
+import { devSeedPlugin } from '../scripts/vite/devSeedPlugin.js';
 
 // GitHub Pages serves project sites from a /<repo-name>/ subpath, not the domain root — the
 // deploy workflow (.github/workflows/deploy-pages.yml) sets this from the repo name at build
@@ -11,8 +14,13 @@ const base = process.env.VITE_BASE_PATH || '/';
 
 export default defineConfig({
   base,
+  // .env/.env.example are deliberately kept at the repo root (see README's "Environment
+  // Variables" / final restructure report) rather than duplicated into frontend/ — point Vite's
+  // env loader back up at them instead of its default (same directory as this config).
+  envDir: path.resolve(__dirname, '..'),
   plugins: [
     react(),
+    devSeedPlugin(),
     VitePWA({
       registerType: 'autoUpdate',
       // Firebase Messaging already ships its own service worker (public/firebase-messaging-sw.js,
@@ -64,6 +72,11 @@ export default defineConfig({
     open: true,
   },
   build: {
+    // dist/ deliberately stays at the repo root (Capacitor's webDir and the GitHub Pages workflow
+    // both expect it there) rather than inside frontend/ — outDir escaping this config's own root
+    // requires emptyOutDir explicitly, since Vite refuses to guess it's safe to wipe by default.
+    outDir: path.resolve(__dirname, '../dist'),
+    emptyOutDir: true,
     sourcemap: false,
     rollupOptions: {
       output: {

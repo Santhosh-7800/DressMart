@@ -24,7 +24,7 @@ import { pathToFileURL } from 'node:url';
 import { db } from './seedFirestore';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PUBLIC_DIR = path.resolve(__dirname, '..', 'public');
+const PUBLIC_DIR = path.resolve(__dirname, '..', 'frontend', 'public');
 const CATEGORY_SLUG = 'checked-shirts';
 const EXPECTED_FOLDER_FRAGMENT = '/images/products/men/checked-shirts/';
 

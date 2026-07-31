@@ -69,6 +69,14 @@ if (env.useEmulators) {
   connectFunctionsEmulator(functions, emulatorHost, 5001);
 }
 
+if (import.meta.env.DEV) {
+  console.info(
+    env.useEmulators
+      ? '[firebase] Using local Firebase emulators (Firestore :8081, Auth :9099, Storage :9199, Functions :5001).'
+      : `[firebase] Using live Firebase project "${env.firebase.projectId}".`,
+  );
+}
+
 /** Lazily resolved — FCM requires browser support (no SSR, needs a service worker) and is unavailable in most emulator/test contexts. */
 export async function getMessagingIfSupported(): Promise<Messaging | null> {
   if (!(await isSupported())) return null;

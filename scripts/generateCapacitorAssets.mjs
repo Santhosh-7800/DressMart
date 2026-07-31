@@ -3,7 +3,7 @@ import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
-const ASSETS_DIR = path.join(ROOT, 'assets');
+const ASSETS_DIR = path.join(ROOT, 'mobile/assets');
 mkdirSync(ASSETS_DIR, { recursive: true });
 
 const NAVY = '#131921';

@@ -53,10 +53,12 @@ const CATEGORY_FOLDER_MAP: Record<string, string> = {
   // Kids
   'kids-tshirts': 'tshirts',
   'kids-shirts': 'shirts',
-  'school-uniform': 'shirts',
-  'kids-party-wear': 'shirts',
+  // These 3 used to fall back to a shared folder (shirts/jeans) before each got its own real,
+  // dedicated photography — see scripts/curatedKidsData.ts and productImageManifest.ts.
+  'school-uniform': 'School Uniform',
+  'kids-party-wear': 'Party Wear',
+  'kids-joggers': 'Joggers',
   'kids-jeans': 'jeans',
-  'kids-joggers': 'jeans',
   'kids-shorts': 'shorts',
   'kids-hoodies': 'hoodies',
   'kids-sweaters': 'hoodies',

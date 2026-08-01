@@ -51,7 +51,12 @@ function buildColorSwatchGroups(colors: FacetCount[] | undefined): ColorSwatchGr
   return [...groups.values()].sort((a, b) => b.count - a.count);
 }
 
+/** Matches the common "show a handful, then reveal the rest" pattern for a long checkbox list. */
+const BRAND_VISIBLE_COUNT = 7;
+
 export function ProductFilters({ facets, filters, onChange }: ProductFiltersProps) {
+  const [showAllBrands, setShowAllBrands] = useState(false);
+
   const toggleArrayValue = (key: 'brandIds' | 'sizes', value: string) => {
     const current = (filters[key] ?? []) as string[];
     const next = current.includes(value) ? current.filter((v) => v !== value) : [...current, value];
@@ -59,6 +64,8 @@ export function ProductFilters({ facets, filters, onChange }: ProductFiltersProp
   };
 
   const colorGroups = useMemo(() => buildColorSwatchGroups(facets?.colors), [facets?.colors]);
+  const visibleBrands = showAllBrands ? facets?.brands : facets?.brands?.slice(0, BRAND_VISIBLE_COUNT);
+  const hasMoreBrands = (facets?.brands.length ?? 0) > BRAND_VISIBLE_COUNT;
 
   const toggleColorGroup = (group: ColorSwatchGroup) => {
     const current = filters.colors ?? [];
@@ -107,8 +114,8 @@ export function ProductFilters({ facets, filters, onChange }: ProductFiltersProp
       </FilterSection>
 
       <FilterSection title="Brand">
-        <div className="scrollbar-thin max-h-48 space-y-1.5 overflow-y-auto">
-          {facets?.brands.map((brand) => (
+        <div className="space-y-2">
+          {visibleBrands?.map((brand) => (
             <label key={brand.value} className="flex cursor-pointer items-center justify-between text-sm">
               <span className="flex items-center gap-2">
                 <input
@@ -123,10 +130,19 @@ export function ProductFilters({ facets, filters, onChange }: ProductFiltersProp
             </label>
           ))}
         </div>
+        {hasMoreBrands && (
+          <button
+            onClick={() => setShowAllBrands((v) => !v)}
+            className="mt-2.5 flex items-center gap-1 text-sm font-medium text-accent-600 hover:underline dark:text-accent-400"
+          >
+            <ChevronDown size={14} className={cn('transition-transform', showAllBrands && 'rotate-180')} />
+            {showAllBrands ? 'See less' : 'See more'}
+          </button>
+        )}
       </FilterSection>
 
       <FilterSection title="Color">
-        <div className="flex flex-wrap gap-3">
+        <div className="grid grid-cols-8 gap-2">
           {colorGroups.map((group) => {
             const isSelected = group.rawValues.some((v) => (filters.colors ?? []).includes(v));
             const needsBorder = isLightColor(group.hex);
@@ -134,22 +150,16 @@ export function ProductFilters({ facets, filters, onChange }: ProductFiltersProp
               <button
                 key={group.displayName}
                 onClick={() => toggleColorGroup(group)}
-                className="group flex items-center gap-1.5"
                 aria-pressed={isSelected}
+                aria-label={group.displayName}
                 title={group.displayName}
+                className={cn(
+                  'flex h-7 w-7 items-center justify-center rounded-md transition-transform hover:scale-110',
+                  isSelected ? 'ring-2 ring-offset-1 ring-[#FF6B00] dark:ring-offset-primary-800' : needsBorder ? 'border border-[#D1D5DB]' : 'border border-black/5',
+                )}
+                style={{ backgroundColor: group.hex }}
               >
-                <span
-                  className={cn(
-                    'flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-transform duration-150 group-hover:scale-110 group-hover:shadow-md',
-                    isSelected ? 'border-2 border-[#FF6B00]' : needsBorder ? 'border border-[#D1D5DB]' : 'border border-black/5',
-                  )}
-                  style={{ backgroundColor: group.hex }}
-                >
-                  {isSelected && <Check size={11} strokeWidth={3} className={needsBorder ? 'text-black/70' : 'text-white'} />}
-                </span>
-                <span className={cn('text-sm font-medium', isSelected ? 'text-accent-700 dark:text-accent-400' : 'text-primary-700 group-hover:text-accent-600 dark:text-primary-200')}>
-                  {group.displayName}
-                </span>
+                {isSelected && <Check size={13} strokeWidth={3} className={needsBorder ? 'text-black/70' : 'text-white'} />}
               </button>
             );
           })}
@@ -163,8 +173,10 @@ export function ProductFilters({ facets, filters, onChange }: ProductFiltersProp
               key={size.value}
               onClick={() => toggleArrayValue('sizes', size.value)}
               className={cn(
-                'flex h-8 min-w-[2rem] items-center justify-center rounded-md border px-2 text-xs',
-                (filters.sizes ?? []).includes(size.value) ? 'border-accent bg-accent-50 text-accent-700 dark:bg-accent-900/30' : 'border-primary-200 dark:border-primary-600',
+                'flex h-9 min-w-[2.75rem] items-center justify-center rounded-full border px-3 text-sm font-medium transition-colors',
+                (filters.sizes ?? []).includes(size.value)
+                  ? 'border-accent bg-accent-50 text-accent-700 dark:bg-accent-900/30'
+                  : 'border-primary-300 text-primary-700 hover:border-primary-400 dark:border-primary-600 dark:text-primary-200 dark:hover:border-primary-500',
               )}
             >
               {size.value}

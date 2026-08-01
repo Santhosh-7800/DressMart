@@ -51,6 +51,15 @@ async function waitForFirestore(deadline: number): Promise<boolean> {
   return false;
 }
 
+/** Spawns the periodic safety-net exporter (scripts/autoExportEmulator.ts) — detached, so it
+ *  outlives this script and keeps running for as long as the emulator does. Safe to call every
+ *  time `npm run dev` starts, even when the emulator was already running from an earlier session:
+ *  the exporter's own PID lockfile makes a duplicate instance a no-op. */
+function startAutoExporter(): void {
+  const child = spawn('npx', ['tsx', 'scripts/autoExportEmulator.ts'], { detached: true, stdio: 'ignore', shell: true });
+  child.unref();
+}
+
 async function main() {
   if (!usingEmulator()) {
     console.log('✔ Using a real Firebase project — skipping local emulator autostart.');
@@ -59,6 +68,7 @@ async function main() {
 
   if (await isPortOpen(FIRESTORE_PORT, HOST)) {
     console.log('✔ Firestore emulator already running — reusing it.');
+    startAutoExporter();
     return;
   }
 
@@ -89,6 +99,7 @@ async function main() {
     return;
   }
   console.log('✔ Firestore emulator is up.');
+  startAutoExporter();
 }
 
 main().catch((error) => {

@@ -104,4 +104,11 @@ export const queryKeys = {
     recentOrders: (maxDocs: number) => ['seller', 'recent-orders', maxDocs] as const,
     platformSettings: ['seller', 'platform-settings'] as const,
   },
+  staff: {
+    roster: (sellerId: string) => ['staff', 'roster', sellerId] as const,
+    profile: (staffId: string) => ['staff', 'profile', staffId] as const,
+    permissions: (staffId: string) => ['staff', 'permissions', staffId] as const,
+    activity: (sellerId: string) => ['staff', 'activity', sellerId] as const,
+    ownActivity: (staffId: string) => ['staff', 'own-activity', staffId] as const,
+  },
 } as const;

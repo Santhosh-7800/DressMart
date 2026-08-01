@@ -19,10 +19,16 @@
  *
  * Deliberately only ever targets the local Firestore emulator (see EnsureSeededOptions.emulatorHost)
  * — never a real project, even if GOOGLE_APPLICATION_CREDENTIALS happens to be set in the shell.
+ *
+ * Checks `_meta/catalog_seed`'s `demoSeedDisabled` field before anything else — set once you've
+ * deliberately emptied the demo catalog (e.g. to replace it with real products) so it doesn't get
+ * silently refilled the next time `npm run dev` runs. An empty `products` collection alone isn't
+ * enough signal for that: it's also the state of a genuinely fresh checkout, where auto-seeding is
+ * exactly the right thing to do.
  */
 import 'dotenv/config';
 
-export type SeedOutcome = 'already-seeded' | 'seeded' | 'unreachable';
+export type SeedOutcome = 'already-seeded' | 'seeded' | 'unreachable' | 'demo-seed-disabled';
 
 export interface SeedCheckResult {
   outcome: SeedOutcome;
@@ -82,6 +88,21 @@ async function run({
   // this is what actually closes the "predev ran before the emulator finished starting" race.
   for (;;) {
     try {
+      // Deliberately emptied on purpose (see _meta/catalog_seed) — e.g. real products are about to
+      // replace the demo catalog via the Seller Dashboard. An empty `products` collection alone
+      // isn't enough signal to skip seeding (that's also true on a completely fresh checkout, where
+      // auto-seeding is exactly what should happen), so this sentinel is what tells them apart.
+      const sentinel = await db.collection('_meta').doc('catalog_seed').get();
+      if (sentinel.exists && sentinel.data()?.demoSeedDisabled) {
+        if (!quiet) {
+          console.log(
+            '✔ Demo auto-seed is disabled (_meta/catalog_seed.demoSeedDisabled) — leaving the ' +
+              'catalog as-is instead of refilling it. Delete that field/doc to re-enable.',
+          );
+        }
+        return { outcome: 'demo-seed-disabled' };
+      }
+
       const snap = await db.collection('products').limit(1).get();
       if (!snap.empty) {
         if (!quiet) console.log('✔ Catalog check: products already exist — skipping auto-seed.');

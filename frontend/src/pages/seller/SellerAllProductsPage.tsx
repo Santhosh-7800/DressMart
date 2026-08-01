@@ -114,8 +114,9 @@ export function SellerAllProductsPage() {
     return acc;
   }, {});
 
-  const handleDelete = (id: string, name: string) => {
-    if (confirm(`Delete "${name}"? This cannot be undone.`)) remove.mutate(id);
+  const handleDelete = (product: Product) => {
+    if (confirm(`Delete "${product.name}"? This cannot be undone.`))
+      remove.mutate({ productId: product.id, sellerId: product.seller_id, productName: product.name });
   };
 
   const handleToggleDeal = (product: Product) => {
@@ -264,7 +265,7 @@ export function SellerAllProductsPage() {
                       <ProductRowActions
                         product={product}
                         onToggleHidden={() => setStatus.mutate({ productId: product.id, status: product.status === 'hidden' ? 'active' : 'hidden' })}
-                        onDelete={() => handleDelete(product.id, product.name)}
+                        onDelete={() => handleDelete(product)}
                       />
                     </td>
                   </tr>
@@ -309,7 +310,7 @@ export function SellerAllProductsPage() {
                     <ProductRowActions
                       product={product}
                       onToggleHidden={() => setStatus.mutate({ productId: product.id, status: product.status === 'hidden' ? 'active' : 'hidden' })}
-                      onDelete={() => handleDelete(product.id, product.name)}
+                      onDelete={() => handleDelete(product)}
                     />
                   </div>
                 </Card>

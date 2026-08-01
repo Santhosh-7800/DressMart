@@ -6,10 +6,27 @@ service firebase.storage {
       return request.auth != null;
     }
 
-    // Product photos — publicly readable, writable only by the owning seller (path-scoped by uid).
+    // Cross-service read of the caller's own users/{uid} profile — lets a staff account (whose
+    // uid never equals the store's seller_id) upload under that store's own path when they have
+    // the upload_images permission. See firestore.rules' matching staffCan()/staffSellerId()
+    // pattern; this is the Storage-side equivalent, since Storage rules can't share functions with
+    // Firestore rules and must call across via firestore.get() instead of a plain get().
+    function callerProfile() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+    }
+    function isActiveStaffFor(sellerId) {
+      return isSignedIn() && callerProfile().role == 'staff' && callerProfile().staff_status == 'active' && callerProfile().seller_id == sellerId;
+    }
+    function staffCanUploadImages() {
+      return firestore.get(/databases/(default)/documents/staff_permissions/$(request.auth.uid)).data.upload_images == true;
+    }
+
+    // Product photos — publicly readable, writable by the owning seller OR by a staff account
+    // with the upload_images permission scoped to that same store (path-scoped by sellerId, not
+    // by whoever the signed-in uploader actually is).
     match /products/{sellerId}/{allPaths=**} {
       allow read: if true;
-      allow write: if isSignedIn() && request.auth.uid == sellerId
+      allow write: if isSignedIn() && (request.auth.uid == sellerId || (isActiveStaffFor(sellerId) && staffCanUploadImages()))
         && request.resource.size < 8 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
     }

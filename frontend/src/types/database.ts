@@ -5,10 +5,14 @@
 
 export type Gender = 'men' | 'kids';
 
-/** Head Seller is a single, designated seller account with extra platform-management powers — see lib/roles.ts. */
-export type UserRole = 'buyer' | 'seller' | 'head_seller';
+/** Head Seller is a single, designated seller account with extra platform-management powers — see
+ *  lib/roles.ts. Staff are employees created by the Head Seller to help run its store under
+ *  granular, individually-assignable permissions — see StaffPermissions below. */
+export type UserRole = 'buyer' | 'seller' | 'head_seller' | 'staff';
 
 export type SellerStatus = 'pending' | 'approved' | 'rejected' | 'suspended';
+
+export type StaffStatus = 'active' | 'disabled';
 
 export interface Profile {
   id: string;
@@ -27,6 +31,13 @@ export interface Profile {
   seller_approved_at?: string | null;
   /** Set when seller_status is 'suspended' or 'rejected' — shown back to the seller. */
   seller_status_reason?: string | null;
+  /** Present only when role is 'staff' — the Head Seller's uid this staff account was created
+   *  under. Every product/order/inventory/return a staff member touches is scoped to this id
+   *  (see lib/roles.ts's effectiveSellerId), never their own uid. */
+  seller_id?: string;
+  staff_status?: StaffStatus;
+  /** Set when staff_status is 'disabled' — shown back to the staff member. */
+  staff_status_reason?: string | null;
   /** Web Push (FCM) registration tokens for this user's browsers — appended via arrayUnion by useFcmToken, one entry per opted-in browser/device. */
   fcm_tokens?: string[];
   /** Shop branding/logistics — present only for seller/head_seller, same as store_name/gst_number. */
@@ -52,6 +63,64 @@ export interface ShopAddress {
   state: string;
   pincode: string;
   landmark: string | null;
+}
+
+/** One togglable capability a Head Seller can grant a staff account — see `staff_permissions/{staffId}`. */
+export type StaffPermissionKey =
+  | 'add_products'
+  | 'edit_products'
+  | 'delete_products'
+  | 'manage_inventory'
+  | 'upload_images'
+  | 'process_orders'
+  | 'update_order_status'
+  | 'approve_returns'
+  | 'reply_to_customers'
+  | 'view_reports';
+
+/** `staff_permissions/{staffId}` — one doc per staff account, every key defaulting to false until
+ *  the Head Seller grants it. Read by both firestore.rules (gating writes) and the Staff Dashboard
+ *  nav (hiding actions the staff member can't perform). */
+export type StaffPermissions = Record<StaffPermissionKey, boolean> & {
+  staff_id: string;
+  updated_at: string;
+};
+
+/** `staff/{staffId}` — extended profile fields for a staff account, separate from the auth-linked
+ *  `users/{staffId}` doc (which only carries what login/role-gating needs). */
+export interface StaffProfile {
+  id: string;
+  /** The Head Seller's uid this staff account works under — same value as Profile.seller_id. */
+  seller_id: string;
+  employee_id: string | null;
+  designation: string;
+  department: string | null;
+  status: StaffStatus;
+  status_reason: string | null;
+  /** uid of the Head Seller who created this account. */
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type StaffActivityAction =
+  | 'login'
+  | 'product_created'
+  | 'product_updated'
+  | 'product_deleted';
+
+/** `staff_activity/{id}` — append-only audit log of staff-performed actions, powering both the
+ *  Head Seller's Activity Logs view and each staff member's own "recent activity" list. */
+export interface StaffActivity {
+  id: string;
+  seller_id: string;
+  staff_id: string;
+  staff_name: string;
+  action: StaffActivityAction;
+  target_type: 'product' | 'session' | null;
+  target_id: string | null;
+  target_label: string | null;
+  created_at: string;
 }
 
 export interface Brand {
@@ -176,6 +245,16 @@ export interface Product {
   thumbnailUrl?: string;
   created_at: string;
   updated_at: string;
+  /** uid of whoever actually created this doc — the signed-in seller/head-seller for a normal
+   *  self-added product, or a staff member's own uid when added on the store's behalf. Distinct
+   *  from `seller_id`, which is always the owning store and never changes to a staff account. */
+  created_by?: string | null;
+  /** Present only when a staff account (not the seller themselves) created/last touched this
+   *  product — denormalized name alongside the id so history reads fine even if the staff account
+   *  is later removed. */
+  staff_id?: string | null;
+  staff_name?: string | null;
+  updated_by?: string | null;
   images: ProductImage[];
   variants: ProductVariant[];
 }
@@ -471,6 +550,23 @@ export interface SellerRequest {
   reviewed_at: string | null;
   reviewed_by: string | null;
   rejection_reason: string | null;
+}
+
+/**
+ * `user_activity/{uid}` — a signed-in user's lightweight personalization signals, one doc per
+ * user so it roams across devices/browsers. Guests keep using localStorage (see
+ * lib/guestId.ts) — this collection only exists for authenticated uids, created lazily on first
+ * write rather than at signup, since a brand-new account has nothing to record yet.
+ */
+export interface UserActivity {
+  id: string;
+  /** Most-recent-first, deduped by product, capped — see userActivityService.MAX_RECENTLY_VIEWED. */
+  recently_viewed: { product_id: string; viewed_at: string }[];
+  /** Most-recent-first, deduped by slug, capped — see userActivityService.MAX_CATEGORY_HISTORY. */
+  category_history: string[];
+  /** Most-recent-first, deduped case-insensitively, capped — see userActivityService.MAX_RECENT_SEARCHES. */
+  recent_searches: string[];
+  updated_at: string;
 }
 
 /** Singleton doc (`platform_settings/config`) — Head Seller's Platform Settings page. */

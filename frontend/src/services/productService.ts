@@ -104,6 +104,8 @@ function matchesRemainingFilters(p: Product, filters: ProductFilters): boolean {
   if (filters.brandIds?.length && !filters.brandIds.includes(p.brand_id)) return false;
   if (filters.colors?.length && !p.variants.some((v) => filters.colors!.includes(v.color))) return false;
   if (filters.sizes?.length && !p.variants.some((v) => filters.sizes!.includes(v.size))) return false;
+  if (filters.occasions?.length && !filters.occasions.includes(p.specifications.occasion ?? '')) return false;
+  if (filters.patterns?.length && !filters.patterns.includes(p.specifications.pattern ?? '')) return false;
   if (filters.minPrice !== undefined && p.price < filters.minPrice) return false;
   if (filters.maxPrice !== undefined && p.price > filters.maxPrice) return false;
   if (filters.minRating !== undefined && p.rating < filters.minRating) return false;
@@ -264,6 +266,10 @@ export const productService = {
     const brandCounts = new Map<string, number>();
     const colorCounts = new Map<string, number>();
     const sizeCounts = new Map<string, number>();
+    const occasionCounts = new Map<string, number>();
+    const occasionSampleImage = new Map<string, string>();
+    const patternCounts = new Map<string, number>();
+    const patternSampleImage = new Map<string, string>();
     let min = Infinity;
     let max = 0;
 
@@ -273,6 +279,16 @@ export const productService = {
         colorCounts.set(v.color, (colorCounts.get(v.color) ?? 0) + 1);
         sizeCounts.set(v.size, (sizeCounts.get(v.size) ?? 0) + 1);
       });
+      const occasion = p.specifications.occasion;
+      if (occasion) {
+        occasionCounts.set(occasion, (occasionCounts.get(occasion) ?? 0) + 1);
+        if (!occasionSampleImage.has(occasion)) occasionSampleImage.set(occasion, p.coverImage);
+      }
+      const pattern = p.specifications.pattern;
+      if (pattern) {
+        patternCounts.set(pattern, (patternCounts.get(pattern) ?? 0) + 1);
+        if (!patternSampleImage.has(pattern)) patternSampleImage.set(pattern, p.coverImage);
+      }
       min = Math.min(min, p.price);
       max = Math.max(max, p.price);
     });
@@ -285,6 +301,12 @@ export const productService = {
         .sort((a, b) => b.count - a.count),
       colors: [...colorCounts.entries()].map(([value, count]) => ({ value, count })).sort((a, b) => b.count - a.count),
       sizes: [...sizeCounts.entries()].map(([value, count]) => ({ value, count })).sort((a, b) => b.count - a.count),
+      occasions: [...occasionCounts.entries()]
+        .map(([value, count]) => ({ value, count, sampleImageUrl: occasionSampleImage.get(value) }))
+        .sort((a, b) => b.count - a.count),
+      patterns: [...patternCounts.entries()]
+        .map(([value, count]) => ({ value, count, sampleImageUrl: patternSampleImage.get(value) }))
+        .sort((a, b) => b.count - a.count),
       priceRange: scoped.length > 0 ? { min, max } : { min: 0, max: 0 },
     };
   },
@@ -375,8 +397,10 @@ export const productService = {
   },
 
   /** Creates the product doc + its paired inventory doc together. seller_id/seller_name are always
-   *  taken from the signed-in seller, never trusted from the form (see firestore.rules). */
-  async create(sellerId: string, sellerName: string, input: SellerProductInput): Promise<Product> {
+   *  taken from the signed-in seller, never trusted from the form (see firestore.rules). `actor` is
+   *  present only when a staff member (not the seller themselves) performed the action — it never
+   *  changes who *owns* the product (seller_id/seller_name), only who's recorded as having done it. */
+  async create(sellerId: string, sellerName: string, input: SellerProductInput, actor?: { id: string; name: string }): Promise<Product> {
     const ref = doc(collection(db, PRODUCTS_COLLECTION));
     const { variants, variantStock } = buildVariantsFromInput(input, ref.id);
     const images = buildImagesFromColors(input.colors, ref.id, input.name);
@@ -426,6 +450,10 @@ export const productService = {
       coverImage: images[0]?.url ?? '',
       created_at: now,
       updated_at: now,
+      created_by: actor?.id ?? sellerId,
+      staff_id: actor?.id ?? null,
+      staff_name: actor?.name ?? null,
+      updated_by: actor?.id ?? sellerId,
       images,
       variants,
     };
@@ -443,7 +471,7 @@ export const productService = {
    * stock is always taken directly from the submitted per-color sizeStock (the Inventory page is
    * for quick stock-only tweaks — editing the product here is the source of truth for the full grid).
    */
-  async update(productId: string, sellerId: string, sellerName: string, input: SellerProductInput): Promise<Product> {
+  async update(productId: string, sellerId: string, sellerName: string, input: SellerProductInput, actor?: { id: string; name: string }): Promise<Product> {
     const existing = await this.getById(productId);
     const { variants, variantStock } = buildVariantsFromInput(input, productId, existing?.variants ?? []);
     const images = buildImagesFromColors(input.colors, productId, input.name);
@@ -479,10 +507,15 @@ export const productService = {
       },
       tags: [...new Set(input.colors.map((c) => c.name.toLowerCase()))],
       updated_at: new Date().toISOString(),
+      updated_by: actor?.id ?? sellerId,
       coverImage: images[0]?.url ?? existing?.coverImage ?? '',
       images,
       variants,
     };
+    if (actor) {
+      updates.staff_id = actor.id;
+      updates.staff_name = actor.name;
+    }
     await updateDoc(doc(db, PRODUCTS_COLLECTION, productId), updates);
     await inventoryService.updateStock(productId, variantStock, input.low_stock_threshold);
 
@@ -614,6 +647,31 @@ export const brandService = {
 
   async featured(): Promise<Brand[]> {
     return (await this.list()).filter((b) => b.is_featured);
+  },
+
+  /** Head-Seller-only brand CRUD — powers SellerBrandsPage. Mirrors categoryService's create/
+   *  update/remove exactly, including the module-level catalog cache invalidation. */
+  async create(input: Omit<Brand, 'id'>): Promise<Brand> {
+    const ref = doc(collection(db, 'brands'));
+    await setDoc(ref, input);
+    primeCatalogCaches();
+    return { id: ref.id, ...input };
+  },
+
+  async update(brandId: string, updates: Partial<Omit<Brand, 'id'>>): Promise<void> {
+    await updateDoc(doc(db, 'brands', brandId), updates);
+    primeCatalogCaches();
+  },
+
+  /** Refuses if any product still references this brand — orphaning brand_id silently breaks
+   *  every read site that joins it in, rather than crashing anything. */
+  async remove(brandId: string): Promise<void> {
+    const inUse = await getDocs(query(collection(db, PRODUCTS_COLLECTION), where('brand_id', '==', brandId), fsLimit(1)));
+    if (!inUse.empty) {
+      throw new Error('This brand still has products assigned to it. Reassign or remove those products first.');
+    }
+    await deleteDoc(doc(db, 'brands', brandId));
+    primeCatalogCaches();
   },
 };
 

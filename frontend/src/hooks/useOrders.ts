@@ -5,7 +5,7 @@ import { orderService, type AdvanceStatusInput } from '@/services/orderService';
 import { queryKeys } from '@/lib/queryClient';
 import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 import { useAuth } from '@/contexts/AuthContext';
-import { isHeadSeller } from '@/lib/roles';
+import { effectiveSellerId, isHeadSeller } from '@/lib/roles';
 import type { Order } from '@/types';
 
 /** Buyer's own orders — one card per seller-scoped shipment; group by order_number/group_id for
@@ -113,7 +113,7 @@ export function useSellerOrders() {
       return;
     }
     setIsLoading(true);
-    const unsubscribe = orderService.subscribeForSeller(user.id, isHeadSeller(user.role), (data) => {
+    const unsubscribe = orderService.subscribeForSeller(effectiveSellerId(user), isHeadSeller(user.role), (data) => {
       setOrders(data);
       setIsLoading(false);
     });

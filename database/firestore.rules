@@ -9,6 +9,12 @@ rules_version = '2';
 //   platform_settings. Cross-document transitions (approving a seller_request AND flipping the
 //   applicant's profile in the same operation) are done by Cloud Functions running with admin
 //   privileges, not by these rules — see functions/src for reviewSellerRequest/suspendSeller.
+// - staff: an employee created by (and scoped to) one Head Seller's store. Can touch
+//   products/inventory/orders/returns/reviews owned by that store ONLY to the extent
+//   staff_permissions/{uid} grants (add/edit/delete products, manage inventory, process orders,
+//   approve returns, reply to customers) — see staffCan() below. Account lifecycle (create/
+//   delete/reset password) goes through Cloud Functions exactly like sellers; permission/status
+//   edits are simple enough to allow as direct Head-Seller-only Firestore writes.
 //
 // NOTE: this is a solid starting point, not a substitute for a security review before going to
 // production — in particular, order/coupon totals here are trusted from the client on write;
@@ -39,6 +45,25 @@ service cloud.firestore {
     }
     function isOwner(userId) {
       return isSignedIn() && uid() == userId;
+    }
+    function isStaff() {
+      return isSignedIn() && role() == 'staff';
+    }
+    function isActiveStaff() {
+      return isStaff() && userData().staff_status == 'active';
+    }
+    // The Head Seller's uid a staff account was created under (Profile.seller_id) — every
+    // product/order/inventory/return a staff member may touch is scoped to this id, never their
+    // own uid. Denormalized onto users/{uid} at creation (see functions/src/callables/addStaff)
+    // specifically so this never needs a second document read.
+    function staffSellerId() {
+      return userData().seller_id;
+    }
+    function staffPermissions() {
+      return get(/databases/$(database)/documents/staff_permissions/$(uid())).data;
+    }
+    function staffCan(permission) {
+      return isActiveStaff() && staffPermissions()[permission] == true;
     }
 
     // Singleton flag for the one-time Head Seller setup flow (see functions/src/callables/
@@ -79,30 +104,45 @@ service cloud.firestore {
 
     match /products/{productId} {
       allow read: if true;
-      allow create: if isApprovedSeller() && request.resource.data.seller_id == uid();
-      allow update, delete: if isHeadSeller() || (isApprovedSeller() && resource.data.seller_id == uid());
+      allow create: if (isApprovedSeller() && request.resource.data.seller_id == uid()) ||
+        (staffCan('add_products') && request.resource.data.seller_id == staffSellerId());
+      allow update: if isHeadSeller() ||
+        (isApprovedSeller() && resource.data.seller_id == uid()) ||
+        (staffCan('edit_products') && resource.data.seller_id == staffSellerId());
+      allow delete: if isHeadSeller() ||
+        (isApprovedSeller() && resource.data.seller_id == uid()) ||
+        (staffCan('delete_products') && resource.data.seller_id == staffSellerId());
     }
 
     match /inventory/{productId} {
       allow read: if true;
-      allow write: if isHeadSeller() || (isApprovedSeller() && resource.data.seller_id == uid());
-      allow create: if isApprovedSeller() && request.resource.data.seller_id == uid();
+      allow write: if isHeadSeller() ||
+        (isApprovedSeller() && resource.data.seller_id == uid()) ||
+        (staffCan('manage_inventory') && resource.data.seller_id == staffSellerId());
+      allow create: if (isApprovedSeller() && request.resource.data.seller_id == uid()) ||
+        (staffCan('add_products') && request.resource.data.seller_id == staffSellerId());
     }
 
     match /orders/{orderId} {
-      allow read: if isSignedIn() && (resource.data.buyer_id == uid() || resource.data.seller_id == uid() || isHeadSeller());
+      allow read: if isSignedIn() && (resource.data.buyer_id == uid() || resource.data.seller_id == uid() || isHeadSeller() ||
+        (isStaff() && resource.data.seller_id == staffSellerId()));
       allow create: if isSignedIn() && request.resource.data.buyer_id == uid();
       // Buyers may only move their own order to 'cancelled'; sellers/head-seller can advance any
-      // other status field on orders they own / all orders respectively.
+      // other status field on orders they own / all orders respectively; a staff member needs the
+      // update_order_status permission and is scoped to their own store's orders.
       allow update: if isHeadSeller() ||
         (isSeller() && resource.data.seller_id == uid()) ||
-        (resource.data.buyer_id == uid() && request.resource.data.status == 'cancelled');
+        (resource.data.buyer_id == uid() && request.resource.data.status == 'cancelled') ||
+        (staffCan('update_order_status') && resource.data.seller_id == staffSellerId());
     }
 
     match /returns/{returnId} {
-      allow read: if isSignedIn() && (resource.data.buyer_id == uid() || resource.data.seller_id == uid() || isHeadSeller());
+      allow read: if isSignedIn() && (resource.data.buyer_id == uid() || resource.data.seller_id == uid() || isHeadSeller() ||
+        (isStaff() && resource.data.seller_id == staffSellerId()));
       allow create: if isSignedIn() && request.resource.data.buyer_id == uid();
-      allow update: if isHeadSeller() || (isSeller() && resource.data.seller_id == uid());
+      allow update: if isHeadSeller() ||
+        (isSeller() && resource.data.seller_id == uid()) ||
+        (staffCan('approve_returns') && resource.data.seller_id == staffSellerId());
     }
 
     match /exchanges/{exchangeId} {
@@ -153,7 +193,9 @@ service cloud.firestore {
       // Seller reply: the owning seller of the reviewed product (or head-seller) may update ONLY
       // the seller_reply field — the buyer-authored fields stay immutable to them.
       allow update: if isSignedIn() &&
-        (isHeadSeller() || get(/databases/$(database)/documents/products/$(resource.data.product_id)).data.seller_id == uid()) &&
+        (isHeadSeller() ||
+          get(/databases/$(database)/documents/products/$(resource.data.product_id)).data.seller_id == uid() ||
+          (staffCan('reply_to_customers') && get(/databases/$(database)/documents/products/$(resource.data.product_id)).data.seller_id == staffSellerId())) &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seller_reply']);
       allow delete: if isSignedIn() && resource.data.user_id == uid();
     }
@@ -161,6 +203,33 @@ service cloud.firestore {
     match /platform_settings/{docId} {
       allow read: if true;
       allow write: if isHeadSeller();
+    }
+
+    // Staff Management — see functions/src/callables/addStaff|removeStaff|resetStaffPassword for
+    // the account-creation/deletion path (Admin SDK, bypasses these rules entirely). Direct client
+    // writes here are limited to the Head Seller editing a single doc's simple fields (permissions,
+    // designation, status) — never anything cross-document.
+    match /staff/{staffId} {
+      allow read: if isOwner(staffId) || isHeadSeller();
+      allow write: if isHeadSeller();
+    }
+
+    match /staff_permissions/{staffId} {
+      allow read: if isOwner(staffId) || isHeadSeller();
+      allow write: if isHeadSeller();
+    }
+
+    match /staff_activity/{activityId} {
+      allow read: if isHeadSeller() || (isSignedIn() && resource.data.staff_id == uid());
+      allow create: if isHeadSeller() || (isActiveStaff() && request.resource.data.staff_id == uid());
+    }
+
+    // Signed-in-only personalization signals (recently viewed, category history, recent
+    // searches) — see services/userActivityService.ts. Guests keep using localStorage instead,
+    // so this collection never needs a "create if it's your own new doc" case; it's always the
+    // owner reading/overwriting their own single doc.
+    match /user_activity/{userId} {
+      allow read, write: if isOwner(userId);
     }
   }
 }

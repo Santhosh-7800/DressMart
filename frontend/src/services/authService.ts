@@ -82,6 +82,10 @@ export const authService = {
       await firebaseSignOut(auth);
       throw new Error('Your seller account has been suspended. Contact the Head Seller.');
     }
+    if (profile.staff_status === 'disabled') {
+      await firebaseSignOut(auth);
+      throw new Error('Your staff account has been disabled. Contact the Head Seller.');
+    }
     return profile;
   },
 

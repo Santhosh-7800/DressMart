@@ -1,13 +1,15 @@
 import { Suspense, useEffect } from 'react';
-import { Routes, Route, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { MainLayout } from '@/layouts/MainLayout';
 import { AuthLayout } from '@/layouts/AuthLayout';
 import { AccountLayout } from '@/layouts/AccountLayout';
 import { SellerLayout } from '@/layouts/SellerLayout';
+import { StaffLayout } from '@/layouts/StaffLayout';
 import { ProtectedRoute } from './ProtectedRoute';
 import { RequireSeller } from './RequireSeller';
 import { RequireHeadSeller } from './RequireHeadSeller';
+import { RequireStaff } from './RequireStaff';
 import { lazyWithRetry } from '@/lib/lazyWithRetry';
 import { DEEP_LINK_EVENT } from '@/lib/deepLinks';
 
@@ -73,9 +75,15 @@ const SellerApplyPage = lazyWithRetry(() => import('@/pages/seller/SellerApplyPa
 const SellerLoginPage = lazyWithRetry(() => import('@/pages/seller/SellerLoginPage').then((m) => ({ default: m.SellerLoginPage })));
 const HeadSellerSetupPage = lazyWithRetry(() => import('@/pages/seller/HeadSellerSetupPage').then((m) => ({ default: m.HeadSellerSetupPage })));
 const SellerCategoriesPage = lazyWithRetry(() => import('@/pages/seller/SellerCategoriesPage').then((m) => ({ default: m.SellerCategoriesPage })));
+const SellerBrandsPage = lazyWithRetry(() => import('@/pages/seller/SellerBrandsPage').then((m) => ({ default: m.SellerBrandsPage })));
 const SellerBannersPage = lazyWithRetry(() => import('@/pages/seller/SellerBannersPage').then((m) => ({ default: m.SellerBannersPage })));
 const SellerReviewsPage = lazyWithRetry(() => import('@/pages/seller/SellerReviewsPage').then((m) => ({ default: m.SellerReviewsPage })));
 const SellerNotificationsPage = lazyWithRetry(() => import('@/pages/seller/SellerNotificationsPage').then((m) => ({ default: m.SellerNotificationsPage })));
+const SellerStaffPage = lazyWithRetry(() => import('@/pages/seller/SellerStaffPage').then((m) => ({ default: m.SellerStaffPage })));
+
+// Staff pages
+const StaffLoginPage = lazyWithRetry(() => import('@/pages/staff/StaffLoginPage').then((m) => ({ default: m.StaffLoginPage })));
+const StaffDashboardPage = lazyWithRetry(() => import('@/pages/staff/StaffDashboardPage').then((m) => ({ default: m.StaffDashboardPage })));
 
 function RouteFallback() {
   return (
@@ -160,6 +168,7 @@ export function AppRoutes() {
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/seller/login" element={<SellerLoginPage />} />
           <Route path="/seller/setup" element={<HeadSellerSetupPage />} />
+          <Route path="/staff/login" element={<StaffLoginPage />} />
         </Route>
 
         {/* Seller Dashboard Routes */}
@@ -180,16 +189,43 @@ export function AppRoutes() {
             {/* Head Seller (Admin) only routes */}
             <Route element={<RequireHeadSeller />}>
               <Route path="/seller/sellers" element={<SellerSellersPage />} />
+              <Route path="/seller/staff" element={<SellerStaffPage />} />
               <Route path="/seller/all-products" element={<SellerAllProductsPage />} />
               <Route path="/seller/analytics" element={<SellerAnalyticsPage />} />
               <Route path="/seller/reports" element={<SellerReportsPage />} />
               <Route path="/seller/coupons" element={<SellerCouponsPage />} />
               <Route path="/seller/categories" element={<SellerCategoriesPage />} />
+              <Route path="/seller/brands" element={<SellerBrandsPage />} />
               <Route path="/seller/banners" element={<SellerBannersPage />} />
               <Route path="/seller/platform-settings" element={<SellerPlatformSettingsPage />} />
             </Route>
           </Route>
         </Route>
+
+        {/* Staff Dashboard Routes — a staff account's nav (see StaffLayout) only shows the sections
+            its permissions grant, but the underlying product/inventory/order/return pages are the
+            exact same components a seller uses (see SellerProductFormPage/productService for how
+            seller_id resolution and created_by/staff_id attribution differ for a staff actor). */}
+        <Route element={<RequireStaff />}>
+          <Route element={<StaffLayout />}>
+            <Route path="/staff/dashboard" element={<StaffDashboardPage />} />
+            <Route path="/staff/products" element={<SellerProductsPage />} />
+            <Route path="/staff/products/new" element={<SellerProductFormPage />} />
+            <Route path="/staff/products/:id/edit" element={<SellerProductFormPage />} />
+            <Route path="/staff/inventory" element={<SellerInventoryPage />} />
+            <Route path="/staff/orders" element={<SellerOrdersPage />} />
+            <Route path="/staff/returns" element={<SellerReturnsPage />} />
+          </Route>
+        </Route>
+
+        {/* Bare-path convenience aliases — /admin has no dedicated app (Head Seller IS a seller
+            account with extra nav items, see SellerLayout), so it just points at the same
+            dashboard entry point as a plain /seller shortcut would. Each target route's own guard
+            (RequireSeller/RequireStaff) handles the actual auth/role redirect from there — these
+            are pure path aliases, not a parallel auth check. */}
+        <Route path="/admin" element={<Navigate to="/seller/dashboard" replace />} />
+        <Route path="/seller" element={<Navigate to="/seller/dashboard" replace />} />
+        <Route path="/staff" element={<Navigate to="/staff/dashboard" replace />} />
 
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

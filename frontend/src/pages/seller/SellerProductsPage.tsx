@@ -2,18 +2,21 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Plus, Search, Eye, EyeOff, Trash2, Pencil, Copy, AlertTriangle, PackageSearch } from 'lucide-react';
+import { Plus, Search, Eye, EyeOff, Trash2, Pencil, Copy, Zap, AlertTriangle, PackageSearch } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Modal } from '@/components/ui/Modal';
 import { Pagination } from '@/components/ui/Pagination';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Card } from '@/components/ui/Card';
 import { useAuth } from '@/contexts/AuthContext';
-import { useSellerProducts, useSetProductStatus, useDeleteProduct, useDuplicateProduct } from '@/hooks/useSellerProducts';
+import { useSellerProducts, useSetProductStatus, useDeleteProduct, useDuplicateProduct, useSetProductDealOfDay } from '@/hooks/useSellerProducts';
+import { useStaffPermissions } from '@/hooks/useStaff';
 import { inventoryService } from '@/services/inventoryService';
 import { formatCurrency, cn } from '@/lib/utils';
+import { isStaffRole } from '@/lib/roles';
 import type { Product, ProductStatus } from '@/types';
 
 const PAGE_SIZE = 20;
@@ -44,35 +47,62 @@ const STATUS_LABEL: Record<ProductStatus, string> = {
  *  just embedded in two different layout containers. */
 function ProductRowActions({
   product,
+  basePath,
+  canEdit,
+  canDelete,
+  canOffer,
   onSetStatus,
   onDuplicate,
   onDelete,
+  onToggleDeal,
 }: {
   product: Product;
+  basePath: string;
+  canEdit: boolean;
+  canDelete: boolean;
+  canOffer: boolean;
   onSetStatus: (status: ProductStatus) => void;
   onDuplicate: () => void;
   onDelete: () => void;
+  onToggleDeal: () => void;
 }) {
   return (
     <div className="flex items-center justify-end gap-1">
-      <Link to={`/seller/products/${product.id}/edit`} className="tap-target-48 rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700" title="Edit" aria-label="Edit product">
-        <Pencil size={15} />
-      </Link>
-      {product.status === 'active' ? (
-        <button onClick={() => onSetStatus('hidden')} className="tap-target-48 rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700" title="Hide" aria-label="Hide product">
-          <EyeOff size={15} />
-        </button>
-      ) : (
-        <button onClick={() => onSetStatus('active')} className="tap-target-48 rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700" title="Publish" aria-label="Publish product">
-          <Eye size={15} />
+      {canEdit && (
+        <Link to={`${basePath}/products/${product.id}/edit`} className="tap-target-48 rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700" title="Edit" aria-label="Edit product">
+          <Pencil size={15} />
+        </Link>
+      )}
+      {canEdit &&
+        (product.status === 'active' ? (
+          <button onClick={() => onSetStatus('hidden')} className="tap-target-48 rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700" title="Hide" aria-label="Hide product">
+            <EyeOff size={15} />
+          </button>
+        ) : (
+          <button onClick={() => onSetStatus('active')} className="tap-target-48 rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700" title="Publish" aria-label="Publish product">
+            <Eye size={15} />
+          </button>
+        ))}
+      {canEdit && (
+        <button onClick={onDuplicate} className="tap-target-48 rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700" title="Duplicate" aria-label="Duplicate product">
+          <Copy size={15} />
         </button>
       )}
-      <button onClick={onDuplicate} className="tap-target-48 rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700" title="Duplicate" aria-label="Duplicate product">
-        <Copy size={15} />
-      </button>
-      <button onClick={onDelete} className="tap-target-48 rounded-lg p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20" title="Delete" aria-label="Delete product">
-        <Trash2 size={15} />
-      </button>
+      {canOffer && (
+        <button
+          onClick={onToggleDeal}
+          className={cn('tap-target-48 rounded-lg p-1.5 hover:bg-primary-100 dark:hover:bg-primary-700', product.is_deal_of_day && 'text-accent')}
+          title={product.is_deal_of_day ? 'Remove from Deal of the Day' : 'Add to Deal of the Day'}
+          aria-label={product.is_deal_of_day ? 'Remove from Deal of the Day' : 'Add to Deal of the Day'}
+        >
+          <Zap size={15} fill={product.is_deal_of_day ? 'currentColor' : 'none'} />
+        </button>
+      )}
+      {canDelete && (
+        <button onClick={onDelete} className="tap-target-48 rounded-lg p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20" title="Delete" aria-label="Delete product">
+          <Trash2 size={15} />
+        </button>
+      )}
     </div>
   );
 }
@@ -80,6 +110,15 @@ function ProductRowActions({
 export function SellerProductsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const isStaff = isStaffRole(user?.role);
+  const basePath = isStaff ? '/staff' : '/seller';
+  const { data: permissions } = useStaffPermissions();
+  // Permission gate only applies to staff — sellers/head-sellers keep full access, same as today.
+  const canAdd = !isStaff || Boolean(permissions?.add_products);
+  const canEdit = !isStaff || Boolean(permissions?.edit_products);
+  const canDelete = !isStaff || Boolean(permissions?.delete_products);
+  // Deal-of-Day ("Offers") isn't part of the staff permission set — sellers/head-sellers only.
+  const canOffer = !isStaff;
   const isPending = user?.seller_status === 'pending';
   const isSuspendedOrRejected = user?.seller_status === 'suspended' || user?.seller_status === 'rejected';
   const [search, setSearch] = useState('');
@@ -87,6 +126,8 @@ export function SellerProductsPage() {
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+  const [dealTarget, setDealTarget] = useState<Product | null>(null);
+  const [dealEndsAt, setDealEndsAt] = useState('');
 
   const { data: allProducts = [], isLoading: isLoadingProducts } = useSellerProducts();
   const { data: inventoryMap = {}, isLoading: isLoadingInventory } = useQuery({
@@ -98,6 +139,7 @@ export function SellerProductsPage() {
   const setStatus = useSetProductStatus();
   const remove = useDeleteProduct();
   const duplicate = useDuplicateProduct();
+  const setDealOfDay = useSetProductDealOfDay();
 
   const isLoading = isLoadingProducts || isLoadingInventory;
 
@@ -146,7 +188,12 @@ export function SellerProductsPage() {
     if (!confirm(`Delete ${selectedIds.size} product(s)? This cannot be undone.`)) return;
     setIsBulkProcessing(true);
     try {
-      await Promise.all([...selectedIds].map((id) => remove.mutateAsync(id)));
+      await Promise.all(
+        [...selectedIds].map((id) => {
+          const product = allProducts.find((p) => p.id === id);
+          return remove.mutateAsync({ productId: id, sellerId: product?.seller_id ?? '', productName: product?.name ?? '' });
+        }),
+      );
       setSelectedIds(new Set());
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Bulk delete failed');
@@ -158,12 +205,30 @@ export function SellerProductsPage() {
   const handleDuplicate = (product: Product) => {
     duplicate.mutate(
       { productId: product.id, sellerId: product.seller_id, sellerName: product.seller_name },
-      { onSuccess: (created) => navigate(`/seller/products/${created.id}/edit`) },
+      { onSuccess: (created) => navigate(`${basePath}/products/${created.id}/edit`) },
     );
   };
 
   const handleDelete = (product: Product) => {
-    if (confirm(`Delete "${product.name}"? This cannot be undone.`)) remove.mutate(product.id);
+    if (confirm(`Delete "${product.name}"? This cannot be undone.`))
+      remove.mutate({ productId: product.id, sellerId: product.seller_id, productName: product.name });
+  };
+
+  const handleToggleDeal = (product: Product) => {
+    if (product.is_deal_of_day) {
+      setDealOfDay.mutate({ productId: product.id, isDeal: false, dealEndsAt: null });
+    } else {
+      setDealTarget(product);
+      setDealEndsAt(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16));
+    }
+  };
+
+  const confirmDeal = () => {
+    if (!dealTarget) return;
+    setDealOfDay.mutate(
+      { productId: dealTarget.id, isDeal: true, dealEndsAt: new Date(dealEndsAt).toISOString() },
+      { onSuccess: () => setDealTarget(null) },
+    );
   };
 
   return (
@@ -171,8 +236,8 @@ export function SellerProductsPage() {
       <Seo title="Seller — Products" />
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">Products</h1>
-        {!isPending && !isSuspendedOrRejected && (
-          <Link to="/seller/products/new" className="btn-accent text-sm">
+        {!isPending && !isSuspendedOrRejected && canAdd && (
+          <Link to={`${basePath}/products/new`} className="btn-accent text-sm">
             <Plus size={15} /> Add Product
           </Link>
         )}
@@ -304,8 +369,13 @@ export function SellerProductsPage() {
                       <td className="p-3">
                         <ProductRowActions
                           product={product}
+                          basePath={basePath}
+                          canEdit={canEdit}
+                          canDelete={canDelete}
+                          canOffer={canOffer}
                           onSetStatus={(status) => setStatus.mutate({ productId: product.id, status })}
                           onDuplicate={() => handleDuplicate(product)}
+                          onToggleDeal={() => handleToggleDeal(product)}
                           onDelete={() => handleDelete(product)}
                         />
                       </td>
@@ -354,8 +424,13 @@ export function SellerProductsPage() {
                     <div className="mt-2 border-t border-primary-100 pt-2 dark:border-primary-700">
                       <ProductRowActions
                         product={product}
+                        basePath={basePath}
+                        canEdit={canEdit}
+                        canDelete={canDelete}
+                        canOffer={canOffer}
                         onSetStatus={(status) => setStatus.mutate({ productId: product.id, status })}
                         onDuplicate={() => handleDuplicate(product)}
+                        onToggleDeal={() => handleToggleDeal(product)}
                         onDelete={() => handleDelete(product)}
                       />
                     </div>
@@ -368,6 +443,28 @@ export function SellerProductsPage() {
       )}
 
       <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+
+      <Modal isOpen={Boolean(dealTarget)} onClose={() => setDealTarget(null)} title={`Add "${dealTarget?.name ?? ''}" to Deal of the Day`}>
+        <div className="space-y-4">
+          <label className="block text-sm font-medium text-primary-800 dark:text-primary-100">
+            Deal ends at
+            <input
+              type="datetime-local"
+              value={dealEndsAt}
+              onChange={(e) => setDealEndsAt(e.target.value)}
+              className="input-field mt-1.5 w-full"
+            />
+          </label>
+          <div className="flex gap-3">
+            <Button variant="outline" fullWidth onClick={() => setDealTarget(null)}>
+              Cancel
+            </Button>
+            <Button variant="accent" fullWidth onClick={confirmDeal} isLoading={setDealOfDay.isPending}>
+              Add to Deal of the Day
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

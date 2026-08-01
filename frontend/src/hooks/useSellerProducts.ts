@@ -1,18 +1,23 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { productService } from '@/services/productService';
+import { staffService } from '@/services/staffService';
 import { queryKeys } from '@/lib/queryClient';
 import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 import { useAuth } from '@/contexts/AuthContext';
+import { effectiveSellerId, isStaffRole } from '@/lib/roles';
 import type { ProductStatus, SellerProductInput } from '@/types';
 
-/** The signed-in seller's own products (any status) — powers SellerProductsPage / SellerInventoryPage. */
+/** The signed-in seller's own products (any status) — powers SellerProductsPage / SellerInventoryPage.
+ *  For a staff account this resolves to the Head Seller's store they work under, not their own uid
+ *  (see lib/roles.ts's effectiveSellerId) — staff never own products under their own identity. */
 export function useSellerProducts() {
   const { user } = useAuth();
+  const sellerId = effectiveSellerId(user);
   return useQuery({
-    queryKey: queryKeys.products.bySeller(user?.id ?? ''),
-    queryFn: () => productService.getBySeller(user!.id),
-    enabled: Boolean(user?.id),
+    queryKey: queryKeys.products.bySeller(sellerId),
+    queryFn: () => productService.getBySeller(sellerId),
+    enabled: Boolean(sellerId),
   });
 }
 
@@ -34,13 +39,24 @@ export function useCreateProduct() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ sellerId, sellerName, input }: { sellerId: string; sellerName: string; input: SellerProductInput }) =>
-      productService.create(sellerId, sellerName, input),
-    onSuccess: (_data, { sellerId }) => {
+    mutationFn: ({ sellerId, sellerName, input, actor }: { sellerId: string; sellerName: string; input: SellerProductInput; actor?: { id: string; name: string } }) =>
+      productService.create(sellerId, sellerName, input, actor),
+    onSuccess: (data, { sellerId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.products.bySeller(sellerId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.products.bySeller(user?.id ?? '') });
       queryClient.invalidateQueries({ queryKey: ['products', 'all-sellers'] });
       toast.success('Product created');
+      if (user && isStaffRole(user.role)) {
+        void staffService.logActivity({
+          sellerId,
+          staffId: user.id,
+          staffName: user.full_name,
+          action: 'product_created',
+          targetType: 'product',
+          targetId: data.id,
+          targetLabel: data.name,
+        });
+      }
     },
     onError: (error: Error) => toast.error(getFriendlyErrorMessage(error)),
   });
@@ -55,14 +71,31 @@ export function useUpdateProduct() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ productId, sellerId, sellerName, input }: { productId: string; sellerId: string; sellerName: string; input: SellerProductInput }) =>
-      productService.update(productId, sellerId, sellerName, input),
-    onSuccess: (_data, { sellerId }) => {
+    mutationFn: ({
+      productId,
+      sellerId,
+      sellerName,
+      input,
+      actor,
+    }: { productId: string; sellerId: string; sellerName: string; input: SellerProductInput; actor?: { id: string; name: string } }) =>
+      productService.update(productId, sellerId, sellerName, input, actor),
+    onSuccess: (data, { sellerId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.products.bySeller(sellerId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.products.bySeller(user?.id ?? '') });
       queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
       queryClient.invalidateQueries({ queryKey: ['products', 'all-sellers'] });
       toast.success('Product updated');
+      if (user && isStaffRole(user.role)) {
+        void staffService.logActivity({
+          sellerId,
+          staffId: user.id,
+          staffName: user.full_name,
+          action: 'product_updated',
+          targetType: 'product',
+          targetId: data.id,
+          targetLabel: data.name,
+        });
+      }
     },
     onError: (error: Error) => toast.error(getFriendlyErrorMessage(error)),
   });
@@ -119,12 +152,24 @@ export function useDeleteProduct() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (productId: string) => productService.remove(productId),
-    onSuccess: () => {
+    mutationFn: ({ productId }: { productId: string; sellerId: string; productName: string }) => productService.remove(productId),
+    onSuccess: (_data, { sellerId, productId, productName }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.products.bySeller(user?.id ?? '') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.products.bySeller(sellerId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
       queryClient.invalidateQueries({ queryKey: ['products', 'all-sellers'] });
       toast.success('Product deleted');
+      if (user && isStaffRole(user.role)) {
+        void staffService.logActivity({
+          sellerId,
+          staffId: user.id,
+          staffName: user.full_name,
+          action: 'product_deleted',
+          targetType: 'product',
+          targetId: productId,
+          targetLabel: productName,
+        });
+      }
     },
     onError: (error: Error) => toast.error(getFriendlyErrorMessage(error)),
   });

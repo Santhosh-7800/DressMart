@@ -11,6 +11,7 @@ import {
   Repeat,
   Settings,
   Users,
+  UserCog,
   BarChart3,
   FileBarChart,
   Ticket,
@@ -24,6 +25,7 @@ import {
   MessageSquare,
   Bell,
   FolderTree,
+  Tags,
   Image,
   type LucideIcon,
 } from 'lucide-react';
@@ -90,11 +92,13 @@ const BASE_NAV_ITEMS: NavItem[] = [
 
 const HEAD_SELLER_NAV_ITEMS: NavItem[] = [
   { to: '/seller/sellers', label: 'Seller Management', icon: Users },
+  { to: '/seller/staff', label: 'Staff Management', icon: UserCog },
   { to: '/seller/all-products', label: 'All Products', icon: Layers },
   { to: '/seller/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/seller/reports', label: 'Revenue Reports', icon: FileBarChart },
   { to: '/seller/coupons', label: 'Coupons', icon: Ticket },
   { to: '/seller/categories', label: 'Categories', icon: FolderTree },
+  { to: '/seller/brands', label: 'Brands', icon: Tags },
   { to: '/seller/banners', label: 'Banner Management', icon: Image },
   { to: '/seller/platform-settings', label: 'Platform Settings', icon: SlidersHorizontal },
 ];

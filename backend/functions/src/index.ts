@@ -14,6 +14,9 @@ export { addSeller } from './callables/addSeller';
 export { createHeadSeller } from './callables/createHeadSeller';
 export { resetSellerPassword } from './callables/resetSellerPassword';
 export { removeSeller } from './callables/removeSeller';
+export { addStaff } from './callables/addStaff';
+export { removeStaff } from './callables/removeStaff';
+export { resetStaffPassword } from './callables/resetStaffPassword';
 
 // Firestore triggers
 export { onOrderStatusChange } from './triggers/onOrderStatusChange';

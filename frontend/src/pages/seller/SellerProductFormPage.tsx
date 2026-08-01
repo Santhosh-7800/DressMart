@@ -10,11 +10,12 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSellerProduct, useCreateProduct, useUpdateProduct } from '@/hooks/useSellerProducts';
 import { useInventory } from '@/hooks/useInventory';
+import { useStaffPermissions } from '@/hooks/useStaff';
 import { brandService, categoryService, toColorInputs } from '@/services/productService';
 import { uploadProductImages, isAcceptedImageFile } from '@/services/storageService';
 import { MATERIALS, FITS, PATTERNS, OCCASIONS, COLOR_PALETTE } from '@/data/catalogSource';
 import { cn, calculateDiscount, generateSku } from '@/lib/utils';
-import { isHeadSeller } from '@/lib/roles';
+import { effectiveSellerId, isHeadSeller, isStaffRole } from '@/lib/roles';
 import type { Gender, ProductStatus, SellerProductColorInput, SellerProductInput } from '@/types';
 
 /**
@@ -349,6 +350,9 @@ export function SellerProductFormPage() {
   const isEditing = Boolean(id);
   const navigate = useNavigate();
   const { user } = useAuth();
+  const isStaff = isStaffRole(user?.role);
+  const basePath = isStaff ? '/staff' : '/seller';
+  const { data: permissions } = useStaffPermissions();
 
   const { data: existingProduct, isLoading: isLoadingProduct } = useSellerProduct(id);
   const { data: existingInventory, isLoading: isLoadingInventory } = useInventory(id);
@@ -416,6 +420,9 @@ export function SellerProductFormPage() {
   // always has access (e.g. editing another seller's product) regardless of their own seller_status.
   const isHeadSellerUser = isHeadSeller(user?.role);
   const isBlockedBySellerStatus = !isHeadSellerUser && (user?.seller_status === 'pending' || user?.seller_status === 'suspended');
+  // A staff account without the corresponding permission is blocked outright, even if they reach
+  // this page directly by URL rather than through the (already permission-gated) Products list.
+  const isBlockedByStaffPermission = isStaff && !(isEditing ? permissions?.edit_products : permissions?.add_products);
 
   const updateColor = (index: number, patch: Partial<ColorFormState>) => {
     setForm((prev) => ({ ...prev, colors: prev.colors.map((c, i) => (i === index ? { ...c, ...patch } : c)) }));
@@ -464,8 +471,11 @@ export function SellerProductFormPage() {
     }
     if (!user) return;
 
-    const sellerId = isEditing && existingProduct ? existingProduct.seller_id : user.id;
+    const sellerId = isEditing && existingProduct ? existingProduct.seller_id : effectiveSellerId(user);
     const sellerName = isEditing && existingProduct ? existingProduct.seller_name : user.store_name ?? user.full_name;
+    // Present only when a staff member (not the seller themselves) is performing this action —
+    // see productService.create/update's `actor` param and its created_by/staff_id/staff_name fields.
+    const actor = isStaff ? { id: user.id, name: user.full_name } : undefined;
 
     setIsSubmitting(true);
 
@@ -514,11 +524,11 @@ export function SellerProductFormPage() {
 
     try {
       if (isEditing && id) {
-        await updateProduct.mutateAsync({ productId: id, sellerId, sellerName, input });
+        await updateProduct.mutateAsync({ productId: id, sellerId, sellerName, input, actor });
       } else {
-        await createProduct.mutateAsync({ sellerId, sellerName, input });
+        await createProduct.mutateAsync({ sellerId, sellerName, input, actor });
       }
-      navigate('/seller/products');
+      navigate(`${basePath}/products`);
     } catch {
       // The mutation hook already surfaces a toast on failure.
     } finally {
@@ -551,7 +561,25 @@ export function SellerProductFormPage() {
               ? "You can't add or edit products yet — this unlocks as soon as the Head Seller approves your account."
               : user?.seller_status_reason ?? 'You cannot add or edit products while your account is in this state.'}
           </p>
-          <Button variant="outline" className="mt-6" onClick={() => navigate('/seller/products')}>
+          <Button variant="outline" className="mt-6" onClick={() => navigate(`${basePath}/products`)}>
+            Back to Products
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isBlockedByStaffPermission) {
+    return (
+      <div className="mx-auto max-w-xl">
+        <Seo title={isEditing ? 'Edit Product' : 'Add Product'} />
+        <div className="card-surface flex flex-col items-center p-10 text-center">
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-amber-50 dark:bg-amber-900/30">
+            <ShieldAlert size={26} className="text-amber-600 dark:text-amber-400" />
+          </div>
+          <h2 className="text-lg font-bold">You don't have permission to {isEditing ? 'edit' : 'add'} products</h2>
+          <p className="mt-2 max-w-sm text-sm text-primary-500">Ask the Head Seller to grant you this permission from Staff Management.</p>
+          <Button variant="outline" className="mt-6" onClick={() => navigate(`${basePath}/products`)}>
             Back to Products
           </Button>
         </div>
@@ -794,7 +822,7 @@ export function SellerProductFormPage() {
         </section>
 
         <div className="flex justify-end gap-3">
-          <Button variant="outline" onClick={() => navigate('/seller/products')}>
+          <Button variant="outline" onClick={() => navigate(`${basePath}/products`)}>
             Cancel
           </Button>
           <Button variant="accent" onClick={handleSubmit} isLoading={isSaving}>

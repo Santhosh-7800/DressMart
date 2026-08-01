@@ -8,8 +8,34 @@
  */
 
 export type Gender = 'men' | 'kids';
-export type UserRole = 'buyer' | 'seller' | 'head_seller';
+export type UserRole = 'buyer' | 'seller' | 'head_seller' | 'staff';
 export type SellerStatus = 'pending' | 'approved' | 'rejected' | 'suspended';
+export type StaffStatus = 'active' | 'disabled';
+
+export type StaffPermissionKey =
+  | 'add_products'
+  | 'edit_products'
+  | 'delete_products'
+  | 'manage_inventory'
+  | 'upload_images'
+  | 'process_orders'
+  | 'update_order_status'
+  | 'approve_returns'
+  | 'reply_to_customers'
+  | 'view_reports';
+
+export interface StaffProfile {
+  id: string;
+  seller_id: string;
+  employee_id: string | null;
+  designation: string;
+  department: string | null;
+  status: StaffStatus;
+  status_reason: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface ShopAddress {
   line1: string;
@@ -35,6 +61,9 @@ export interface Profile {
   seller_applied_at?: string;
   seller_approved_at?: string | null;
   seller_status_reason?: string | null;
+  seller_id?: string;
+  staff_status?: StaffStatus;
+  staff_status_reason?: string | null;
   fcm_tokens?: string[];
   shop_logo_url?: string | null;
   shop_banner_url?: string | null;
@@ -117,6 +146,10 @@ export interface Product {
   thumbnailUrl?: string;
   created_at: string;
   updated_at: string;
+  created_by?: string | null;
+  staff_id?: string | null;
+  staff_name?: string | null;
+  updated_by?: string | null;
   images: ProductImage[];
   variants: ProductVariant[];
 }

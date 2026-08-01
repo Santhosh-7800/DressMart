@@ -5,7 +5,7 @@ import { returnService } from '@/services/returnService';
 import { queryKeys } from '@/lib/queryClient';
 import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 import { useAuth } from '@/contexts/AuthContext';
-import { isHeadSeller } from '@/lib/roles';
+import { effectiveSellerId, isHeadSeller } from '@/lib/roles';
 import type { Order, ReturnRequest, ReturnStatus } from '@/types';
 
 /** Buyer's own return requests — realtime, updates live as a seller approves/rejects/advances them. */
@@ -45,7 +45,7 @@ export function useSellerReturns() {
       return;
     }
     setIsLoading(true);
-    const unsubscribe = returnService.subscribeForSeller(user.id, isHeadSeller(user.role), (data) => {
+    const unsubscribe = returnService.subscribeForSeller(effectiveSellerId(user), isHeadSeller(user.role), (data) => {
       setReturns(data);
       setIsLoading(false);
     });

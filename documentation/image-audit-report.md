@@ -1,7 +1,7 @@
 # Product Image Audit Report
 
-Generated: 2026-07-31T13:34:18.389Z
-Products scanned: 962
+Generated: 2026-08-01T16:47:30.251Z
+Products scanned: 272
 Total findings: 0
 
 ## Findings by category

@@ -30,3 +30,4 @@ firestore-debug.log
 ui-debug.log
 .firebase/
 .emulator-data/
+.emulator-data-backup*/

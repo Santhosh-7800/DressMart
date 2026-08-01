@@ -10,24 +10,21 @@ export interface LookSlotDef {
 const MEN_TOP_SLOT: LookSlotDef = {
   key: 'top',
   label: 'Top Wear',
-  categorySlugs: ['casual-shirts', 'formal-shirts', 'printed-shirts', 'checked-shirts', 'solid-shirts', 'round-neck-tshirts', 'polo-tshirts', 'henley-tshirts', 'oversized-tshirts'],
+  categorySlugs: ['casual-shirts', 'formal-shirts', 'printed-shirts', 'solid-shirts', 'round-neck-tshirts', 'polo-tshirts', 'henley-tshirts', 'oversized-tshirts'],
 };
 
-/** The five categories requested by the outfit builder — shown whenever the viewed product isn't one of them itself. */
+/** Shown whenever the viewed product isn't one of these itself. Footwear/wallet/watch slots were
+ *  removed along with those categories — see documentation/README.md's catalog scope. */
 const MEN_PRIMARY_SLOTS: LookSlotDef[] = [
   { key: 'bottom', label: 'Pants', categorySlugs: ['regular-jeans', 'slim-jeans', 'formal-pants', 'cargo-pants', 'joggers'] },
-  { key: 'footwear', label: 'Shoes', categorySlugs: ['sneakers', 'loafers', 'sports-shoes', 'sandals'] },
   { key: 'belt', label: 'Belt', categorySlugs: ['belts'] },
-  { key: 'wallet', label: 'Wallet', categorySlugs: ['wallets'] },
-  { key: 'watch', label: 'Watch', categorySlugs: ['watches'] },
 ];
 
-/** Kids' catalog has no belt/wallet/watch equivalents, so the slot set is simpler. */
+/** Kids' catalog has no belt/wallet/watch/footwear equivalents, so the slot set is simpler. */
 const KIDS_SLOTS: LookSlotDef[] = [
   { key: 'top', label: 'Top Wear', categorySlugs: ['kids-tshirts', 'kids-shirts', 'school-uniform', 'kids-party-wear'] },
   { key: 'bottom', label: 'Bottoms', categorySlugs: ['kids-jeans', 'kids-shorts', 'kids-joggers'] },
-  { key: 'footwear', label: 'Shoes', categorySlugs: ['kids-shoes', 'kids-sandals'] },
-  { key: 'layer', label: 'Layer', categorySlugs: ['kids-hoodies', 'kids-jackets', 'kids-sweaters', 'kids-winter-wear'] },
+  { key: 'layer', label: 'Layer', categorySlugs: ['kids-hoodies', 'kids-jackets'] },
 ];
 
 const NEUTRAL_COLORS = new Set(['Black', 'White', 'Charcoal Grey', 'Navy Blue', 'Beige', 'Khaki', 'Steel Grey', 'Brown', 'Denim Blue']);

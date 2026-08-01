@@ -51,17 +51,16 @@ export interface CategoryDef {
   slug: string;
   gender: Gender;
   productCount: number;
-  sizeSet: 'apparel' | 'jeans' | 'shoes' | 'kids-age' | 'belt' | 'onesize';
+  sizeSet: 'apparel' | 'jeans' | 'kids-age' | 'belt';
   garmentType: string;
 }
 
+/** Men's & Kids' fashion only — see documentation/README.md's catalog scope. */
 export const MEN_CATEGORY_DEFS: CategoryDef[] = [
   { name: 'Formal Shirts', slug: 'formal-shirts', gender: 'men', productCount: 200, sizeSet: 'apparel', garmentType: 'shirt' },
   { name: 'Casual Shirts', slug: 'casual-shirts', gender: 'men', productCount: 150, sizeSet: 'apparel', garmentType: 'shirt' },
   { name: 'Printed Shirts', slug: 'printed-shirts', gender: 'men', productCount: 40, sizeSet: 'apparel', garmentType: 'shirt' },
-  { name: 'Checked Shirts', slug: 'checked-shirts', gender: 'men', productCount: 40, sizeSet: 'apparel', garmentType: 'shirt' },
   { name: 'Solid Shirts', slug: 'solid-shirts', gender: 'men', productCount: 40, sizeSet: 'apparel', garmentType: 'shirt' },
-  { name: 'Linen Shirts', slug: 'linen-shirts', gender: 'men', productCount: 30, sizeSet: 'apparel', garmentType: 'shirt' },
   { name: 'Cotton Shirts', slug: 'cotton-shirts', gender: 'men', productCount: 30, sizeSet: 'apparel', garmentType: 'shirt' },
   { name: 'Polo T-Shirts', slug: 'polo-tshirts', gender: 'men', productCount: 60, sizeSet: 'apparel', garmentType: 'tshirt' },
   { name: 'Round Neck T-Shirts', slug: 'round-neck-tshirts', gender: 'men', productCount: 50, sizeSet: 'apparel', garmentType: 'tshirt' },
@@ -82,12 +81,6 @@ export const MEN_CATEGORY_DEFS: CategoryDef[] = [
   { name: 'Innerwear', slug: 'innerwear', gender: 'men', productCount: 30, sizeSet: 'apparel', garmentType: 'tshirt' },
   { name: 'Belts', slug: 'belts', gender: 'men', productCount: 20, sizeSet: 'belt', garmentType: 'default' },
   { name: 'Vests', slug: 'vests', gender: 'men', productCount: 15, sizeSet: 'apparel', garmentType: 'tshirt' },
-  { name: 'Wallets', slug: 'wallets', gender: 'men', productCount: 20, sizeSet: 'onesize', garmentType: 'default' },
-  { name: 'Sneakers', slug: 'sneakers', gender: 'men', productCount: 40, sizeSet: 'shoes', garmentType: 'shoe' },
-  { name: 'Loafers', slug: 'loafers', gender: 'men', productCount: 20, sizeSet: 'shoes', garmentType: 'shoe' },
-  { name: 'Sports Shoes', slug: 'sports-shoes', gender: 'men', productCount: 30, sizeSet: 'shoes', garmentType: 'shoe' },
-  { name: 'Sandals', slug: 'sandals', gender: 'men', productCount: 10, sizeSet: 'shoes', garmentType: 'shoe' },
-  { name: 'Watches', slug: 'watches', gender: 'men', productCount: 20, sizeSet: 'onesize', garmentType: 'watch' },
 ];
 
 export const KIDS_CATEGORY_DEFS: CategoryDef[] = [
@@ -99,20 +92,14 @@ export const KIDS_CATEGORY_DEFS: CategoryDef[] = [
   { name: 'School Uniform', slug: 'school-uniform', gender: 'kids', productCount: 15, sizeSet: 'kids-age', garmentType: 'shirt' },
   { name: 'Party Wear', slug: 'kids-party-wear', gender: 'kids', productCount: 10, sizeSet: 'kids-age', garmentType: 'shirt' },
   { name: 'Hoodies', slug: 'kids-hoodies', gender: 'kids', productCount: 10, sizeSet: 'kids-age', garmentType: 'hoodie' },
-  { name: 'Sweaters', slug: 'kids-sweaters', gender: 'kids', productCount: 10, sizeSet: 'kids-age', garmentType: 'hoodie' },
-  { name: 'Winter Wear', slug: 'kids-winter-wear', gender: 'kids', productCount: 5, sizeSet: 'kids-age', garmentType: 'jacket' },
   { name: 'Jackets', slug: 'kids-jackets', gender: 'kids', productCount: 5, sizeSet: 'kids-age', garmentType: 'jacket' },
-  { name: 'Shoes', slug: 'kids-shoes', gender: 'kids', productCount: 10, sizeSet: 'shoes', garmentType: 'shoe' },
-  { name: 'Sandals', slug: 'kids-sandals', gender: 'kids', productCount: 5, sizeSet: 'shoes', garmentType: 'shoe' },
 ];
 
 export const SIZE_SETS: Record<CategoryDef['sizeSet'], string[]> = {
   apparel: ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'],
   jeans: ['28', '30', '32', '34', '36', '38'],
-  shoes: ['6', '7', '8', '9', '10', '11'],
   'kids-age': ['2-3Y', '4-5Y', '6-7Y', '8-9Y', '10-11Y', '12-13Y', '14-15Y'],
   belt: ['S', 'M', 'L', 'XL'],
-  onesize: ['One Size'],
 };
 
 export const COLOR_PALETTE: { name: string; hex: string }[] = [

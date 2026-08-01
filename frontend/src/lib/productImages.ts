@@ -3,19 +3,16 @@ import type { Gender } from '@/types';
 /**
  * Maps every catalog category slug to one of the folders under
  * public/images/products/<gender>/<folder>/ (see that directory for the full
- * scaffolded list). Categories that don't fit an apparel bucket (shoes,
- * belts/wallets/watches) get their own folder rather than being misfiled.
+ * scaffolded list).
  */
 const CATEGORY_FOLDER_MAP: Record<string, string> = {
   // Men — shirts
   'formal-shirts': 'formal-shirts',
   'casual-shirts': 'casual-shirts',
-  // These 6 used to fall back to a shared folder (casual-shirts/tshirts) before each got its own
+  // These 4 used to fall back to a shared folder (casual-shirts/tshirts) before each got its own
   // real, dedicated photography — see scripts/curatedShirtsTshirtsData.ts and productImageManifest.ts.
   'printed-shirts': 'Printed-Shirts',
-  'checked-shirts': 'checked-shirts',
   'solid-shirts': 'Solid-Shirts',
-  'linen-shirts': 'casual-shirts',
   'cotton-shirts': 'Cotton-Shirts',
   // These 11 used to fall back to a shared folder (casual-shirts/tshirts/jeans/jackets/hoodies/
   // accessories) before each got its own real, dedicated photography — see
@@ -40,15 +37,9 @@ const CATEGORY_FOLDER_MAP: Record<string, string> = {
   sherwanis: 'Sherwani',
   hoodies: 'hoodies',
   sweatshirts: 'Sweatshirts',
-  // Men — accessories & footwear
+  // Men — essentials
   belts: 'Belts',
   vests: 'Vests',
-  wallets: 'accessories',
-  watches: 'accessories',
-  sneakers: 'shoes',
-  loafers: 'shoes',
-  'sports-shoes': 'shoes',
-  sandals: 'shoes',
 
   // Kids
   'kids-tshirts': 'tshirts',
@@ -61,11 +52,7 @@ const CATEGORY_FOLDER_MAP: Record<string, string> = {
   'kids-jeans': 'jeans',
   'kids-shorts': 'shorts',
   'kids-hoodies': 'hoodies',
-  'kids-sweaters': 'hoodies',
   'kids-jackets': 'jackets',
-  'kids-winter-wear': 'jackets',
-  'kids-shoes': 'shoes',
-  'kids-sandals': 'shoes',
 };
 
 export function getImageFolder(categorySlug: string): string {
@@ -104,37 +91,11 @@ export interface ProductImageSet {
   galleryImages: string[];
 }
 
-/** Generic fallback — shown for any product that has no real photography of its own and isn't one
- *  of the categories below (never another product's photo). */
+/** Shown for any product that has no real photography of its own — never another product's photo.
+ *  Every remaining category in the catalog has real, dedicated photography (see the image audit
+ *  report), so this is a pure safety net at this point, not something any seeded product actually
+ *  hits. */
 export const PLACEHOLDER_IMAGE_PATH = '/images/placeholder-shirt.webp';
-
-/** A handful of categories have zero on-disk photography at all (no source photos were ever
- *  provided for them — see the image audit report) and are visually nothing like a shirt, so the
- *  generic apparel placeholder above looks wrong for them specifically. These get their own
- *  category-shaped fallback instead — still an honest "no photo available" placeholder, never a
- *  fabricated product photo. */
-const PLACEHOLDER_BY_CATEGORY_SLUG: Record<string, string> = {
-  sneakers: '/images/placeholder-shoe.svg',
-  loafers: '/images/placeholder-shoe.svg',
-  'sports-shoes': '/images/placeholder-shoe.svg',
-  sandals: '/images/placeholder-shoe.svg',
-  'kids-shoes': '/images/placeholder-shoe.svg',
-  'kids-sandals': '/images/placeholder-shoe.svg',
-  wallets: '/images/placeholder-accessory.svg',
-  watches: '/images/placeholder-accessory.svg',
-};
-
-/** The right "no photo available" placeholder for this category — a shoe/accessory-shaped one for
- *  the handful of categories with zero real photography (see PLACEHOLDER_BY_CATEGORY_SLUG above),
- *  the generic apparel one for everything else. */
-export function placeholderImagePathFor(categorySlug: string): string {
-  return PLACEHOLDER_BY_CATEGORY_SLUG[categorySlug] ?? PLACEHOLDER_IMAGE_PATH;
-}
-
-/** Every path a product's image fields are allowed to intentionally point at when it has no real
- *  photography — used by scripts/auditProductImages.ts to tell "this is a known, deliberate
- *  placeholder shared by every photo-less product in this category" apart from an actual bug. */
-export const KNOWN_PLACEHOLDER_PATHS: readonly string[] = [PLACEHOLDER_IMAGE_PATH, ...new Set(Object.values(PLACEHOLDER_BY_CATEGORY_SLUG))];
 
 const PLACEHOLDER_IMAGE_SET: ProductImageSet = {
   imageUrl: PLACEHOLDER_IMAGE_PATH,
@@ -622,20 +583,6 @@ export interface VerifiedColor {
   name: string;
   hex: string;
 }
-
-/**
- * NOTE: real Checked Shirt photography (CHS001-CHS030, minus CHS015) now exists on disk under
- * public/images/products/men/checked-shirts/ (uploaded directly, not via this codebase) — this
- * superseded an earlier batch of procedurally-generated SVG placeholder art (see the now-unused
- * scripts/generateCheckedShirtPlaceholders.mjs) that used to have entries here. Those invented
- * colors no longer describe what's actually in the (real) photos, so they've been removed rather
- * than left in place silently claiming ground truth they no longer have — that mismatch is exactly
- * the "Purple shirt labeled Khaki" class of bug this whole verified-color mechanism exists to
- * prevent. Until someone hand-verifies each CHS code's real photo the same way the FS031-073 batch
- * was verified (see REAL_PRODUCT_PHOTOGRAPHY above), generic Checked Shirts products fall back to a
- * random color pick from COLOR_PALETTE — the same, already-accepted behavior every other
- * non-curated category (jeans, jackets, hoodies, etc.) already has.
- */
 
 /**
  * Code -> hand-verified color, independent of which (mock-catalog-era) product slug a photo set was

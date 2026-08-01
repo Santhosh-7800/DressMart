@@ -36,7 +36,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { BRAND_DEFS, MEN_CATEGORY_DEFS, KIDS_CATEGORY_DEFS, SIZE_SETS, COLOR_PALETTE, MATERIALS, FITS, PATTERNS, OCCASIONS, ADJECTIVES, type CategoryDef } from '../frontend/src/data/catalogSource';
 import { SeededRng } from '../frontend/src/lib/seededRandom';
 import { slugify, calculateDiscount } from '../frontend/src/lib/utils';
-import { getImageFolder, resolveProductImagePath, placeholderImagePathFor, getVerifiedColorForCode, REAL_PRODUCT_PHOTOGRAPHY } from '../frontend/src/lib/productImages';
+import { getImageFolder, resolveProductImagePath, getVerifiedColorForCode, REAL_PRODUCT_PHOTOGRAPHY } from '../frontend/src/lib/productImages';
 import { PRODUCT_IMAGE_MANIFEST } from '../frontend/src/data/productImageManifest';
 import { CURATED_SHIRTS_TSHIRTS } from './curatedShirtsTshirtsData';
 import { CURATED_APPAREL } from './curatedApparelData';
@@ -192,7 +192,12 @@ export async function main() {
     const sizes = SIZE_SETS[def.sizeSet];
     const priceBand = PRICE_BANDS[def.garmentType] ?? PRICE_BANDS.default;
     const photoSets = realPhotoSetsFor(def.gender, def.slug);
-    const count = Math.min(def.productCount, CATEGORY_PRODUCT_CAP);
+    // No real photography left for this generic filler (either every manifest code for this
+    // folder is claimed by a curated batch, or the folder has no photos at all) — generate zero
+    // filler products rather than falling back to a placeholder image. Every product this seeder
+    // writes must have real, on-disk photography; a category with no filler photos left over just
+    // relies entirely on its curated seed data instead.
+    const count = photoSets.length > 0 ? Math.min(def.productCount, CATEGORY_PRODUCT_CAP) : 0;
 
     for (let i = 0; i < count; i++) {
       const brandDef = brands[i % brands.length];
@@ -214,20 +219,21 @@ export async function main() {
       const discountPercent = rng.bool(0.7) ? rng.int(10, 45) : 0;
       const price = Math.max(Math.round((mrp * (1 - discountPercent / 100)) / 10) * 10 - 1, 149);
 
-      // Real photos (if this category folder has any) round-robin assigned by product index —
-      // still genuine on-disk photography, just not hand-bound to one specific generated product.
-      const photoSet = photoSets.length > 0 ? photoSets[i % photoSets.length] : null;
+      // Real photos, round-robin assigned by product index — still genuine on-disk photography,
+      // just not hand-bound to one specific generated product. Always non-empty: `count` above is
+      // forced to 0 whenever photoSets is empty, so this loop only ever runs when photoSets.length > 0.
+      const photoSet = photoSets[i % photoSets.length];
 
       // Exactly one declared color per generated product — every product here only ever has ONE
-      // real (or placeholder) photo set, never distinct photography per color. Randomly assigning
-      // several fake color names to a single photo set was the original root cause of "select
-      // Mustard Yellow, see a Black shirt": switching color could never show a matching photo
-      // because no color-specific photo existed. One color, one photo set, zero possibility of a
+      // real photo set, never distinct photography per color. Randomly assigning several fake
+      // color names to a single photo set was the original root cause of "select Mustard Yellow,
+      // see a Black shirt": switching color could never show a matching photo because no
+      // color-specific photo existed. One color, one photo set, zero possibility of a
       // switching-colors mismatch. But a random color name can STILL be wrong for what the photo
       // actually shows (e.g. calling a verified-Purple photo "Khaki") — for any code with a
       // hand-verified color (src/lib/productImages.ts's REAL_PRODUCT_PHOTOGRAPHY), use that
       // instead of guessing; only fall back to random when no ground truth exists for this photo.
-      const verifiedColor = photoSet ? getVerifiedColorForCode(photoSet[0].split('-')[0]) : null;
+      const verifiedColor = getVerifiedColorForCode(photoSet[0].split('-')[0]);
       const colors = verifiedColor ? [verifiedColor] : rng.pickMany(COLOR_PALETTE, 1);
 
       const variants: GeneratedVariant[] = [];
@@ -255,15 +261,13 @@ export async function main() {
 
       // Tagged with this product's one declared color — safe since there's only one color, so this
       // can never be mistaken for (or leak into) a different color's gallery.
-      const images = photoSet
-        ? photoSet.map((filename, idx) => ({
-            id: `${ref.id}-img-${idx}`,
-            url: resolveProductImagePath(def.gender, def.slug, filename),
-            alt: `${name} — photo ${idx + 1}`,
-            color: colors[0].name,
-            sort_order: idx,
-          }))
-        : [{ id: `${ref.id}-img-0`, url: placeholderImagePathFor(def.slug), alt: `${name} — photo 1`, color: colors[0].name, sort_order: 0 }];
+      const images = photoSet.map((filename, idx) => ({
+        id: `${ref.id}-img-${idx}`,
+        url: resolveProductImagePath(def.gender, def.slug, filename),
+        alt: `${name} — photo ${idx + 1}`,
+        color: colors[0].name,
+        sort_order: idx,
+      }));
 
       const now = new Date();
       const createdAt = new Date(now.getTime() - rng.int(0, 200) * 24 * 60 * 60 * 1000).toISOString();

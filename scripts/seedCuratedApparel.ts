@@ -15,7 +15,7 @@ import { BRAND_DEFS, MEN_CATEGORY_DEFS, SIZE_SETS, type CategoryDef } from '../f
 import { PRODUCT_IMAGE_MANIFEST } from '../frontend/src/data/productImageManifest.js';
 import { SeededRng, hashStringToSeed } from '../frontend/src/lib/seededRandom.js';
 import { slugify, calculateDiscount } from '../frontend/src/lib/utils.js';
-import { resolveProductImagePath, placeholderImagePathFor } from '../frontend/src/lib/productImages.js';
+import { resolveProductImagePath } from '../frontend/src/lib/productImages.js';
 import { sellerFor, PRICE_BANDS } from './seedFirestore.js';
 import { CURATED_APPAREL, type CuratedApparelItem } from './curatedApparelData.js';
 import { docGet, docSet } from './lib/firestoreDocStore.js';
@@ -125,7 +125,7 @@ export async function main() {
 
   let inserted = 0;
   let updated = 0;
-  let placeholderCount = 0;
+  let skippedCount = 0;
 
   for (let i = 0; i < CURATED_APPAREL.length; i++) {
     const item = CURATED_APPAREL[i];
@@ -133,8 +133,9 @@ export async function main() {
     const photos = realPhotosFor(item);
     const imagePending = photos.length === 0;
     if (imagePending) {
-      console.warn(`  ! Image Pending for ${item.sku} (${item.name}) — no images found on disk for ${item.folderKey}/${item.sku}; using placeholder.`);
-      placeholderCount++;
+      console.warn(`  ! Skipping ${item.sku} (${item.name}) — no images found on disk for ${item.folderKey}/${item.sku}. Every seeded product must have real photography.`);
+      skippedCount++;
+      continue;
     }
 
     const docId = `curated-${item.categorySlug}-${item.sku.toLowerCase()}`;
@@ -176,21 +177,18 @@ export async function main() {
       variantStock[v.id] = idx === variants.length - 1 ? 50 - baseStock * (variants.length - 1) : baseStock;
     });
 
-    const images = imagePending
-      ? [{ id: `${docId}-img-0`, url: placeholderImagePathFor(item.categorySlug), alt: `${item.name} — image pending`, color: item.color, sort_order: 0 }]
-      : photos.map((url, idx) => ({
-          id: `${docId}-img-${idx}`,
-          url,
-          alt: `${item.name} — ${item.color}, photo ${idx + 1}`,
-          color: item.color,
-          sort_order: idx,
-        }));
+    const images = photos.map((url, idx) => ({
+      id: `${docId}-img-${idx}`,
+      url,
+      alt: `${item.name} — ${item.color}, photo ${idx + 1}`,
+      color: item.color,
+      sort_order: idx,
+    }));
 
     const totalStock = Object.values(variantStock).reduce((sum, n) => sum + n, 0);
     const now = new Date().toISOString();
     const subcategoryName = SUBCATEGORY_NAME_BY_SLUG.get(item.categorySlug) ?? null;
     const tags = [item.categorySlug.replace(/-/g, ' '), item.color.toLowerCase()];
-    if (imagePending) tags.push('image pending');
 
     const product = {
       id: docId,
@@ -245,13 +243,13 @@ export async function main() {
 
     if (isNew) inserted++;
     else updated++;
-    console.log(`  ${isNew ? '+ added' : '~ updated'}  ${item.sku}  ${item.name}  (${item.color}, ${images.length} images)${imagePending ? ' [IMAGE PENDING]' : ''}`);
+    console.log(`  ${isNew ? '+ added' : '~ updated'}  ${item.sku}  ${item.name}  (${item.color}, ${images.length} images)`);
   }
 
   console.log('\n=== FINAL REPORT ===');
   console.log(`Total products added:   ${inserted}`);
   console.log(`Total products updated: ${updated}`);
-  console.log(`Total products with a placeholder image (no real photos found): ${placeholderCount}`);
+  console.log(`Total products skipped (no real photos found on disk): ${skippedCount}`);
   console.log(`\n✔ ${inserted + updated}/${CURATED_APPAREL.length} curated apparel products written.`);
 }
 

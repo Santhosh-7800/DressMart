@@ -20,14 +20,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { initializeApp, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { getImageFolder, resolveProductImagePath, KNOWN_PLACEHOLDER_PATHS } from '../frontend/src/lib/productImages.js';
+import { getImageFolder, resolveProductImagePath, PLACEHOLDER_IMAGE_PATH } from '../frontend/src/lib/productImages.js';
 import { PRODUCT_IMAGE_MANIFEST } from '../frontend/src/data/productImageManifest.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const PUBLIC_DIR = path.join(ROOT, 'frontend', 'public');
-const PLACEHOLDER_PATH = KNOWN_PLACEHOLDER_PATHS[0]; // the generic one — used where a single fallback value is needed
-const isKnownPlaceholder = (url: string): boolean => (KNOWN_PLACEHOLDER_PATHS as string[]).includes(url);
+const PLACEHOLDER_PATH = PLACEHOLDER_IMAGE_PATH;
+const isKnownPlaceholder = (url: string): boolean => url === PLACEHOLDER_PATH;
 
 const args = process.argv.slice(2);
 const shouldFix = args.includes('--fix');
@@ -420,10 +420,16 @@ async function main() {
       const url = urls[cursor++];
       try {
         const res = await fetch(BASE_URL + url, { method: 'GET' });
-        if (res.status === 200) ok200++;
+        // A Vite dev server (this app is an SPA) returns 200 + text/html for ANY unmatched path —
+        // its history-fallback middleware serves index.html rather than a real 404. A missing
+        // /images/... file is therefore indistinguishable from a real page load by status code
+        // alone; every one of these 200s was a false pass until this check existed. A genuine image
+        // response is always an image/* content type — anything else at a 200 is actually missing.
+        const contentType = res.headers.get('content-type') ?? '';
+        if (res.status === 200 && contentType.startsWith('image/')) ok200++;
         else {
           notOk++;
-          failures.push({ url, status: res.status });
+          failures.push({ url, status: res.status === 200 ? `200 but content-type "${contentType}" (SPA fallback — file missing)` : res.status });
         }
       } catch (error) {
         notOk++;

@@ -5,7 +5,6 @@ import type { Gender, ProductFilters as Filters } from '@/types';
 import { Seo } from '@/components/common/Seo';
 import { ProductGrid } from '@/components/product/ProductGrid';
 import { ProductFilters } from '@/components/product/ProductFilters';
-import { NarrowYourSearch } from '@/components/product/NarrowYourSearch';
 import { SortDropdown } from '@/components/product/SortDropdown';
 import { InfiniteScrollSentinel } from '@/components/product/InfiniteScrollSentinel';
 import { useProductFacets } from '@/hooks/useProducts';
@@ -89,8 +88,6 @@ export function ProductListingPage({ gender }: ProductListingPageProps) {
           <SortDropdown value={filters.sort ?? 'popularity'} onChange={(sort) => updateFilters({ ...filters, sort, page: 1 })} />
         </div>
       </div>
-
-      <NarrowYourSearch facets={facetsQuery.data} filters={filters} onChange={(next) => updateFilters({ ...next, page: 1 })} />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[260px_1fr]">
         <div className="hidden lg:block">

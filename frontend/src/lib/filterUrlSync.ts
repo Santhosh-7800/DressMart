@@ -12,8 +12,6 @@ export interface UrlSyncableFilters {
   brandIds?: string[];
   colors?: string[];
   sizes?: string[];
-  occasions?: string[];
-  patterns?: string[];
   minPrice?: number;
   maxPrice?: number;
   minRating?: number;
@@ -37,8 +35,6 @@ export function filtersFromSearchParams(params: URLSearchParams): UrlSyncableFil
     brandIds: csv('brands'),
     colors: csv('colors'),
     sizes: csv('sizes'),
-    occasions: csv('occasions'),
-    patterns: csv('patterns'),
     minPrice: num('minPrice'),
     maxPrice: num('maxPrice'),
     minRating: num('minRating'),
@@ -61,8 +57,6 @@ export function applyFiltersToSearchParams(existing: URLSearchParams, filters: U
   setOrDelete('brands', filters.brandIds?.length ? filters.brandIds.join(',') : undefined);
   setOrDelete('colors', filters.colors?.length ? filters.colors.join(',') : undefined);
   setOrDelete('sizes', filters.sizes?.length ? filters.sizes.join(',') : undefined);
-  setOrDelete('occasions', filters.occasions?.length ? filters.occasions.join(',') : undefined);
-  setOrDelete('patterns', filters.patterns?.length ? filters.patterns.join(',') : undefined);
   setOrDelete('minPrice', filters.minPrice !== undefined ? String(filters.minPrice) : undefined);
   setOrDelete('maxPrice', filters.maxPrice !== undefined ? String(filters.maxPrice) : undefined);
   setOrDelete('minRating', filters.minRating !== undefined ? String(filters.minRating) : undefined);

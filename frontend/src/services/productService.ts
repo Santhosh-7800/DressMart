@@ -104,8 +104,6 @@ function matchesRemainingFilters(p: Product, filters: ProductFilters): boolean {
   if (filters.brandIds?.length && !filters.brandIds.includes(p.brand_id)) return false;
   if (filters.colors?.length && !p.variants.some((v) => filters.colors!.includes(v.color))) return false;
   if (filters.sizes?.length && !p.variants.some((v) => filters.sizes!.includes(v.size))) return false;
-  if (filters.occasions?.length && !filters.occasions.includes(p.specifications.occasion ?? '')) return false;
-  if (filters.patterns?.length && !filters.patterns.includes(p.specifications.pattern ?? '')) return false;
   if (filters.minPrice !== undefined && p.price < filters.minPrice) return false;
   if (filters.maxPrice !== undefined && p.price > filters.maxPrice) return false;
   if (filters.minRating !== undefined && p.rating < filters.minRating) return false;
@@ -266,10 +264,6 @@ export const productService = {
     const brandCounts = new Map<string, number>();
     const colorCounts = new Map<string, number>();
     const sizeCounts = new Map<string, number>();
-    const occasionCounts = new Map<string, number>();
-    const occasionSampleImage = new Map<string, string>();
-    const patternCounts = new Map<string, number>();
-    const patternSampleImage = new Map<string, string>();
     let min = Infinity;
     let max = 0;
 
@@ -279,16 +273,6 @@ export const productService = {
         colorCounts.set(v.color, (colorCounts.get(v.color) ?? 0) + 1);
         sizeCounts.set(v.size, (sizeCounts.get(v.size) ?? 0) + 1);
       });
-      const occasion = p.specifications.occasion;
-      if (occasion) {
-        occasionCounts.set(occasion, (occasionCounts.get(occasion) ?? 0) + 1);
-        if (!occasionSampleImage.has(occasion)) occasionSampleImage.set(occasion, p.coverImage);
-      }
-      const pattern = p.specifications.pattern;
-      if (pattern) {
-        patternCounts.set(pattern, (patternCounts.get(pattern) ?? 0) + 1);
-        if (!patternSampleImage.has(pattern)) patternSampleImage.set(pattern, p.coverImage);
-      }
       min = Math.min(min, p.price);
       max = Math.max(max, p.price);
     });
@@ -301,12 +285,6 @@ export const productService = {
         .sort((a, b) => b.count - a.count),
       colors: [...colorCounts.entries()].map(([value, count]) => ({ value, count })).sort((a, b) => b.count - a.count),
       sizes: [...sizeCounts.entries()].map(([value, count]) => ({ value, count })).sort((a, b) => b.count - a.count),
-      occasions: [...occasionCounts.entries()]
-        .map(([value, count]) => ({ value, count, sampleImageUrl: occasionSampleImage.get(value) }))
-        .sort((a, b) => b.count - a.count),
-      patterns: [...patternCounts.entries()]
-        .map(([value, count]) => ({ value, count, sampleImageUrl: patternSampleImage.get(value) }))
-        .sort((a, b) => b.count - a.count),
       priceRange: scoped.length > 0 ? { min, max } : { min: 0, max: 0 },
     };
   },
@@ -637,6 +615,32 @@ export const categoryService = {
     }
     await deleteDoc(doc(db, 'categories', categoryId));
     primeCatalogCaches();
+  },
+
+  /**
+   * One real product photo per category, for the homepage "Shop by Category" tiles — reuses
+   * actual catalog photography instead of a generic icon or placeholder. A single-field `in`
+   * query (no second `where`) needs no composite index. Chunked to Firestore's 30-value `in`
+   * limit, same pattern as inventoryService.getInventoryBatch.
+   */
+  async getCoverImages(categoryIds: string[]): Promise<Record<string, string>> {
+    if (categoryIds.length === 0) return {};
+    const result: Record<string, string> = {};
+    const chunks: string[][] = [];
+    for (let i = 0; i < categoryIds.length; i += 30) chunks.push(categoryIds.slice(i, i + 30));
+    await Promise.all(
+      chunks.map(async (chunk) => {
+        const snap = await getDocs(query(collection(db, PRODUCTS_COLLECTION), where('category_id', 'in', chunk), fsLimit(chunk.length * 3)));
+        snap.docs.forEach((d) => {
+          const p = d.data() as Product;
+          if (!result[p.category_id]) {
+            const image = p.coverImage || p.images[0]?.url;
+            if (image) result[p.category_id] = image;
+          }
+        });
+      }),
+    );
+    return result;
   },
 };
 

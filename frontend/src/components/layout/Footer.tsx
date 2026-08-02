@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Facebook, Instagram, Twitter, Youtube, ShieldCheck, Truck, RotateCcw, Headphones } from 'lucide-react';
 
 const FOOTER_LINKS: { title: string; links: { label: string; to: string }[] }[] = [
@@ -42,19 +42,27 @@ const TRUST_BADGES = [
 ];
 
 export function Footer() {
+  // The homepage has its own richer "Why Shop DressMart" version of these same four points right
+  // above the footer — repeating them again immediately below as a plain text strip read as an
+  // obvious duplicate, so this row is skipped there specifically. Every other page still gets it.
+  const { pathname } = useLocation();
+  const isHomePage = pathname === '/';
+
   return (
     // Hidden on mobile — a heavy multi-column desktop footer has no place on a phone-sized app
     // screen; its links are reachable from the Profile tab (BottomNavBar) instead. Still shown at
     // md:+ for anyone browsing on a tablet/desktop viewport.
     <footer className="mt-16 hidden bg-primary text-primary-100 md:block">
-      <div className="container-app grid grid-cols-2 gap-6 border-b border-primary-700 py-8 sm:grid-cols-4">
-        {TRUST_BADGES.map(({ icon: Icon, label }) => (
-          <div key={label} className="flex items-center gap-3">
-            <Icon size={22} className="shrink-0 text-accent" />
-            <span className="text-xs sm:text-sm">{label}</span>
-          </div>
-        ))}
-      </div>
+      {!isHomePage && (
+        <div className="container-app grid grid-cols-2 gap-6 border-b border-primary-700 py-8 sm:grid-cols-4">
+          {TRUST_BADGES.map(({ icon: Icon, label }) => (
+            <div key={label} className="flex items-center gap-3">
+              <Icon size={22} className="shrink-0 text-accent" />
+              <span className="text-xs sm:text-sm">{label}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="container-app grid grid-cols-2 gap-8 py-12 md:grid-cols-5">
         <div className="col-span-2">

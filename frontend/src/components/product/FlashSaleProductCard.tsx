@@ -1,14 +1,16 @@
-import { memo, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { memo, useCallback, useMemo } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Heart } from 'lucide-react';
+import { Heart, ShoppingCart } from 'lucide-react';
 import type { Product } from '@/types';
 import { PriceTag } from '@/components/ui/PriceTag';
 import { Rating } from '@/components/ui/Rating';
 import { ProductImage } from '@/components/ui/ProductImage';
 import { useWishlist } from '@/hooks/useWishlist';
 import { useInventory } from '@/hooks/useInventory';
+import { useCart } from '@/hooks/useCart';
+import { useAuth } from '@/contexts/AuthContext';
 import { productService } from '@/services/productService';
 import { queryKeys } from '@/lib/queryClient';
 import { cn } from '@/lib/utils';
@@ -19,6 +21,9 @@ interface FlashSaleProductCardProps {
   product: Product;
   onExpire?: (productId: string) => void;
   className?: string;
+  /** Shows a full-width labeled "Add to Cart" button — opt-in, unset on the dedicated Flash
+   *  Sales page (/flash-sales), only enabled from the homepage's premium card treatment. */
+  showAddToCartButton?: boolean;
 }
 
 /**
@@ -26,19 +31,41 @@ interface FlashSaleProductCardProps {
  * which aliases it to Deal of the Day) — stock/countdown here come from the real inventory doc and
  * product.deal_ends_at instead of the old flash_sale_total_stock/claimed/ends_at fields.
  */
-function FlashSaleProductCardImpl({ product, onExpire, className }: FlashSaleProductCardProps) {
+function FlashSaleProductCardImpl({ product, onExpire, className, showAddToCartButton }: FlashSaleProductCardProps) {
   const { isWishlisted, toggle } = useWishlist();
   const wishlisted = isWishlisted(product.id);
   const { data: inventory } = useInventory(product.id);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+  const { addItem } = useCart();
   const primaryImage = product.coverImage || product.thumbnailUrl || product.imageUrl || product.images[0]?.url;
 
   const totalStock = inventory?.total_stock ?? 0;
   const isSoldOut = inventory !== undefined && inventory !== null && totalStock <= 0;
 
+  // Same "skip color/size selection, grab the first in-stock variant" shortcut as ProductCard's
+  // quick add — see that component's doc comment for the full rationale.
+  const quickAddVariant = useMemo(() => {
+    if (product.variants.length === 0) return undefined;
+    if (!inventory) return product.variants[0];
+    return product.variants.find((v) => (inventory.variant_stock[v.id] ?? 0) > 0);
+  }, [product.variants, inventory]);
+
   const prefetchDetails = useCallback(() => {
     queryClient.prefetchQuery({ queryKey: queryKeys.products.detail(product.slug), queryFn: () => productService.getBySlug(product.slug) });
   }, [queryClient, product.slug]);
+
+  const handleAddToCart = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isAuthenticated) {
+      navigate('/login', { state: { from: `/product/${product.slug}` } });
+      return;
+    }
+    if (!quickAddVariant) return;
+    await addItem({ productId: product.id, variantId: quickAddVariant.id });
+  };
 
   return (
     <motion.div
@@ -84,6 +111,13 @@ function FlashSaleProductCardImpl({ product, onExpire, className }: FlashSalePro
           {inventory && <StockIndicator claimed={Math.max(0, totalStock - inventory.low_stock_threshold)} total={totalStock} />}
         </div>
       </Link>
+      {showAddToCartButton && !isSoldOut && (
+        <div className="px-3 pb-3">
+          <button onClick={handleAddToCart} disabled={!quickAddVariant} className="btn-accent w-full !py-2 text-xs">
+            <ShoppingCart size={14} /> Add to Cart
+          </button>
+        </div>
+      )}
     </motion.div>
   );
 }

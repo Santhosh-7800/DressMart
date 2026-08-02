@@ -144,6 +144,18 @@ export function useFeaturedBrands() {
   return useQuery({ queryKey: queryKeys.brands.featured, queryFn: () => brandService.featured() });
 }
 
+/** One real product photo per category id, for the homepage category tiles — see
+ *  categoryService.getCoverImages. Long staleTime: a category's representative photo doesn't
+ *  need to track catalog changes in real time. */
+export function useCategoryCoverImages(categoryIds: string[]) {
+  return useQuery({
+    queryKey: ['categories', 'cover-images', categoryIds],
+    queryFn: () => categoryService.getCoverImages(categoryIds),
+    enabled: categoryIds.length > 0,
+    staleTime: 10 * 60 * 1000,
+  });
+}
+
 export function useBanners() {
   return useQuery({ queryKey: queryKeys.banners.all, queryFn: () => bannerService.list() });
 }

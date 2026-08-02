@@ -27,9 +27,14 @@ interface ProductCardProps {
    *  Profile previews, etc.) omit both props and get the original one-card-one-fetch behavior. */
   inventory?: Inventory | null;
   skipOwnFetch?: boolean;
+  /** Shows a full-width labeled "Add to Cart" button below the price instead of the small
+   *  floating quick-add icon. Opt-in (default false/unset) — every existing page keeps the
+   *  compact icon-only quick add exactly as before; only the homepage's premium card treatment
+   *  passes this. */
+  showAddToCartButton?: boolean;
 }
 
-function ProductCardImpl({ product, className, inventory: inventoryProp, skipOwnFetch }: ProductCardProps) {
+function ProductCardImpl({ product, className, inventory: inventoryProp, skipOwnFetch, showAddToCartButton }: ProductCardProps) {
   debugLog('ProductCard', 'render', product.id, product.slug);
   const { isWishlisted, toggle } = useWishlist();
   const wishlisted = isWishlisted(product.id);
@@ -120,7 +125,7 @@ function ProductCardImpl({ product, className, inventory: inventoryProp, skipOwn
               <span className="rounded-full bg-primary-950/80 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">Out of Stock</span>
             </div>
           )}
-          {!isOutOfStock && (
+          {!isOutOfStock && !showAddToCartButton && (
             <button
               onClick={handleQuickAdd}
               disabled={!quickAddVariant}
@@ -140,6 +145,13 @@ function ProductCardImpl({ product, className, inventory: inventoryProp, skipOwn
           {isOutOfStock && <p className="text-xs font-semibold text-red-500">Out of stock</p>}
         </div>
       </Link>
+      {showAddToCartButton && !isOutOfStock && (
+        <div className="px-3 pb-3">
+          <button onClick={handleQuickAdd} disabled={!quickAddVariant} className="btn-accent w-full !py-2 text-xs">
+            <ShoppingCart size={14} /> Add to Cart
+          </button>
+        </div>
+      )}
     </motion.div>
   );
 }

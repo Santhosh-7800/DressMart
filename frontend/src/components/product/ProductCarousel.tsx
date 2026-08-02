@@ -20,9 +20,12 @@ interface ProductCarouselProps {
   onRetry?: () => void;
   viewAllHref?: string;
   countdownTo?: string | null;
+  /** Forwarded to every ProductCard — see its own doc comment. Opt-in, unset everywhere except
+   *  the homepage's premium card treatment. */
+  showAddToCartButtons?: boolean;
 }
 
-export function ProductCarousel({ title, products, isLoading, isError, onRetry, viewAllHref }: ProductCarouselProps) {
+export function ProductCarousel({ title, products, isLoading, isError, onRetry, viewAllHref, showAddToCartButtons }: ProductCarouselProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   debugLog('ProductCarousel', 'render', typeof title === 'string' ? title : '(node)', { isLoading, isError, count: products.length });
   // One batched inventory read for the whole carousel instead of each ProductCard firing its own.
@@ -81,7 +84,12 @@ export function ProductCarousel({ title, products, isLoading, isError, onRetry, 
                   transition={{ duration: 0.25, delay: Math.min(index, 6) * 0.03 }}
                   className="w-44 shrink-0 sm:w-52"
                 >
-                  <ProductCard product={product} inventory={inventoryMap ? (inventoryMap[product.id] ?? null) : undefined} skipOwnFetch />
+                  <ProductCard
+                    product={product}
+                    inventory={inventoryMap ? (inventoryMap[product.id] ?? null) : undefined}
+                    skipOwnFetch
+                    showAddToCartButton={showAddToCartButtons}
+                  />
                 </motion.div>
               ))}
         </div>

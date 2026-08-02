@@ -15,9 +15,12 @@ interface ProductGridProps {
   isError?: boolean;
   onRetry?: () => void;
   emptyMessage?: string;
+  /** Forwarded to every ProductCard — see its own doc comment. Opt-in, unset everywhere except
+   *  the homepage's premium card treatment. */
+  showAddToCartButtons?: boolean;
 }
 
-export function ProductGrid({ products, isLoading, isError, onRetry, emptyMessage }: ProductGridProps) {
+export function ProductGrid({ products, isLoading, isError, onRetry, emptyMessage, showAddToCartButtons }: ProductGridProps) {
   debugLog('ProductGrid', 'render', { isLoading, isError, count: products.length });
   // One batched inventory read for the whole grid instead of each ProductCard firing its own —
   // see useInventoryBatch's docstring.
@@ -56,7 +59,13 @@ export function ProductGrid({ products, isLoading, isError, onRetry, emptyMessag
       className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4"
     >
       {products.map((product) => (
-        <ProductCard key={product.id} product={product} inventory={inventoryMap ? (inventoryMap[product.id] ?? null) : undefined} skipOwnFetch />
+        <ProductCard
+          key={product.id}
+          product={product}
+          inventory={inventoryMap ? (inventoryMap[product.id] ?? null) : undefined}
+          skipOwnFetch
+          showAddToCartButton={showAddToCartButtons}
+        />
       ))}
     </motion.div>
   );

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Ban, RotateCcw, UserCog, Clock, Plus, KeyRound, Trash2, LogIn, PackagePlus, PencilLine } from 'lucide-react';
+import { Ban, RotateCcw, UserCog, Clock, Plus, KeyRound, Trash2, LogIn, PackagePlus, PencilLine, Truck, Repeat, Boxes } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -332,6 +332,10 @@ const ACTIVITY_ICON: Record<StaffActivityAction, typeof LogIn> = {
   product_created: PackagePlus,
   product_updated: PencilLine,
   product_deleted: Trash2,
+  order_status_updated: Truck,
+  return_processed: RotateCcw,
+  exchange_processed: Repeat,
+  inventory_updated: Boxes,
 };
 
 const ACTIVITY_LABEL: Record<StaffActivityAction, string> = {
@@ -339,6 +343,10 @@ const ACTIVITY_LABEL: Record<StaffActivityAction, string> = {
   product_created: 'added',
   product_updated: 'updated',
   product_deleted: 'deleted',
+  order_status_updated: 'updated order',
+  return_processed: 'processed return',
+  exchange_processed: 'processed exchange',
+  inventory_updated: 'updated stock for',
 };
 
 /** Most recent Add/Edit/Delete actions and logins across the whole staff roster. */

@@ -27,6 +27,7 @@ import type {
   ProductFacets,
   ProductFilters,
   ProductImage,
+  ProductSpecifications,
   ProductStatus,
   ProductVariant,
 } from '@/types';
@@ -135,6 +136,23 @@ function sortProducts(items: Product[], sort: ProductFilters['sort']): Product[]
     default:
       return sorted.sort((a, b) => b.rating_count - a.rating_count); // popularity
   }
+}
+
+/**
+ * pattern/sleeve/collar/occasion are optional — when the seller leaves one blank, the key must be
+ * OMITTED entirely, never set to `undefined` (Firestore's setDoc rejects any field whose value is
+ * `undefined` outright, throwing "invalid data... Unsupported field value: undefined").
+ */
+function buildSpecifications(input: SellerProductInput): ProductSpecifications {
+  return {
+    fabric: input.fabric,
+    fit: input.fit,
+    country_of_origin: 'India',
+    ...(input.pattern ? { pattern: input.pattern } : {}),
+    ...(input.sleeve ? { sleeve: input.sleeve } : {}),
+    ...(input.collar ? { collar: input.collar } : {}),
+    ...(input.occasion ? { occasion: input.occasion } : {}),
+  };
 }
 
 /**
@@ -414,15 +432,7 @@ export const productService = {
       deal_ends_at: null,
       is_return_eligible: input.is_return_eligible,
       is_exchange_eligible: input.is_exchange_eligible,
-      specifications: {
-        fabric: input.fabric,
-        fit: input.fit,
-        pattern: input.pattern || undefined,
-        sleeve: input.sleeve || undefined,
-        collar: input.collar || undefined,
-        occasion: input.occasion || undefined,
-        country_of_origin: 'India',
-      },
+      specifications: buildSpecifications(input),
       tags: [...new Set(input.colors.map((c) => c.name.toLowerCase()))],
       video_url: null,
       coverImage: images[0]?.url ?? '',
@@ -474,15 +484,7 @@ export const productService = {
       is_active: isActiveStatus(input.status),
       is_return_eligible: input.is_return_eligible,
       is_exchange_eligible: input.is_exchange_eligible,
-      specifications: {
-        fabric: input.fabric,
-        fit: input.fit,
-        pattern: input.pattern || undefined,
-        sleeve: input.sleeve || undefined,
-        collar: input.collar || undefined,
-        occasion: input.occasion || undefined,
-        country_of_origin: 'India',
-      },
+      specifications: buildSpecifications(input),
       tags: [...new Set(input.colors.map((c) => c.name.toLowerCase()))],
       updated_at: new Date().toISOString(),
       updated_by: actor?.id ?? sellerId,

@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { orderService, type AdvanceStatusInput } from '@/services/orderService';
+import { staffService } from '@/services/staffService';
 import { queryKeys } from '@/lib/queryClient';
 import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 import { useAuth } from '@/contexts/AuthContext';
-import { effectiveSellerId, isHeadSeller } from '@/lib/roles';
+import { effectiveSellerId, isHeadSeller, isStaffRole } from '@/lib/roles';
 import type { Order } from '@/types';
 
 /** Buyer's own orders — one card per seller-scoped shipment; group by order_number/group_id for
@@ -125,15 +126,27 @@ export function useSellerOrders() {
 }
 
 export function useAdvanceOrderStatus() {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({ order, input }: { order: Order; input: AdvanceStatusInput }) => orderService.advanceStatus(order, input),
-    onSuccess: () => {
+    onSuccess: (_data, { order, input }) => {
       // Realtime listeners (useOrders/useSellerOrders) already reflect this write — invalidate
       // only the plain react-query caches that don't have a live listener (e.g. by-order-number lookups).
       queryClient.invalidateQueries({ queryKey: ['orders', 'number'] });
       toast.success('Order updated');
+      if (user && isStaffRole(user.role)) {
+        void staffService.logActivity({
+          sellerId: order.seller_id,
+          staffId: user.id,
+          staffName: user.full_name,
+          action: 'order_status_updated',
+          targetType: 'order',
+          targetId: order.id,
+          targetLabel: `${order.order_number} → ${input.nextStatus}`,
+        });
+      }
     },
     onError: (error: Error) => toast.error(getFriendlyErrorMessage(error)),
   });

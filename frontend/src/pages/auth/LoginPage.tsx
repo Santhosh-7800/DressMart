@@ -7,14 +7,15 @@ import { Mail, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Seo } from '@/components/common/Seo';
 import { Input } from '@/components/ui/Input';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/contexts/AuthContext';
 import { getPostLoginRedirect } from '@/lib/roles';
 import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 
 const schema = z.object({
-  email: z.string().email('Enter a valid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  email: z.string().min(1, 'Email is required.').email('Please enter a valid email address.'),
+  password: z.string().min(1, 'Password is required.'),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -61,7 +62,7 @@ export function LoginPage() {
 
       <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
         <Input label="Email Address" type="email" placeholder="you@example.com" leftIcon={<Mail size={16} />} error={errors.email?.message} {...register('email')} />
-        <Input label="Password" type="password" placeholder="••••••••" leftIcon={<Lock size={16} />} error={errors.password?.message} {...register('password')} />
+        <PasswordInput label="Password" placeholder="••••••••" leftIcon={<Lock size={16} />} error={errors.password?.message} {...register('password')} />
         <div className="flex justify-end">
           <Link to="/forgot-password" className="text-sm text-accent-600 hover:underline">
             Forgot password?

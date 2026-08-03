@@ -12,8 +12,8 @@
     "strict": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./frontend/src/*"]
+      "@/*": ["../frontend/src/*"]
     }
   },
-  "include": ["scripts/**/*.ts"]
+  "include": ["../scripts/**/*.ts"]
 }

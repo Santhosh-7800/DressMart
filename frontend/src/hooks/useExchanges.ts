@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { exchangeService, type RequestExchangeInput } from '@/services/exchangeService';
+import { staffService } from '@/services/staffService';
 import { queryKeys } from '@/lib/queryClient';
 import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 import { useAuth } from '@/contexts/AuthContext';
-import { isHeadSeller } from '@/lib/roles';
+import { isHeadSeller, isStaffRole } from '@/lib/roles';
+import { EXCHANGE_STATUS_LABELS } from '@/lib/exchangeStatus';
 import type { ExchangeRequest, ExchangeStatus } from '@/types';
 
 /** Buyer's own exchange requests — realtime, updates live as a seller approves/rejects/advances them. */
@@ -71,14 +73,26 @@ export function useRequestExchange() {
 }
 
 export function useAdvanceExchangeStatus() {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({ exchangeRequest, nextStatus }: { exchangeRequest: ExchangeRequest; nextStatus: ExchangeStatus }) =>
       exchangeService.advanceStatus(exchangeRequest, nextStatus),
-    onSuccess: () => {
+    onSuccess: (_data, { exchangeRequest, nextStatus }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
       toast.success('Exchange updated');
+      if (user && isStaffRole(user.role)) {
+        void staffService.logActivity({
+          sellerId: exchangeRequest.seller_id,
+          staffId: user.id,
+          staffName: user.full_name,
+          action: 'exchange_processed',
+          targetType: 'exchange',
+          targetId: exchangeRequest.id,
+          targetLabel: EXCHANGE_STATUS_LABELS[nextStatus],
+        });
+      }
     },
     onError: (error: Error) => toast.error(getFriendlyErrorMessage(error)),
   });

@@ -12,6 +12,7 @@ import { RequireHeadSeller } from './RequireHeadSeller';
 import { RequireStaff } from './RequireStaff';
 import { lazyWithRetry } from '@/lib/lazyWithRetry';
 import { DEEP_LINK_EVENT } from '@/lib/deepLinks';
+import { useAuth } from '@/contexts/AuthContext';
 
 const HomePage = lazyWithRetry(() => import('@/pages/home/HomePage').then((m) => ({ default: m.HomePage })));
 const SearchResultsPage = lazyWithRetry(() => import('@/pages/home/SearchResultsPage').then((m) => ({ default: m.SearchResultsPage })));
@@ -84,6 +85,8 @@ const SellerStaffPage = lazyWithRetry(() => import('@/pages/seller/SellerStaffPa
 // Staff pages
 const StaffLoginPage = lazyWithRetry(() => import('@/pages/staff/StaffLoginPage').then((m) => ({ default: m.StaffLoginPage })));
 const StaffDashboardPage = lazyWithRetry(() => import('@/pages/staff/StaffDashboardPage').then((m) => ({ default: m.StaffDashboardPage })));
+const StaffActivityPage = lazyWithRetry(() => import('@/pages/staff/StaffActivityPage').then((m) => ({ default: m.StaffActivityPage })));
+const StaffProfilePage = lazyWithRetry(() => import('@/pages/staff/StaffProfilePage').then((m) => ({ default: m.StaffProfilePage })));
 
 function RouteFallback() {
   return (
@@ -91,6 +94,15 @@ function RouteFallback() {
       <Loader2 className="animate-spin text-primary-300" size={32} />
     </div>
   );
+}
+
+/** Gates "/" itself: signed-out visitors are sent to /login instead of browsing Home; once
+ *  authenticated, "/" shows Home as normal. Waits out AuthContext's initial isLoading so a
+ *  refreshing, already-logged-in user doesn't flash the login page before their session resolves. */
+function RootGate() {
+  const { isAuthenticated, isLoading } = useAuth();
+  if (isLoading) return <RouteFallback />;
+  return isAuthenticated ? <HomePage /> : <Navigate to="/login" replace />;
 }
 
 /** Bridges native deep-link events (dispatched by initCapacitorNative, outside the React tree)
@@ -115,7 +127,7 @@ export function AppRoutes() {
     <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route element={<MainLayout />}>
-          <Route path="/" element={<HomePage />} />
+          <Route path="/" element={<RootGate />} />
           <Route path="/search" element={<SearchResultsPage />} />
           <Route path="/deals" element={<DealsPage />} />
           <Route path="/flash-sales" element={<FlashSalesPage />} />
@@ -202,10 +214,11 @@ export function AppRoutes() {
           </Route>
         </Route>
 
-        {/* Staff Dashboard Routes — a staff account's nav (see StaffLayout) only shows the sections
-            its permissions grant, but the underlying product/inventory/order/return pages are the
-            exact same components a seller uses (see SellerProductFormPage/productService for how
-            seller_id resolution and created_by/staff_id attribution differ for a staff actor). */}
+        {/* Staff Dashboard Routes — the Staff role is product-management-only (see StaffLayout's
+            fixed nav): Products/Inventory reuse the same seller page components (see
+            SellerProductFormPage/productService for how seller_id resolution and
+            created_by/staff_id attribution differ for a staff actor), while Activity and Profile
+            are dedicated staff-only pages. No Orders/Returns/Revenue/Seller-Management access. */}
         <Route element={<RequireStaff />}>
           <Route element={<StaffLayout />}>
             <Route path="/staff/dashboard" element={<StaffDashboardPage />} />
@@ -213,8 +226,8 @@ export function AppRoutes() {
             <Route path="/staff/products/new" element={<SellerProductFormPage />} />
             <Route path="/staff/products/:id/edit" element={<SellerProductFormPage />} />
             <Route path="/staff/inventory" element={<SellerInventoryPage />} />
-            <Route path="/staff/orders" element={<SellerOrdersPage />} />
-            <Route path="/staff/returns" element={<SellerReturnsPage />} />
+            <Route path="/staff/activity" element={<StaffActivityPage />} />
+            <Route path="/staff/settings" element={<StaffProfilePage />} />
           </Route>
         </Route>
 

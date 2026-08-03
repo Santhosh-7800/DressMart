@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Search, Eye, EyeOff, Trash2, Pencil, Star, Layers, Zap } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { Input } from '@/components/ui/Input';
@@ -84,7 +84,9 @@ function ProductRowActions({ product, onToggleHidden, onDelete }: { product: Pro
  * available on the regular per-seller Products page. Route: /seller/all-products.
  */
 export function SellerAllProductsPage() {
-  const [search, setSearch] = useState('');
+  const [searchParams] = useSearchParams();
+  // Prefills from the Dashboard's Quick Search (`?q=`) — purely additive, everyone else still lands here with an empty box.
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '');
   const [statusFilter, setStatusFilter] = useState<ProductStatus | 'all'>('all');
   const [dealsOnly, setDealsOnly] = useState(false);
   const [page, setPage] = useState(1);

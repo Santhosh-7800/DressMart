@@ -20,12 +20,12 @@ export function useStaffPermissions() {
   });
 }
 
-export function useOwnStaffActivity() {
+export function useOwnStaffActivity(maxDocs = 20) {
   const { user } = useAuth();
   const isStaff = isStaffRole(user?.role);
   return useQuery({
-    queryKey: queryKeys.staff.ownActivity(user?.id ?? ''),
-    queryFn: () => staffService.listOwnActivity(user!.id),
+    queryKey: [...queryKeys.staff.ownActivity(user?.id ?? ''), maxDocs],
+    queryFn: () => staffService.listOwnActivity(user!.id, maxDocs),
     enabled: isStaff && Boolean(user?.id),
   });
 }

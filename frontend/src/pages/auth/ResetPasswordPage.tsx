@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Lock } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
-import { Input } from '@/components/ui/Input';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 import { Button } from '@/components/ui/Button';
 import { authService } from '@/services/authService';
 import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
@@ -50,8 +50,8 @@ export function ResetPasswordPage() {
       <p className="mt-1 text-sm text-primary-400">Choose a strong password you haven't used before.</p>
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-        <Input label="New Password" type="password" leftIcon={<Lock size={16} />} value={password} onChange={(e) => setPassword(e.target.value)} required />
-        <Input label="Confirm New Password" type="password" leftIcon={<Lock size={16} />} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+        <PasswordInput label="New Password" leftIcon={<Lock size={16} />} value={password} onChange={(e) => setPassword(e.target.value)} required />
+        <PasswordInput label="Confirm New Password" leftIcon={<Lock size={16} />} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
         <Button type="submit" variant="accent" fullWidth size="lg" isLoading={isSubmitting}>
           Reset Password
         </Button>

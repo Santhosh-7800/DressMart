@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { SlidersHorizontal, Truck, FileText, ShieldCheck } from 'lucide-react';
+import { SlidersHorizontal, Truck, FileText, ShieldCheck, Percent } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
@@ -105,6 +105,27 @@ export function SellerPlatformSettingsPage() {
             type="number"
             value={form.exchange_window_days}
             onChange={(e) => update('exchange_window_days', Number(e.target.value))}
+          />
+        </div>
+      </Card>
+
+      <Card hover={false}>
+        <div className="mb-4 flex items-center gap-2">
+          <Percent size={17} className="text-acc-primary" />
+          <h2 className="text-base font-bold text-acc-text dark:text-white">Commission</h2>
+        </div>
+        <p className="mb-4 text-sm text-acc-text-secondary">
+          The percentage of paid-order revenue the platform keeps — drives the dashboard's Platform Earnings / Seller Earnings split.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Input
+            floating
+            label="Commission Rate (%)"
+            type="number"
+            min={0}
+            max={100}
+            value={form.commission_rate_percent}
+            onChange={(e) => update('commission_rate_percent', Number(e.target.value))}
           />
         </div>
       </Card>

@@ -17,7 +17,7 @@ export const staffService = {
     staffId: string;
     staffName: string;
     action: StaffActivityAction;
-    targetType?: 'product' | 'session' | null;
+    targetType?: StaffActivity['target_type'];
     targetId?: string | null;
     targetLabel?: string | null;
   }): Promise<void> {

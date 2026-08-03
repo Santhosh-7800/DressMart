@@ -6,6 +6,7 @@ import { Mail, Lock, User, Phone } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Seo } from '@/components/common/Seo';
 import { Input } from '@/components/ui/Input';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/contexts/AuthContext';
 import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
@@ -59,8 +60,8 @@ export function SignupPage() {
         <Input label="Full Name" placeholder="John Doe" leftIcon={<User size={16} />} error={errors.fullName?.message} {...register('fullName')} />
         <Input label="Email Address" type="email" placeholder="you@example.com" leftIcon={<Mail size={16} />} error={errors.email?.message} {...register('email')} />
         <Input label="Phone Number" placeholder="9876543210" leftIcon={<Phone size={16} />} error={errors.phone?.message} {...register('phone')} />
-        <Input label="Password" type="password" placeholder="••••••••" leftIcon={<Lock size={16} />} error={errors.password?.message} {...register('password')} />
-        <Input label="Confirm Password" type="password" placeholder="••••••••" leftIcon={<Lock size={16} />} error={errors.confirmPassword?.message} {...register('confirmPassword')} />
+        <PasswordInput label="Password" placeholder="••••••••" leftIcon={<Lock size={16} />} error={errors.password?.message} {...register('password')} />
+        <PasswordInput label="Confirm Password" placeholder="••••••••" leftIcon={<Lock size={16} />} error={errors.confirmPassword?.message} {...register('confirmPassword')} />
         <Button type="submit" variant="accent" fullWidth size="lg" isLoading={isSubmitting}>
           Create Account
         </Button>

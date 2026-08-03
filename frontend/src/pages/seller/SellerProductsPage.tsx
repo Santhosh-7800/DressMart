@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { Plus, Search, Eye, EyeOff, Trash2, Pencil, Copy, Zap, AlertTriangle, PackageSearch } from 'lucide-react';
@@ -121,7 +121,9 @@ export function SellerProductsPage() {
   const canOffer = !isStaff;
   const isPending = user?.seller_status === 'pending';
   const isSuspendedOrRejected = user?.seller_status === 'suspended' || user?.seller_status === 'rejected';
-  const [search, setSearch] = useState('');
+  const [searchParams] = useSearchParams();
+  // Prefills from the Dashboard's Quick Search (`?q=`) — purely additive, everyone else still lands here with an empty box.
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '');
   const [statusFilter, setStatusFilter] = useState<ProductStatus | 'all'>('all');
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());

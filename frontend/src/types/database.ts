@@ -51,6 +51,8 @@ export interface Profile {
   bank_ifsc?: string;
   /** Shop-level COD default — distinct from the per-product Product.cod_available. */
   shop_cod_available?: boolean;
+  /** Set on every successful sign-in (see authService.signIn) — powers the Seller Dashboard's "Last Login" display. */
+  last_login_at?: string;
 }
 
 /** Embedded address shape for a seller's pickup/return address — deliberately not the same as the
@@ -107,7 +109,11 @@ export type StaffActivityAction =
   | 'login'
   | 'product_created'
   | 'product_updated'
-  | 'product_deleted';
+  | 'product_deleted'
+  | 'order_status_updated'
+  | 'return_processed'
+  | 'exchange_processed'
+  | 'inventory_updated';
 
 /** `staff_activity/{id}` — append-only audit log of staff-performed actions, powering both the
  *  Head Seller's Activity Logs view and each staff member's own "recent activity" list. */
@@ -117,7 +123,7 @@ export interface StaffActivity {
   staff_id: string;
   staff_name: string;
   action: StaffActivityAction;
-  target_type: 'product' | 'session' | null;
+  target_type: 'product' | 'session' | 'order' | 'return' | 'exchange' | 'inventory' | null;
   target_id: string | null;
   target_label: string | null;
   created_at: string;
@@ -582,5 +588,28 @@ export interface PlatformSettings {
   exchange_window_days: number;
   return_policy: string;
   privacy_policy: string;
+  /** Percentage of paid-order revenue the platform keeps — 0 until the Head Seller sets it, so
+   *  existing installs are unaffected. Drives the dashboard's Platform Earnings / Seller Earnings split. */
+  commission_rate_percent: number;
   updated_at: string;
+}
+
+export type PayoutStatus = 'pending' | 'paid';
+
+/** `payouts/{id}` — a manually-recorded payout from the platform to a seller for a given period.
+ *  No payment gateway integration exists for payouts; the Head Seller records that a bank transfer
+ *  happened and marks it paid, same spirit as the app's existing "informational only" bank fields. */
+export interface Payout {
+  id: string;
+  seller_id: string;
+  seller_name: string;
+  amount: number;
+  period_start: string;
+  period_end: string;
+  status: PayoutStatus;
+  note: string | null;
+  created_at: string;
+  created_by: string;
+  paid_at: string | null;
+  paid_by: string | null;
 }

@@ -126,6 +126,25 @@ export const reviewService = {
     });
   },
 
+  /** Lightweight dashboard stat — average rating + unreplied count across this seller's own
+   *  products, without the product-name/slug join `listForSeller` does (that's for the full Reviews
+   *  page; the dashboard only needs the two numbers). */
+  async getSellerRatingOverview(sellerId: string): Promise<{ averageRating: number; totalReviews: number; unrepliedCount: number }> {
+    const productsSnap = await getDocs(query(collection(db, PRODUCTS_COLLECTION), where('seller_id', '==', sellerId)));
+    const ids = productsSnap.docs.map((d) => d.id);
+    if (ids.length === 0) return { averageRating: 0, totalReviews: 0, unrepliedCount: 0 };
+
+    const chunks: string[][] = [];
+    for (let i = 0; i < ids.length; i += 30) chunks.push(ids.slice(i, i + 30));
+    const results = await Promise.all(chunks.map((chunk) => getDocs(query(collection(db, REVIEWS_COLLECTION), where('product_id', 'in', chunk)))));
+    const reviews = results.flatMap((snap) => snap.docs.map((d) => d.data() as Review));
+
+    if (reviews.length === 0) return { averageRating: 0, totalReviews: 0, unrepliedCount: 0 };
+    const totalRating = reviews.reduce((sum, r) => sum + r.rating, 0);
+    const unrepliedCount = reviews.filter((r) => !r.seller_reply).length;
+    return { averageRating: Math.round((totalRating / reviews.length) * 10) / 10, totalReviews: reviews.length, unrepliedCount };
+  },
+
   /** Every review across this seller's own products, newest first — reviews are keyed by
    *  product_id, not seller_id, so this resolves the seller's product ids first. Powers
    *  SellerReviewsPage. */

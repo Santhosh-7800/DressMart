@@ -9,6 +9,7 @@ import { User, Store, Mail, Phone, Lock, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Seo } from '@/components/common/Seo';
 import { Input } from '@/components/ui/Input';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 import { Button } from '@/components/ui/Button';
 import { db, functions } from '@/lib/firebase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -97,8 +98,8 @@ export function HeadSellerSetupPage() {
         <Input label="Store Name" placeholder="DressMart HQ" leftIcon={<Store size={16} />} error={errors.storeName?.message} {...register('storeName')} />
         <Input label="Email Address" type="email" placeholder="owner@example.com" leftIcon={<Mail size={16} />} error={errors.email?.message} {...register('email')} />
         <Input label="Phone Number" placeholder="9876543210" leftIcon={<Phone size={16} />} error={errors.phone?.message} {...register('phone')} />
-        <Input label="Password" type="password" placeholder="••••••••" leftIcon={<Lock size={16} />} error={errors.password?.message} {...register('password')} />
-        <Input label="Confirm Password" type="password" placeholder="••••••••" leftIcon={<Lock size={16} />} error={errors.confirmPassword?.message} {...register('confirmPassword')} />
+        <PasswordInput label="Password" placeholder="••••••••" leftIcon={<Lock size={16} />} error={errors.password?.message} {...register('password')} />
+        <PasswordInput label="Confirm Password" placeholder="••••••••" leftIcon={<Lock size={16} />} error={errors.confirmPassword?.message} {...register('confirmPassword')} />
         <Button type="submit" variant="accent" fullWidth size="lg" isLoading={isSubmitting}>
           Create Head Seller
         </Button>

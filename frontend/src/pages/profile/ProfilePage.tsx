@@ -1,7 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Store, Clock3, ShieldAlert } from 'lucide-react';
+import { Clock3, ShieldAlert } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { InstallAppBanner } from '@/components/profile/InstallAppBanner';
 import { ProfileMobileList } from '@/components/profile/ProfileMobileList';
@@ -40,23 +38,6 @@ export function ProfilePage() {
       {isDesktop && <ProfileDesktopDashboard user={user} onSignOut={handleSignOut} />}
 
       <InstallAppBanner />
-
-      {user.role === 'buyer' && (
-        <motion.div whileHover={{ y: -3 }} transition={{ duration: 0.2 }}>
-          <Link
-            to="/sell"
-            className="flex items-center gap-3 rounded-[20px] bg-gradient-to-br from-acc-primary to-acc-secondary p-4 text-white shadow-[0_12px_28px_-14px_rgba(255,107,0,0.6)] sm:p-5"
-          >
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/15">
-              <Store size={20} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="font-bold">Become a Seller</p>
-              <p className="text-sm text-white/85">Start selling on DressMart — apply in under a minute.</p>
-            </div>
-          </Link>
-        </motion.div>
-      )}
 
       {(user.role === 'seller' || user.role === 'head_seller') && user.seller_status === 'pending' && (
         <div className="flex items-center gap-3 rounded-[20px] border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/40 dark:bg-amber-900/10">

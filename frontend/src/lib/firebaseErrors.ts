@@ -8,10 +8,15 @@ import { FirebaseError } from 'firebase/app';
  */
 const FRIENDLY_MESSAGES: Record<string, string> = {
   // Auth
+  // Ambiguous by design on projects with Firebase's email-enumeration protection enabled — it
+  // returns this same code for both "no such account" and "wrong password" specifically so a
+  // client can't distinguish the two (that's a deliberate anti-enumeration security feature, not
+  // something to work around client-side). auth/user-not-found / auth/wrong-password below are the
+  // older, split codes still returned by the Auth emulator and by projects without that feature on.
   'auth/invalid-credential': 'Incorrect email or password.',
-  'auth/invalid-email': 'Enter a valid email address.',
-  'auth/user-not-found': 'No account found with that email.',
-  'auth/wrong-password': 'Incorrect email or password.',
+  'auth/invalid-email': 'Please enter a valid email address.',
+  'auth/user-not-found': 'No account found with this email.',
+  'auth/wrong-password': 'Incorrect password.',
   'auth/email-already-in-use': 'An account with this email already exists.',
   'auth/weak-password': 'Choose a stronger password (at least 6 characters).',
   'auth/too-many-requests': 'Too many attempts. Please wait a moment and try again.',
@@ -20,9 +25,9 @@ const FRIENDLY_MESSAGES: Record<string, string> = {
   'auth/invalid-verification-code': 'That code is incorrect. Please try again.',
   'auth/code-expired': 'That code has expired — request a new one.',
   'auth/invalid-phone-number': 'Enter a valid phone number.',
-  'auth/network-request-failed': "Can't reach the server — check your connection and try again.",
+  'auth/network-request-failed': 'Unable to connect. Please check your internet connection.',
   'auth/requires-recent-login': 'Please sign in again to complete this action.',
-  'auth/user-disabled': 'This account has been disabled. Contact support.',
+  'auth/user-disabled': 'Your account has been disabled. Contact support.',
   'auth/invalid-action-code': 'This link is invalid or has expired — request a new one.',
 
   // Firestore / Functions
@@ -50,7 +55,7 @@ function extractCode(error: unknown): { code: string; isCallable: boolean } | nu
 
 /** Friendly message for any Firebase-originated error, with a caller-supplied fallback for anything unrecognized. */
 export function getFriendlyErrorMessage(error: unknown, fallback = 'Something went wrong. Please try again.'): string {
-  if (!navigator.onLine) return "You're offline — check your connection and try again.";
+  if (!navigator.onLine) return 'Unable to connect. Please check your internet connection.';
   const extracted = extractCode(error);
   // Cloud Function callables (functions/*) throw HttpsError with a message the function author
   // wrote specifically for end users (e.g. `Insufficient stock for "Red Shirt, size M".`) — prefer

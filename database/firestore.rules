@@ -205,6 +205,14 @@ service cloud.firestore {
       allow write: if isHeadSeller();
     }
 
+    // Manually-recorded Head-Seller-to-seller payouts (no payment gateway integration — see
+    // types/database.ts's Payout). A seller may read their own payout history; only the Head
+    // Seller can create a payout or mark one paid.
+    match /payouts/{payoutId} {
+      allow read: if isHeadSeller() || (isSignedIn() && resource.data.seller_id == uid());
+      allow write: if isHeadSeller();
+    }
+
     // Staff Management — see functions/src/callables/addStaff|removeStaff|resetStaffPassword for
     // the account-creation/deletion path (Admin SDK, bypasses these rules entirely). Direct client
     // writes here are limited to the Head Seller editing a single doc's simple fields (permissions,

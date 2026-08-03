@@ -1,7 +1,10 @@
+import { Capacitor } from '@capacitor/core';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signInWithPhoneNumber,
   GoogleAuthProvider,
   RecaptchaVerifier,
@@ -57,6 +60,20 @@ async function ensureProfileDoc(fbUser: FirebaseUser, extra?: Partial<Pick<Profi
   return { id: fbUser.uid, ...profile };
 }
 
+/** Stamps `last_login_at` on every successful sign-in (new or returning user, any provider) — see signIn()'s identical stamp for email/password. */
+async function touchLastLogin(uid: string): Promise<string> {
+  const now = new Date().toISOString();
+  await updateDoc(doc(db, 'users', uid), { last_login_at: now });
+  return now;
+}
+
+/** True inside the native Capacitor shell, or a mobile browser — signInWithPopup() is unreliable in
+ *  both (native WebViews commonly block it as a "disallowed_useragent"; mobile browsers give it a
+ *  worse UX), so signInWithGoogle() uses signInWithRedirect() here instead. */
+function isMobileSignIn(): boolean {
+  return Capacitor.isNativePlatform() || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
 export const authService = {
   async fetchProfile(uid: string): Promise<Profile | null> {
     const snap = await getDoc(doc(db, 'users', uid));
@@ -86,12 +103,42 @@ export const authService = {
       await firebaseSignOut(auth);
       throw new Error('Your staff account has been disabled. Contact the Head Seller.');
     }
-    return profile;
+    const last_login_at = await touchLastLogin(cred.user.uid);
+    return { ...profile, last_login_at };
   },
 
-  async signInWithGoogle(): Promise<Profile> {
-    const cred = await signInWithPopup(auth, new GoogleAuthProvider());
-    return ensureProfileDoc(cred.user);
+  /**
+   * `prompt: 'select_account'` forces Google's real account chooser (accounts.google.com) to list
+   * every Google account currently signed into the browser every time — without it, Google may
+   * silently reuse whichever account was last selected instead of showing the chooser.
+   *
+   * signInWithPopup() on desktop (resolves synchronously, so the caller gets the resulting Profile
+   * back directly); signInWithRedirect() on mobile (see isMobileSignIn). The redirect path returns
+   * `null` immediately — the browser navigates away to Google and back, so the actual sign-in is
+   * completed by completeGoogleRedirectSignIn() once the app reloads.
+   */
+  async signInWithGoogle(): Promise<Profile | null> {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    if (isMobileSignIn()) {
+      await signInWithRedirect(auth, provider);
+      return null;
+    }
+    const cred = await signInWithPopup(auth, provider);
+    const profile = await ensureProfileDoc(cred.user);
+    const last_login_at = await touchLastLogin(cred.user.uid);
+    return { ...profile, last_login_at };
+  },
+
+  /** Completes a signInWithGoogle() redirect (mobile only, in practice — see above) after the app
+   *  relaunches. Resolves to `null` when there's no pending redirect to complete (the overwhelmingly
+   *  common case — this is called unconditionally on every app mount, see AuthContext). */
+  async completeGoogleRedirectSignIn(): Promise<Profile | null> {
+    const result = await getRedirectResult(auth);
+    if (!result) return null;
+    const profile = await ensureProfileDoc(result.user);
+    const last_login_at = await touchLastLogin(result.user.uid);
+    return { ...profile, last_login_at };
   },
 
   /** Renders an invisible reCAPTCHA into `containerId` and sends an OTP to `phoneNumber` (E.164, e.g. +919876543210). */

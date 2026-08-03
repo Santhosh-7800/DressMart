@@ -2,8 +2,11 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { inventoryService } from '@/services/inventoryService';
+import { staffService } from '@/services/staffService';
 import { queryKeys } from '@/lib/queryClient';
 import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
+import { useAuth } from '@/contexts/AuthContext';
+import { isStaffRole } from '@/lib/roles';
 import type { Inventory } from '@/types';
 
 /** One-shot, cached read — for grids/tables where a live listener per row would be overkill.
@@ -59,19 +62,42 @@ export function useInventoryRealtime(productId: string | null | undefined) {
   return { data: inventory, isLoading: inventory === undefined };
 }
 
-/** Seller's Inventory management page — updates variant_stock/total_stock/low_stock_threshold. */
+/** Seller's Inventory management page — updates variant_stock/total_stock/low_stock_threshold.
+ *  `sellerId`/`productName` are optional and only used to log staff activity — a regular
+ *  seller/head-seller call site can omit them. */
 export function useUpdateStock() {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ productId, variantStock, lowStockThreshold }: { productId: string; variantStock: Record<string, number>; lowStockThreshold: number }) =>
-      inventoryService.updateStock(productId, variantStock, lowStockThreshold),
-    onSuccess: (_data, { productId }) => {
+    mutationFn: ({
+      productId,
+      variantStock,
+      lowStockThreshold,
+    }: {
+      productId: string;
+      variantStock: Record<string, number>;
+      lowStockThreshold: number;
+      sellerId?: string;
+      productName?: string;
+    }) => inventoryService.updateStock(productId, variantStock, lowStockThreshold),
+    onSuccess: (_data, { productId, sellerId, productName }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.detail(productId) });
       // Seller pages (SellerProductsPage/SellerInventoryPage) batch-fetch inventory under this
       // key prefix keyed by a freshly-computed product-id array each render, so an exact key match
       // never hits — invalidate the whole prefix instead.
       queryClient.invalidateQueries({ queryKey: ['seller', 'inventory', 'batch'] });
       toast.success('Stock updated');
+      if (user && isStaffRole(user.role) && sellerId) {
+        void staffService.logActivity({
+          sellerId,
+          staffId: user.id,
+          staffName: user.full_name,
+          action: 'inventory_updated',
+          targetType: 'inventory',
+          targetId: productId,
+          targetLabel: productName ?? null,
+        });
+      }
     },
     onError: (error: Error) => toast.error(getFriendlyErrorMessage(error)),
   });

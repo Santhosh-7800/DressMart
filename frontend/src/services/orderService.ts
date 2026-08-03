@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, updateDoc, where, type Unsubscribe } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, updateDoc, where, type Unsubscribe } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '@/lib/firebase';
 import type { Order, OrderStatus, OrderTimelineEvent } from '@/types';
@@ -95,6 +95,16 @@ export const orderService = {
     const q = isHeadSeller
       ? query(collection(db, ORDERS_COLLECTION), orderBy('placed_at', 'desc'))
       : query(collection(db, ORDERS_COLLECTION), where('seller_id', '==', sellerId), orderBy('placed_at', 'desc'));
+    return onSnapshot(q, (snap) => callback(snap.docs.map(toOrder)));
+  },
+
+  /** Realtime, bounded (limit 10) — the Dashboard's "Recent Orders" feed. Deliberately a separate
+   *  method from the unbounded `subscribeForSeller` (which SellerOrdersPage relies on for its full
+   *  queue) so a bounded `limit()` never needs to be retrofitted onto that existing, working query. */
+  subscribeRecentForSeller(sellerId: string, isHeadSeller: boolean, maxDocs: number, callback: (orders: Order[]) => void): Unsubscribe {
+    const q = isHeadSeller
+      ? query(collection(db, ORDERS_COLLECTION), orderBy('placed_at', 'desc'), limit(maxDocs))
+      : query(collection(db, ORDERS_COLLECTION), where('seller_id', '==', sellerId), orderBy('placed_at', 'desc'), limit(maxDocs));
     return onSnapshot(q, (snap) => callback(snap.docs.map(toOrder)));
   },
 

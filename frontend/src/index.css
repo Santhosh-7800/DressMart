@@ -63,6 +63,13 @@
     @apply w-full rounded-xl border border-primary-200 bg-white px-4 py-2.5 text-sm text-primary-900 placeholder:text-primary-300 transition-colors focus:border-accent dark:border-primary-600 dark:bg-primary-800 dark:text-white dark:placeholder:text-primary-400;
   }
 
+  /* Suppress browsers' own built-in password reveal/clear icons (Edge's ::-ms-reveal, in
+     particular) so they don't render on top of PasswordInput's custom eye toggle. */
+  input[type='password']::-ms-reveal,
+  input[type='password']::-ms-clear {
+    display: none;
+  }
+
   .skeleton {
     @apply relative overflow-hidden bg-primary-100 dark:bg-primary-700;
   }

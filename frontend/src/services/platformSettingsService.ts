@@ -16,6 +16,7 @@ const DEFAULT_SETTINGS: Omit<PlatformSettings, 'id'> = {
   exchange_window_days: 7,
   return_policy: '',
   privacy_policy: '',
+  commission_rate_percent: 0,
   updated_at: new Date().toISOString(),
 };
 
@@ -24,7 +25,9 @@ export const platformSettingsService = {
   async get(): Promise<PlatformSettings> {
     const snap = await getDoc(doc(db, 'platform_settings', SETTINGS_DOC_ID));
     if (!snap.exists()) return { id: SETTINGS_DOC_ID, ...DEFAULT_SETTINGS };
-    return { id: SETTINGS_DOC_ID, ...(snap.data() as Omit<PlatformSettings, 'id'>) };
+    // Spread over DEFAULT_SETTINGS (not just the raw doc) so a doc saved before commission_rate_percent
+    // existed still gets the safe 0 default instead of `undefined`.
+    return { id: SETTINGS_DOC_ID, ...DEFAULT_SETTINGS, ...(snap.data() as Omit<PlatformSettings, 'id'>) };
   },
 
   /** Head-Seller-only write (see firestore.rules) — merges partial updates into the singleton doc. */

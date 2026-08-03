@@ -1,15 +1,13 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { LayoutDashboard, Package, Boxes, ShoppingBag, RotateCcw, LogOut, Menu, X, Briefcase, ShieldAlert, type LucideIcon } from 'lucide-react';
+import { LayoutDashboard, Package, Boxes, History, UserCog, LogOut, Menu, X, Briefcase, ShieldAlert, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAvatar } from '@/hooks/useAvatar';
-import { useStaffPermissions } from '@/hooks/useStaff';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { AnimatedOutlet } from '@/components/common/PageTransition';
-import type { StaffPermissions } from '@/types';
 
 interface NavItem {
   to: string;
@@ -18,25 +16,18 @@ interface NavItem {
   end?: boolean;
 }
 
-/** Every nav item beyond Dashboard is gated by the matching permission — an account with none of
- *  the product/inventory/order/return permissions sees only Dashboard, per the spec's "Staff
- *  cannot see or use disabled features". */
-function navItemsFor(permissions: StaffPermissions | null | undefined): NavItem[] {
-  const items: NavItem[] = [{ to: '/staff/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true }];
-  if (permissions?.add_products || permissions?.edit_products || permissions?.delete_products) {
-    items.push({ to: '/staff/products', label: 'Products', icon: Package });
-  }
-  if (permissions?.manage_inventory) {
-    items.push({ to: '/staff/inventory', label: 'Inventory', icon: Boxes });
-  }
-  if (permissions?.process_orders || permissions?.update_order_status) {
-    items.push({ to: '/staff/orders', label: 'Orders', icon: ShoppingBag });
-  }
-  if (permissions?.approve_returns) {
-    items.push({ to: '/staff/returns', label: 'Returns', icon: RotateCcw });
-  }
-  return items;
-}
+/** The Staff role is product-management-only — this fixed list IS the full scope of what a staff
+ *  account can reach (no Orders/Returns/Revenue/Seller-Management/Analytics/Payments). Individual
+ *  add/edit/delete/manage_inventory actions inside Products/Inventory still respect the account's
+ *  granted StaffPermissionKeys (see SellerProductsPage/SellerProductFormPage's canX gates) — this
+ *  list only controls which destinations exist at all. */
+const STAFF_NAV_ITEMS: NavItem[] = [
+  { to: '/staff/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/staff/products', label: 'Products', icon: Package },
+  { to: '/staff/inventory', label: 'Inventory', icon: Boxes },
+  { to: '/staff/activity', label: 'My Activity', icon: History },
+  { to: '/staff/settings', label: 'Profile', icon: UserCog },
+];
 
 function NavItems({ items, collapsed, onNavigate }: { items: NavItem[]; collapsed?: boolean; onNavigate?: () => void }) {
   const navigate = useNavigate();
@@ -133,14 +124,14 @@ function DisabledBlock({ reason }: { reason: string | null | undefined }) {
 }
 
 /** Shared shell for every Staff Dashboard page — deliberately separate from SellerLayout even
- *  though it reuses several seller pages under /staff/* (SellerProductsPage etc.), since a staff
- *  member's nav is permission-gated rather than "everything a seller can do". */
+ *  though it reuses two seller pages under /staff/* (SellerProductsPage/SellerInventoryPage), since
+ *  a staff member's nav is a fixed, product-management-only list rather than "everything a seller
+ *  can do". */
 export function StaffLayout() {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const { user } = useAuth();
   const { avatarUrl } = useAvatar();
-  const { data: permissions } = useStaffPermissions();
-  const items = navItemsFor(permissions);
+  const items = STAFF_NAV_ITEMS;
 
   if (user?.staff_status === 'disabled') {
     return <DisabledBlock reason={user.staff_status_reason} />;

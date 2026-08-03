@@ -34,9 +34,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useAvatar } from '@/hooks/useAvatar';
 import { useBackButtonDismiss } from '@/hooks/useBackButtonDismiss';
 import { useRipple } from '@/hooks/useRipple';
+import { useNotifications } from '@/hooks/useNotifications';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { RippleLayer } from '@/components/ui/RippleLayer';
+import { CountBadge } from '@/components/ui/CountBadge';
 import { AnimatedOutlet } from '@/components/common/PageTransition';
 import { isHeadSeller } from '@/lib/roles';
 
@@ -103,6 +105,13 @@ const HEAD_SELLER_NAV_ITEMS: NavItem[] = [
   { to: '/seller/platform-settings', label: 'Platform Settings', icon: SlidersHorizontal },
 ];
 
+/** Live unread-count pill on the Notifications nav item — realtime (see useNotifications), so it
+ *  updates the instant a new notification lands without needing to open the page. */
+function NotificationNavBadge() {
+  const { unreadCount } = useNotifications();
+  return <CountBadge count={unreadCount} />;
+}
+
 function NavItems({ collapsed, onNavigate }: { collapsed?: boolean; onNavigate?: () => void }) {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
@@ -135,6 +144,7 @@ function NavItems({ collapsed, onNavigate }: { collapsed?: boolean; onNavigate?:
         >
           <Icon size={18} className="shrink-0 transition-transform duration-200 group-hover:scale-110" />
           {!collapsed && <span className="truncate">{label}</span>}
+          {to === '/seller/notifications' && <NotificationNavBadge />}
         </NavLink>
       ))}
       <button
@@ -234,9 +244,12 @@ export function SellerLayout() {
     <div className="min-h-screen bg-acc-bg dark:bg-surface-dark">
       <div className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-6 lg:px-8">
         <div className="flex gap-6">
-          {/* Desktop: full labeled sidebar, 260px */}
-          <aside className="hidden shrink-0 lg:block lg:w-[260px]">
-            <nav className="sticky top-24 flex flex-col gap-1.5 rounded-[20px] border border-acc-border bg-white p-3 shadow-[0_2px_16px_rgba(17,24,39,0.06)] dark:border-primary-700 dark:bg-card-dark">
+          {/* Desktop: full labeled sidebar, 260px. The `aside` itself (not the visual `nav` card)
+              owns the sticky positioning — position:sticky, top:0, full viewport height — so the
+              whole page scrolls as one unit under a single browser scrollbar; the nav card keeps
+              its own natural compact height/visual styling unchanged inside that sticky column. */}
+          <aside className="hidden shrink-0 lg:sticky lg:top-0 lg:block lg:h-screen lg:w-[260px]">
+            <nav className="flex flex-col gap-1.5 rounded-[20px] border border-acc-border bg-white p-3 shadow-[0_2px_16px_rgba(17,24,39,0.06)] dark:border-primary-700 dark:bg-card-dark">
               <div className="mb-1 flex items-center gap-2 px-1 pb-2">
                 <Store size={16} className="text-acc-primary" />
                 <span className="text-xs font-bold uppercase tracking-wide text-acc-text-secondary">Seller Dashboard</span>
@@ -246,16 +259,18 @@ export function SellerLayout() {
             </nav>
           </aside>
 
-          {/* Tablet: collapsed icon-only rail */}
-          <aside className="hidden shrink-0 md:block md:w-[76px] lg:hidden">
-            <nav className="sticky top-24 flex flex-col items-center gap-1.5 rounded-[20px] border border-acc-border bg-white p-2 shadow-[0_2px_16px_rgba(17,24,39,0.06)] dark:border-primary-700 dark:bg-card-dark">
+          {/* Tablet: collapsed icon-only rail — same sticky-on-the-wrapper pattern as desktop. */}
+          <aside className="hidden shrink-0 md:sticky md:top-0 md:block md:h-screen md:w-[76px] lg:hidden">
+            <nav className="flex flex-col items-center gap-1.5 rounded-[20px] border border-acc-border bg-white p-2 shadow-[0_2px_16px_rgba(17,24,39,0.06)] dark:border-primary-700 dark:bg-card-dark">
               {user && <Avatar src={avatarUrl} name={user.full_name} size="sm" className="mb-1" />}
               <NavItems collapsed />
             </nav>
           </aside>
 
-          {/* Content — always centered within the 1200px shell, fluid width */}
-          <div className="min-w-0 flex-1 pb-24 md:pb-0">
+          {/* Content — always centered within the 1200px shell, fluid width. No overflow/height
+              constraint of its own: it grows with its content and the single browser scrollbar
+              scrolls the whole page (sidebar + content) together. */}
+          <div className="min-w-0 flex-1 overflow-visible pb-24 md:pb-0">
             {user?.seller_status === 'pending' && <PendingApprovalBanner />}
             <AnimatedOutlet />
           </div>

@@ -463,13 +463,14 @@ export function SellerProductFormPage() {
     return null;
   }
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (overrideStatus?: ProductStatus) => {
     const validationError = validate();
     if (validationError) {
       toast.error(validationError);
       return;
     }
     if (!user) return;
+    const targetStatus = overrideStatus ?? form.status;
 
     const sellerId = isEditing && existingProduct ? existingProduct.seller_id : effectiveSellerId(user);
     const sellerName = isEditing && existingProduct ? existingProduct.seller_name : user.store_name ?? user.full_name;
@@ -519,7 +520,7 @@ export function SellerProductFormPage() {
       colors,
       is_return_eligible: form.is_return_eligible,
       is_exchange_eligible: form.is_exchange_eligible,
-      status: form.status,
+      status: targetStatus,
     };
 
     try {
@@ -736,21 +737,25 @@ export function SellerProductFormPage() {
           </div>
         </section>
 
-        {/* Status */}
-        <section className="card-surface p-5">
-          <h2 className="mb-3 font-semibold">Product Status</h2>
-          <select className="input-field max-w-xs" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as ProductStatus })}>
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-          <p className="mt-2 text-xs text-primary-400">
-            Draft and Hidden aren't visible to buyers. Active and Out of Stock both show in the catalog — Out of Stock just marks it
-            unavailable to purchase. Out of Stock is normally implied once every size's stock reaches zero, but you can set it manually here too.
-          </p>
-        </section>
+        {/* Status — staff only ever choose Draft vs Publish (see the button row below); the full
+            4-state dropdown (including Hidden/Out of Stock, which are seller-level merchandising
+            decisions) is seller/head-seller only. */}
+        {!isStaff && (
+          <section className="card-surface p-5">
+            <h2 className="mb-3 font-semibold">Product Status</h2>
+            <select className="input-field max-w-xs" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as ProductStatus })}>
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-2 text-xs text-primary-400">
+              Draft and Hidden aren't visible to buyers. Active and Out of Stock both show in the catalog — Out of Stock just marks it
+              unavailable to purchase. Out of Stock is normally implied once every size's stock reaches zero, but you can set it manually here too.
+            </p>
+          </section>
+        )}
 
         {/* Colors */}
         <section className="card-surface p-5">
@@ -825,9 +830,20 @@ export function SellerProductFormPage() {
           <Button variant="outline" onClick={() => navigate(`${basePath}/products`)}>
             Cancel
           </Button>
-          <Button variant="accent" onClick={handleSubmit} isLoading={isSaving}>
-            Save Product
-          </Button>
+          {isStaff ? (
+            <>
+              <Button variant="outline" onClick={() => handleSubmit('draft')} isLoading={isSaving}>
+                Save as Draft
+              </Button>
+              <Button variant="accent" onClick={() => handleSubmit('active')} isLoading={isSaving}>
+                Publish
+              </Button>
+            </>
+          ) : (
+            <Button variant="accent" onClick={() => handleSubmit()} isLoading={isSaving}>
+              Save Product
+            </Button>
+          )}
         </div>
       </div>
     </div>

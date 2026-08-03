@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { returnService } from '@/services/returnService';
+import { staffService } from '@/services/staffService';
 import { queryKeys } from '@/lib/queryClient';
 import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 import { useAuth } from '@/contexts/AuthContext';
-import { effectiveSellerId, isHeadSeller } from '@/lib/roles';
+import { effectiveSellerId, isHeadSeller, isStaffRole } from '@/lib/roles';
+import { RETURN_STATUS_LABELS } from '@/lib/returnStatus';
 import type { Order, ReturnRequest, ReturnStatus } from '@/types';
 
 /** Buyer's own return requests — realtime, updates live as a seller approves/rejects/advances them. */
@@ -74,14 +76,26 @@ export function useRequestReturn() {
 }
 
 export function useAdvanceReturnStatus() {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({ returnRequest, nextStatus }: { returnRequest: ReturnRequest; nextStatus: ReturnStatus }) =>
       returnService.advanceStatus(returnRequest, nextStatus),
-    onSuccess: () => {
+    onSuccess: (_data, { returnRequest, nextStatus }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
       toast.success('Return updated');
+      if (user && isStaffRole(user.role)) {
+        void staffService.logActivity({
+          sellerId: returnRequest.seller_id,
+          staffId: user.id,
+          staffName: user.full_name,
+          action: 'return_processed',
+          targetType: 'return',
+          targetId: returnRequest.id,
+          targetLabel: RETURN_STATUS_LABELS[nextStatus],
+        });
+      }
     },
     onError: (error: Error) => toast.error(getFriendlyErrorMessage(error)),
   });

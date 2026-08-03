@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 import { Moon, Sun, Monitor, Lock, AlertTriangle, Bell, BellOff, BellRing } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { Card } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Input';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { useAuth } from '@/contexts/AuthContext';
@@ -96,9 +96,9 @@ export function SettingsPage() {
           <h2 className="text-base font-bold text-acc-text dark:text-white">Change Password</h2>
         </div>
         <div className="space-y-4">
-          <Input floating label="Current Password" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
-          <Input floating label="New Password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
-          <Input floating label="Confirm New Password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+          <PasswordInput floating label="Current Password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
+          <PasswordInput floating label="New Password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+          <PasswordInput floating label="Confirm New Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
           <Button variant="account" onClick={handleChangePassword} isLoading={isSavingPassword}>
             Update Password
           </Button>

@@ -7,6 +7,7 @@ import { Mail, Lock, Phone } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Seo } from '@/components/common/Seo';
 import { Input } from '@/components/ui/Input';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/contexts/AuthContext';
 import { authService, type ConfirmationResult } from '@/services/authService';
@@ -99,7 +100,7 @@ export function SellerLoginPage() {
         <>
           <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
             <Input label="Email Address" type="email" placeholder="you@example.com" leftIcon={<Mail size={16} />} error={errors.email?.message} {...register('email')} />
-            <Input label="Password" type="password" placeholder="••••••••" leftIcon={<Lock size={16} />} error={errors.password?.message} {...register('password')} />
+            <PasswordInput label="Password" placeholder="••••••••" leftIcon={<Lock size={16} />} error={errors.password?.message} {...register('password')} />
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-2 text-sm text-primary-500 dark:text-primary-300">
                 <input

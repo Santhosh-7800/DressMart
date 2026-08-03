@@ -1,4 +1,4 @@
-import { collection, addDoc, doc, getDocs, orderBy, query, updateDoc, where, writeBatch } from 'firebase/firestore';
+import { collection, addDoc, doc, getDocs, onSnapshot, orderBy, query, updateDoc, where, writeBatch, type Unsubscribe } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Notification, NotificationType } from '@/types';
 
@@ -24,6 +24,14 @@ export const notificationService = {
       query(collection(db, NOTIFICATIONS_COLLECTION), where('user_id', '==', userId), orderBy('created_at', 'desc')),
     );
     return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Notification);
+  },
+
+  /** Realtime — a single user's own notifications is naturally small/bounded, unlike a whole-collection
+   *  aggregate, so a live listener here (unlike e.g. platform-wide revenue) is cheap and exactly what
+   *  "unread badge updates the instant a notification lands" needs. */
+  subscribe(userId: string, callback: (notifications: Notification[]) => void): Unsubscribe {
+    const q = query(collection(db, NOTIFICATIONS_COLLECTION), where('user_id', '==', userId), orderBy('created_at', 'desc'));
+    return onSnapshot(q, (snap) => callback(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Notification)));
   },
 
   async markRead(userId: string, notificationId: string): Promise<Notification[]> {

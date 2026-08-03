@@ -1,15 +1,17 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Wallet, CreditCard, Store, TrendingUp } from 'lucide-react';
+import { Wallet, CreditCard, Store, TrendingUp, FileText, FileSpreadsheet, FileDown } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { formatCurrency } from '@/lib/utils';
 import { queryKeys } from '@/lib/queryClient';
 import { sellerAdminService } from '@/services/sellerAdminService';
 import { sellerStatsService, revenueBySeller, paymentMethodBreakdown, totalRevenueOf } from '@/services/sellerStatsService';
+import { exportReportToCsv, exportReportToExcel, exportReportToPdf, type ReportExportInput } from '@/lib/reportExport';
 
 function isoDateDaysAgo(days: number): string {
   const d = new Date();
@@ -56,6 +58,24 @@ export function SellerReportsPage() {
 
   const isLoading = ordersQuery.isLoading || sellersQuery.isLoading;
 
+  const buildExportInput = (): ReportExportInput => ({
+    filenamePrefix: 'dressmart-revenue-report',
+    reportTitle: 'DressMart Revenue Report',
+    summary: [
+      { label: 'Date Range', value: `${fromDate} to ${toDate}` },
+      { label: 'Total Revenue (paid)', value: formatCurrency(totalRevenue) },
+      { label: 'Razorpay', value: `${formatCurrency(byPaymentMethod.razorpay.revenue)} (${byPaymentMethod.razorpay.orders} orders)` },
+      { label: 'COD', value: `${formatCurrency(byPaymentMethod.cod.revenue)} (${byPaymentMethod.cod.orders} orders)` },
+    ],
+    tables: [
+      {
+        title: 'Revenue by Seller',
+        headers: ['Seller', 'Orders', 'Revenue'],
+        rows: bySeller.map((s) => [sellerNameById.get(s.seller_id) ?? s.seller_id, s.orders, formatCurrency(s.revenue)]),
+      },
+    ],
+  });
+
   return (
     <div className="space-y-8">
       <Seo title="Revenue Reports" />
@@ -66,9 +86,22 @@ export function SellerReportsPage() {
         </p>
       </div>
 
-      <Card hover={false} className="flex flex-wrap items-end gap-4">
-        <Input floating label="From" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="max-w-[180px]" />
-        <Input floating label="To" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="max-w-[180px]" />
+      <Card hover={false} className="flex flex-wrap items-end justify-between gap-4">
+        <div className="flex flex-wrap items-end gap-4">
+          <Input floating label="From" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="max-w-[180px]" />
+          <Input floating label="To" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="max-w-[180px]" />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" disabled={filteredOrders.length === 0} onClick={() => exportReportToPdf(buildExportInput())}>
+            <FileText size={14} /> PDF
+          </Button>
+          <Button variant="outline" size="sm" disabled={filteredOrders.length === 0} onClick={() => exportReportToExcel(buildExportInput())}>
+            <FileSpreadsheet size={14} /> Excel
+          </Button>
+          <Button variant="outline" size="sm" disabled={filteredOrders.length === 0} onClick={() => exportReportToCsv(buildExportInput())}>
+            <FileDown size={14} /> CSV
+          </Button>
+        </div>
       </Card>
 
       {isLoading ? (

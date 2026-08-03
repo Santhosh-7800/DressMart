@@ -15,7 +15,9 @@ interface AuthContextValue {
   identityId: string;
   signUp: (input: SignUpInput) => Promise<Profile>;
   signIn: (email: string, password: string, rememberMe?: boolean) => Promise<Profile>;
-  signInWithGoogle: () => Promise<Profile>;
+  /** Returns `null` when this kicked off a signInWithRedirect (mobile) instead of a popup — the
+   *  page is about to navigate away to Google, so there's no Profile to hand back yet. */
+  signInWithGoogle: () => Promise<Profile | null>;
   signOut: () => Promise<void>;
 }
 
@@ -27,6 +29,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let unsubscribeProfile: (() => void) | undefined;
+
+    // Completes a signInWithRedirect() from the mobile Google Sign-In path (see
+    // authService.signInWithGoogle) — a no-op resolving to nothing when there's no pending redirect,
+    // which is the common case on every other mount (including all of desktop).
+    authService.completeGoogleRedirectSignIn().catch(() => {});
 
     const unsubscribeAuth = onAuthStateChanged(auth, (fbUser) => {
       unsubscribeProfile?.();
@@ -63,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithGoogle = useCallback(async () => {
     const profile = await authService.signInWithGoogle();
-    toast.success(`Welcome, ${profile.full_name.split(' ')[0]}!`);
+    if (profile) toast.success(`Welcome, ${profile.full_name.split(' ')[0]}!`);
     return profile;
   }, []);
 

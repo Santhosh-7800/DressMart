@@ -23,7 +23,7 @@ function VariantStockEditor({ product, initialStock, initialThreshold }: { produ
   const total = Object.values(stock).reduce((sum, n) => sum + Math.max(0, n || 0), 0);
 
   const handleSave = () => {
-    updateStock.mutate({ productId: product.id, variantStock: stock, lowStockThreshold: threshold });
+    updateStock.mutate({ productId: product.id, variantStock: stock, lowStockThreshold: threshold, sellerId: product.seller_id, productName: product.name });
   };
 
   return (

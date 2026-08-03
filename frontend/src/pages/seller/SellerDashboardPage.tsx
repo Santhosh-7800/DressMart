@@ -1,57 +1,63 @@
+import { lazy, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
-import type { LucideIcon } from 'lucide-react';
-import { Package, Boxes, ShoppingBag, RotateCcw, Repeat, AlertTriangle, Users, Clock, Wallet, TrendingUp } from 'lucide-react';
+import {
+  Package,
+  Boxes,
+  ShoppingBag,
+  RotateCcw,
+  Repeat,
+  PackageX,
+  Users,
+  Clock,
+  Wallet,
+  TrendingUp,
+  CalendarDays,
+  CalendarRange,
+  MessageSquareWarning,
+  Star,
+  Zap,
+  UserCog,
+  Ticket,
+} from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
-import { Card } from '@/components/ui/Card';
-import { Skeleton } from '@/components/ui/Skeleton';
 import { useAuth } from '@/contexts/AuthContext';
-import { isHeadSeller } from '@/lib/roles';
+import { isHeadSeller, effectiveSellerId } from '@/lib/roles';
 import { formatCurrency } from '@/lib/utils';
 import { queryKeys } from '@/lib/queryClient';
 import { sellerStatsService } from '@/services/sellerStatsService';
+import { DashboardHeader } from '@/components/seller/dashboard/DashboardHeader';
+import { StatGrid } from '@/components/seller/dashboard/StatGrid';
+import { QuickActions } from '@/components/seller/dashboard/QuickActions';
+import { RecentActivityFeed } from '@/components/seller/dashboard/RecentActivityFeed';
+import { SellerManagementSummary } from '@/components/seller/dashboard/SellerManagementSummary';
+import { StaffManagementSummary } from '@/components/seller/dashboard/StaffManagementSummary';
+import { InventorySummary } from '@/components/seller/dashboard/InventorySummary';
+import { OrdersStatusSummary } from '@/components/seller/dashboard/OrdersStatusSummary';
+import { PaymentsSummary } from '@/components/seller/dashboard/PaymentsSummary';
+import { Skeleton } from '@/components/ui/Skeleton';
+import type { StatCardConfig } from '@/components/seller/dashboard/StatCard';
 
-function StatCard({ icon: Icon, label, value, to, tone = 'default' }: { icon: LucideIcon; label: string; value: string | number; to?: string; tone?: 'default' | 'warning' }) {
-  const content = (
-    <Card hover={Boolean(to)} className="flex items-center gap-4">
-      <div
-        className={
-          tone === 'warning'
-            ? 'flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'
-            : 'flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-acc-primary/10 text-acc-primary'
-        }
-      >
-        <Icon size={20} />
-      </div>
-      <div className="min-w-0">
-        <p className="text-2xl font-bold text-acc-text dark:text-white">{value}</p>
-        <p className="truncate text-xs text-acc-text-secondary">{label}</p>
-      </div>
-    </Card>
-  );
-  return to ? <Link to={to}>{content}</Link> : content;
-}
+const SalesAnalyticsSection = lazy(() => import('@/components/seller/dashboard/SalesAnalyticsSection'));
 
-function StatCardSkeleton() {
+function AnalyticsSkeleton() {
   return (
-    <Card hover={false} className="flex items-center gap-4">
-      <Skeleton className="h-11 w-11 rounded-2xl" />
-      <div className="flex-1 space-y-2">
-        <Skeleton className="h-6 w-16" />
-        <Skeleton className="h-3 w-24" />
-      </div>
-    </Card>
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <Skeleton key={i} className="h-72 w-full rounded-[20px]" />
+      ))}
+    </div>
   );
 }
 
 export function SellerDashboardPage() {
   const { user } = useAuth();
   const headSeller = isHeadSeller(user?.role);
+  const sellerId = effectiveSellerId(user);
 
   const overviewQuery = useQuery({
-    queryKey: queryKeys.seller.overview(user?.id ?? ''),
-    queryFn: () => sellerStatsService.getSellerOverview(user!.id),
-    enabled: Boolean(user?.id),
+    queryKey: queryKeys.seller.overview(sellerId),
+    queryFn: () => sellerStatsService.getSellerOverview(sellerId),
+    enabled: Boolean(sellerId),
   });
 
   const platformQuery = useQuery({
@@ -60,84 +66,119 @@ export function SellerDashboardPage() {
     enabled: headSeller,
   });
 
+  const storeCards: StatCardConfig[] | undefined = overviewQuery.data
+    ? [
+        { key: 'today-orders', icon: CalendarDays, label: "Today's Orders", value: overviewQuery.data.todayOrders, to: '/seller/orders' },
+        { key: 'today-revenue', icon: Wallet, label: "Today's Revenue", value: overviewQuery.data.todayRevenue, to: '/seller/reports', formatter: formatCurrency },
+        { key: 'month-revenue', icon: CalendarRange, label: 'Monthly Revenue', value: overviewQuery.data.monthRevenue, to: '/seller/reports', formatter: formatCurrency },
+        { key: 'total-revenue', icon: TrendingUp, label: 'Total Revenue', value: overviewQuery.data.totalRevenue, to: '/seller/reports', formatter: formatCurrency },
+        { key: 'total-products', icon: Package, label: 'Total Products', value: overviewQuery.data.totalProducts, to: '/seller/products' },
+        { key: 'active-products', icon: Package, label: 'Active Products', value: overviewQuery.data.activeProducts, to: '/seller/products' },
+        {
+          key: 'out-of-stock',
+          icon: PackageX,
+          label: 'Out of Stock',
+          value: overviewQuery.data.outOfStockProducts,
+          to: '/seller/inventory',
+          tone: overviewQuery.data.outOfStockProducts > 0 ? 'warning' : 'default',
+        },
+        {
+          key: 'low-stock',
+          icon: Boxes,
+          label: 'Low Stock Items',
+          value: overviewQuery.data.lowStockCount,
+          to: '/seller/inventory',
+          tone: overviewQuery.data.lowStockCount > 0 ? 'warning' : 'default',
+        },
+        {
+          key: 'pending-returns',
+          icon: RotateCcw,
+          label: 'Pending Returns',
+          value: overviewQuery.data.pendingReturns,
+          to: '/seller/returns',
+          tone: overviewQuery.data.pendingReturns > 0 ? 'warning' : 'default',
+        },
+        {
+          key: 'pending-exchanges',
+          icon: Repeat,
+          label: 'Exchange Requests',
+          value: overviewQuery.data.pendingExchanges,
+          to: '/seller/exchanges',
+          tone: overviewQuery.data.pendingExchanges > 0 ? 'warning' : 'default',
+        },
+        {
+          key: 'unreplied-reviews',
+          icon: MessageSquareWarning,
+          label: 'Pending Reviews',
+          value: overviewQuery.data.unrepliedReviews,
+          to: '/seller/reviews',
+          tone: overviewQuery.data.unrepliedReviews > 0 ? 'warning' : 'default',
+        },
+        {
+          key: 'average-rating',
+          icon: Star,
+          label: 'Average Rating',
+          value: overviewQuery.data.averageRating,
+          to: '/seller/reviews',
+          formatter: (n) => n.toFixed(1),
+        },
+        { key: 'flash-sale-products', icon: Zap, label: 'Flash Sale Products', value: overviewQuery.data.flashSaleProducts, to: '/seller/products' },
+      ]
+    : undefined;
+
+  const platformCards: StatCardConfig[] | undefined = platformQuery.data
+    ? [
+        { key: 'total-sellers', icon: Users, label: 'Registered Sellers', value: platformQuery.data.totalSellers, to: '/seller/sellers' },
+        {
+          key: 'pending-applications',
+          icon: Clock,
+          label: 'Pending Seller Approvals',
+          value: platformQuery.data.pendingApplications,
+          to: '/seller/sellers',
+          tone: platformQuery.data.pendingApplications > 0 ? 'warning' : 'default',
+        },
+        { key: 'platform-orders', icon: ShoppingBag, label: 'Orders (Platform-wide)', value: platformQuery.data.totalOrders, to: '/seller/analytics' },
+        { key: 'platform-revenue', icon: Wallet, label: 'Total Revenue', value: platformQuery.data.totalRevenue, to: '/seller/reports', formatter: formatCurrency },
+        { key: 'total-customers', icon: Users, label: 'Total Customers', value: platformQuery.data.totalCustomers, to: '/seller/sellers' },
+        { key: 'staff-members', icon: UserCog, label: 'Staff Members', value: platformQuery.data.staffMembers, to: '/seller/staff' },
+        { key: 'coupons-active', icon: Ticket, label: 'Coupons Active', value: platformQuery.data.couponsActive, to: '/seller/coupons' },
+      ]
+    : undefined;
+
   return (
     <div className="space-y-8">
       <Seo title="Seller Dashboard" />
-      <div>
-        <h1 className="text-2xl font-bold text-acc-text dark:text-white">
-          Welcome back{user?.store_name ? `, ${user.store_name}` : ''}
-        </h1>
-        <p className="mt-1 text-sm text-acc-text-secondary">Here's how your store is doing.</p>
-      </div>
+      <DashboardHeader />
 
-      <section>
-        <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-acc-text-secondary">Your Store</h2>
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-          {overviewQuery.isLoading ? (
-            Array.from({ length: 6 }).map((_, i) => <StatCardSkeleton key={i} />)
-          ) : overviewQuery.data ? (
-            <>
-              <StatCard icon={Package} label="Active Products" value={overviewQuery.data.activeProducts} to="/seller/products" />
-              <StatCard icon={Package} label="Total Products" value={overviewQuery.data.totalProducts} to="/seller/products" />
-              <StatCard
-                icon={Boxes}
-                label="Low Stock Items"
-                value={overviewQuery.data.lowStockCount}
-                to="/seller/inventory"
-                tone={overviewQuery.data.lowStockCount > 0 ? 'warning' : 'default'}
-              />
-              <StatCard icon={ShoppingBag} label="Orders (30 days)" value={overviewQuery.data.ordersLast30Days} to="/seller/orders" />
-              <StatCard icon={ShoppingBag} label="Total Orders" value={overviewQuery.data.totalOrders} to="/seller/orders" />
-              <StatCard
-                icon={RotateCcw}
-                label="Pending Returns"
-                value={overviewQuery.data.pendingReturns}
-                to="/seller/returns"
-                tone={overviewQuery.data.pendingReturns > 0 ? 'warning' : 'default'}
-              />
-              <StatCard
-                icon={Repeat}
-                label="Pending Exchanges"
-                value={overviewQuery.data.pendingExchanges}
-                to="/seller/exchanges"
-                tone={overviewQuery.data.pendingExchanges > 0 ? 'warning' : 'default'}
-              />
-            </>
-          ) : (
-            <Card hover={false} className="col-span-full flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
-              <AlertTriangle size={16} /> Couldn't load your store stats. Try refreshing.
-            </Card>
-          )}
-        </div>
-      </section>
+      <StatGrid title="Your Store" cards={storeCards} isLoading={overviewQuery.isLoading} isError={overviewQuery.isError} skeletonCount={8} />
 
       {headSeller && (
-        <section>
-          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-acc-text-secondary">Platform Overview</h2>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            {platformQuery.isLoading ? (
-              Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)
-            ) : platformQuery.data ? (
-              <>
-                <StatCard icon={Users} label="Total Sellers" value={platformQuery.data.totalSellers} to="/seller/sellers" />
-                <StatCard
-                  icon={Clock}
-                  label="Pending Applications"
-                  value={platformQuery.data.pendingApplications}
-                  to="/seller/sellers"
-                  tone={platformQuery.data.pendingApplications > 0 ? 'warning' : 'default'}
-                />
-                <StatCard icon={TrendingUp} label="Orders (Platform-wide)" value={platformQuery.data.totalOrders} to="/seller/analytics" />
-                <StatCard icon={Wallet} label="Total Revenue" value={formatCurrency(platformQuery.data.totalRevenue)} to="/seller/reports" />
-              </>
-            ) : (
-              <Card hover={false} className="col-span-full flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
-                <AlertTriangle size={16} /> Couldn't load platform stats. Try refreshing.
-              </Card>
-            )}
-          </div>
-        </section>
+        <StatGrid
+          title="Platform Overview"
+          cards={platformCards}
+          isLoading={platformQuery.isLoading}
+          isError={platformQuery.isError}
+          skeletonCount={7}
+        />
       )}
+
+      <QuickActions role={user?.role} />
+
+      <Suspense fallback={<AnalyticsSkeleton />}>
+        <SalesAnalyticsSection sellerId={sellerId} isHeadSeller={headSeller} />
+      </Suspense>
+
+      <OrdersStatusSummary sellerId={sellerId} isHeadSeller={headSeller} />
+
+      <PaymentsSummary sellerId={sellerId} isHeadSeller={headSeller} />
+
+      <InventorySummary sellerId={sellerId} isHeadSeller={headSeller} />
+
+      {headSeller && <SellerManagementSummary />}
+
+      {headSeller && <StaffManagementSummary sellerId={sellerId} />}
+
+      <RecentActivityFeed />
     </div>
   );
 }

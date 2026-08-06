@@ -10,6 +10,7 @@ import {
   RecaptchaVerifier,
   sendPasswordResetEmail,
   confirmPasswordReset,
+  verifyPasswordResetCode,
   updatePassword,
   reauthenticateWithCredential,
   EmailAuthProvider,
@@ -23,6 +24,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
+import { env } from '@/lib/env';
 import type { Profile } from '@/types';
 
 export interface SignUpInput {
@@ -118,6 +120,12 @@ export const authService = {
    * completed by completeGoogleRedirectSignIn() once the app reloads.
    */
   async signInWithGoogle(): Promise<Profile | null> {
+    // Google/Phone sign-in have no "remember me" control (that's email/password-only, see signIn()
+    // above) — always persist locally so a returning user stays signed in across browser/app
+    // restarts. Without this, the auth instance would silently keep whatever persistence mode a
+    // *previous* sign-in call last set (e.g. an earlier "remember me" unchecked attempt), signing
+    // this user out sooner than expected on next launch even though their Firestore data is untouched.
+    await setPersistence(auth, browserLocalPersistence);
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
     if (isMobileSignIn()) {
@@ -143,6 +151,8 @@ export const authService = {
 
   /** Renders an invisible reCAPTCHA into `containerId` and sends an OTP to `phoneNumber` (E.164, e.g. +919876543210). */
   async sendPhoneOtp(phoneNumber: string, containerId: string): Promise<ConfirmationResult> {
+    // Same reasoning as signInWithGoogle() above — phone sign-in has no "remember me" control either.
+    await setPersistence(auth, browserLocalPersistence);
     if (!recaptchaVerifier) {
       recaptchaVerifier = new RecaptchaVerifier(auth, containerId, { size: 'invisible' });
     }
@@ -158,8 +168,19 @@ export const authService = {
     await firebaseSignOut(auth);
   },
 
+  /** `handleCodeInApp: true` makes Firebase email a link straight to `url` (with `mode` &
+   *  `oobCode` query params attached) instead of routing through Firebase's own hosted
+   *  reset-password page — ResetPasswordPage reads `oobCode` off that query string. */
   async requestPasswordReset(email: string): Promise<void> {
-    await sendPasswordResetEmail(auth, email);
+    await sendPasswordResetEmail(auth, email, { url: `${env.siteUrl}/reset-password`, handleCodeInApp: true });
+  },
+
+  /** Validates a reset-password `oobCode` *before* showing the new-password form — catches an
+   *  invalid/expired/already-used link immediately (Firebase throws auth/invalid-action-code or
+   *  auth/expired-action-code) instead of only failing once the user has already typed a new
+   *  password. Resolves to the email address the code was issued for. */
+  async verifyPasswordResetCode(oobCode: string): Promise<string> {
+    return verifyPasswordResetCode(auth, oobCode);
   },
 
   /** Completes the emailed reset-password link — `oobCode` comes from that link's `?oobCode=` query param. */

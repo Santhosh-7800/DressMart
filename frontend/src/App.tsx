@@ -26,6 +26,7 @@ export function App() {
               </CatalogHealthGate>
               <Toaster
                 position="top-center"
+                containerStyle={{ top: 140 }}
                 toastOptions={{
                   duration: 3000,
                   style: { background: '#131921', color: '#fff', borderRadius: '0.75rem', fontSize: '0.875rem' },

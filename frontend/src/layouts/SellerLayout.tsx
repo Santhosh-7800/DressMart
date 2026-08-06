@@ -11,6 +11,7 @@ import {
   Repeat,
   Settings,
   Users,
+  Contact,
   UserCog,
   BarChart3,
   FileBarChart,
@@ -94,6 +95,7 @@ const BASE_NAV_ITEMS: NavItem[] = [
 
 const HEAD_SELLER_NAV_ITEMS: NavItem[] = [
   { to: '/seller/sellers', label: 'Seller Management', icon: Users },
+  { to: '/seller/customers', label: 'Customers', icon: Contact },
   { to: '/seller/staff', label: 'Staff Management', icon: UserCog },
   { to: '/seller/all-products', label: 'All Products', icon: Layers },
   { to: '/seller/analytics', label: 'Analytics', icon: BarChart3 },

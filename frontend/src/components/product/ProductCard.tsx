@@ -125,23 +125,25 @@ function ProductCardImpl({ product, className, inventory: inventoryProp, skipOwn
               <span className="rounded-full bg-primary-950/80 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">Out of Stock</span>
             </div>
           )}
-          {!isOutOfStock && !showAddToCartButton && (
-            <button
-              onClick={handleQuickAdd}
-              disabled={!quickAddVariant}
-              className="tap-target-48 absolute bottom-2 right-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-accent text-primary-900 shadow-sm transition-transform hover:scale-110 disabled:opacity-40"
-              aria-label="Add to cart"
-              title="Add to cart"
-            >
-              <ShoppingCart size={14} />
-            </button>
-          )}
         </div>
         <div className="space-y-1 p-3">
           <p className="truncate text-xs font-medium text-primary-400">{product.brand?.name}</p>
           <h3 className="line-clamp-2 min-h-[2.5rem] text-sm font-medium text-primary-900 dark:text-white">{product.name}</h3>
           <Rating value={product.rating} count={product.rating_count} showValue />
-          <PriceTag price={product.price} mrp={product.mrp} size="sm" />
+          <div className="flex items-center justify-between gap-2">
+            <PriceTag price={product.price} mrp={product.mrp} size="sm" />
+            {!isOutOfStock && !showAddToCartButton && (
+              <button
+                onClick={handleQuickAdd}
+                disabled={!quickAddVariant}
+                className="tap-target-48 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-primary-900 shadow-sm transition-transform hover:scale-110 disabled:opacity-40"
+                aria-label="Add to cart"
+                title="Add to cart"
+              >
+                <ShoppingCart size={14} />
+              </button>
+            )}
+          </div>
           {isOutOfStock && <p className="text-xs font-semibold text-red-500">Out of stock</p>}
         </div>
       </Link>

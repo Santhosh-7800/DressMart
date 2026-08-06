@@ -56,6 +56,7 @@ const HelpCenterPage = lazyWithRetry(() => import('@/pages/static/HelpCenterPage
 const PrivacyPolicyPage = lazyWithRetry(() => import('@/pages/static/PrivacyPolicyPage').then((m) => ({ default: m.PrivacyPolicyPage })));
 const TermsPage = lazyWithRetry(() => import('@/pages/static/TermsPage').then((m) => ({ default: m.TermsPage })));
 const NotFoundPage = lazyWithRetry(() => import('@/pages/errors/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
+const UnauthorizedPage = lazyWithRetry(() => import('@/pages/errors/UnauthorizedPage').then((m) => ({ default: m.UnauthorizedPage })));
 
 // Seller pages
 const SellerDashboardPage = lazyWithRetry(() => import('@/pages/seller/SellerDashboardPage').then((m) => ({ default: m.SellerDashboardPage })));
@@ -67,6 +68,7 @@ const SellerReturnsPage = lazyWithRetry(() => import('@/pages/seller/SellerRetur
 const SellerExchangesPage = lazyWithRetry(() => import('@/pages/seller/SellerExchangesPage').then((m) => ({ default: m.SellerExchangesPage })));
 const SellerSettingsPage = lazyWithRetry(() => import('@/pages/seller/SellerSettingsPage').then((m) => ({ default: m.SellerSettingsPage })));
 const SellerSellersPage = lazyWithRetry(() => import('@/pages/seller/SellerSellersPage').then((m) => ({ default: m.SellerSellersPage })));
+const SellerCustomersPage = lazyWithRetry(() => import('@/pages/seller/SellerCustomersPage').then((m) => ({ default: m.SellerCustomersPage })));
 const SellerAllProductsPage = lazyWithRetry(() => import('@/pages/seller/SellerAllProductsPage').then((m) => ({ default: m.SellerAllProductsPage })));
 const SellerAnalyticsPage = lazyWithRetry(() => import('@/pages/seller/SellerAnalyticsPage').then((m) => ({ default: m.SellerAnalyticsPage })));
 const SellerReportsPage = lazyWithRetry(() => import('@/pages/seller/SellerReportsPage').then((m) => ({ default: m.SellerReportsPage })));
@@ -201,6 +203,7 @@ export function AppRoutes() {
             {/* Head Seller (Admin) only routes */}
             <Route element={<RequireHeadSeller />}>
               <Route path="/seller/sellers" element={<SellerSellersPage />} />
+              <Route path="/seller/customers" element={<SellerCustomersPage />} />
               <Route path="/seller/staff" element={<SellerStaffPage />} />
               <Route path="/seller/all-products" element={<SellerAllProductsPage />} />
               <Route path="/seller/analytics" element={<SellerAnalyticsPage />} />
@@ -239,7 +242,9 @@ export function AppRoutes() {
         <Route path="/admin" element={<Navigate to="/seller/dashboard" replace />} />
         <Route path="/seller" element={<Navigate to="/seller/dashboard" replace />} />
         <Route path="/staff" element={<Navigate to="/staff/dashboard" replace />} />
+        <Route path="/head-seller" element={<Navigate to="/seller/dashboard" replace />} />
 
+        <Route path="/unauthorized" element={<UnauthorizedPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </Suspense>

@@ -53,11 +53,16 @@ export function useWishlist() {
   const items = wishlistQuery.data ?? [];
   const productIds = new Set(items.map((i) => i.product_id));
 
+  // Guards against a rapid double-click firing a second, redundant toggle before the first one's
+  // round-trip finishes — the button gives no visual "in progress" feedback, so a slow-feeling
+  // click otherwise invites an extra tap, which just queues up more of the same latency.
+  const toggleOnce = (productId: string) => (toggle.isPending ? Promise.resolve(undefined) : toggle.mutateAsync(productId));
+
   return {
     items,
     isLoading: wishlistQuery.isLoading,
     isWishlisted: (productId: string) => productIds.has(productId),
-    toggle: toggle.mutateAsync,
+    toggle: toggleOnce,
     remove: remove.mutateAsync,
   };
 }

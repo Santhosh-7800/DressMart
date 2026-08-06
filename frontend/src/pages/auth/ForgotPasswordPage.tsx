@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { FirebaseError } from 'firebase/app';
 import { Mail, ArrowLeft, MailCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Seo } from '@/components/common/Seo';
@@ -13,6 +14,18 @@ import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 
 const schema = z.object({ email: z.string().email('Enter a valid email address') });
 type FormValues = z.infer<typeof schema>;
+
+/** Exact wording for this page, per spec — takes priority over the shared, more generic mapping
+ *  in lib/firebaseErrors.ts (which uses slightly different wording shared across other auth
+ *  pages). Firebase's own error message (error.message) is always logged separately via
+ *  console.error regardless of which string ends up on screen. */
+const FORGOT_PASSWORD_ERRORS: Record<string, string> = {
+  'auth/user-not-found': 'No account exists with this email.',
+  'auth/invalid-email': 'Please enter a valid email address.',
+  'auth/network-request-failed': 'Network error. Please try again.',
+  'auth/too-many-requests': 'Too many attempts. Please try again later.',
+  'auth/internal-error': 'Something went wrong. Please try again.',
+};
 
 export function ForgotPasswordPage() {
   const navigate = useNavigate();
@@ -26,12 +39,19 @@ export function ForgotPasswordPage() {
   } = useForm<FormValues>({ resolver: zodResolver(schema) });
 
   const onSubmit = async (values: FormValues) => {
+    console.log('Sending reset email:', values.email);
     try {
+      // Awaited — the success screen below is only ever reached once Firebase has actually
+      // confirmed the request; it never renders on a thrown error (see catch below).
       await authService.requestPasswordReset(values.email);
+      console.log('Reset email sent');
       setSubmittedEmail(values.email);
       setIsSent(true);
     } catch (error) {
-      toast.error(getFriendlyErrorMessage(error));
+      if (error instanceof FirebaseError) console.error(error.code, error.message);
+      else console.error(error);
+      const code = error instanceof FirebaseError ? error.code : undefined;
+      toast.error((code && FORGOT_PASSWORD_ERRORS[code]) || getFriendlyErrorMessage(error));
     }
   };
 

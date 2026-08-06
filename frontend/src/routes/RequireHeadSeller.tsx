@@ -16,7 +16,7 @@ export function RequireHeadSeller() {
   }
 
   if (!isHeadSeller(user?.role)) {
-    return <Navigate to="/seller/dashboard" replace />;
+    return <Navigate to="/unauthorized" replace />;
   }
 
   return <Outlet />;

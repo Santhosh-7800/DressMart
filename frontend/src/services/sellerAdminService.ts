@@ -24,6 +24,12 @@ export const sellerAdminService = {
     return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Profile);
   },
 
+  /** Read-only customer (buyer) directory for the Head Seller's Customers page. */
+  async listCustomers(): Promise<Profile[]> {
+    const snap = await getDocs(query(collection(db, 'users'), where('role', '==', 'buyer')));
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Profile);
+  },
+
   /** Approves or rejects a pending seller application. Atomically flips seller_requests + users/{uid}. */
   async reviewSellerRequest(input: { requestId: string; approve: boolean; rejectionReason?: string }): Promise<void> {
     const call = httpsCallable<{ requestId: string; approve: boolean; rejectionReason?: string }, { success: true }>(

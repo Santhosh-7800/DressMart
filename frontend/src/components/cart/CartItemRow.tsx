@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { motion, useMotionValue, animate, type PanInfo } from 'framer-motion';
-import { Trash2, Heart } from 'lucide-react';
+import { Trash2, Heart, PackageX } from 'lucide-react';
 import type { CartLineItem } from '@/services/cartService';
 import { QuantitySelector } from '@/components/ui/QuantitySelector';
 import { ProductImage } from '@/components/ui/ProductImage';
@@ -35,7 +35,38 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove, onSaveForLater, 
     }
   };
 
-  if (!product) return null;
+  // A cart line's product can go missing after it was added (deleted, or — in dev/staging — the
+  // catalog got reseeded with new document ids). Previously this returned null: the line vanished
+  // from the list entirely while still counted in the cart's totals/item-count, which looked
+  // exactly like "I added it but the cart page doesn't show it." Rendering a clear, removable
+  // placeholder instead means the item is never silently invisible — the shopper can always see
+  // what's in their cart and remove anything that's no longer valid.
+  if (!product) {
+    return (
+      <div className="flex items-center gap-4 border-b border-primary-100 py-5 last:border-0 dark:border-primary-700">
+        <div className="flex h-28 w-24 shrink-0 items-center justify-center rounded-lg bg-primary-50 dark:bg-primary-800">
+          <PackageX size={28} className="text-primary-300" />
+        </div>
+        <div className="flex flex-1 flex-col justify-between">
+          <div>
+            <p className="text-sm font-medium text-primary-400">This product is no longer available</p>
+            <p className="mt-1 text-xs text-primary-400">
+              Size: {item.size} · Color: {item.color}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs text-primary-400">Qty: {item.quantity}</p>
+            <p className="font-semibold">{formatCurrency(item.price * item.quantity)}</p>
+          </div>
+          <div className="flex gap-4 text-xs">
+            <button onClick={onRemove} className="flex items-center gap-1 text-primary-400 hover:text-red-500">
+              <Trash2 size={13} /> Remove
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <motion.div

@@ -101,6 +101,7 @@ export const queryKeys = {
     overview: (sellerId: string) => ['seller', 'overview', sellerId] as const,
     platformOverview: ['seller', 'platform-overview'] as const,
     sellers: ['seller', 'roster'] as const,
+    customers: ['seller', 'customers'] as const,
     recentOrders: (maxDocs: number) => ['seller', 'recent-orders', maxDocs] as const,
     platformSettings: ['seller', 'platform-settings'] as const,
     orderStatusBreakdown: (sellerId: string) => ['seller', 'order-status-breakdown', sellerId] as const,

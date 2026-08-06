@@ -13,13 +13,35 @@
  * offline-state UI (src/hooks/useCatalogHealth.ts) takes over, same as before this script existed.
  */
 import 'dotenv/config';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
 import net from 'node:net';
 
 const FIRESTORE_PORT = 8081;
 const HOST = 'localhost';
 const READY_TIMEOUT_MS = 60_000;
 const POLL_INTERVAL_MS = 1000;
+
+// Real, direct JS entry point for the local `tsx` devDependency — spawning this straight with
+// `node` (no shell) means Windows never gets a `cmd.exe`/`npx.cmd` layer to pop a console window
+// for, which `shell: true` + `windowsHide: true` turned out not to reliably suppress.
+const TSX_CLI = path.join(process.cwd(), 'node_modules/tsx/dist/cli.mjs');
+
+/** Resolves a *globally* npm-installed CLI's real JS entry point (e.g. firebase-tools, installed
+ *  globally rather than as a project dependency) so it too can be spawned directly with `node`
+ *  instead of through its `.cmd` shim — same window-suppression reasoning as TSX_CLI above.
+ *  Returns null if anything about the lookup fails, so callers can fall back to the shell-based
+ *  invocation rather than break emulator autostart entirely on an unusual global-install layout. */
+function resolveGlobalBin(packageRelPath: string): string | null {
+  try {
+    const globalRoot = execFileSync('npm', ['root', '-g'], { encoding: 'utf8', shell: true }).trim();
+    const resolved = path.join(globalRoot, packageRelPath);
+    return fs.existsSync(resolved) ? resolved : null;
+  } catch {
+    return null;
+  }
+}
 
 function usingEmulator(): boolean {
   const apiKey = process.env.VITE_FIREBASE_API_KEY || '';
@@ -56,7 +78,11 @@ async function waitForFirestore(deadline: number): Promise<boolean> {
  *  time `npm run dev` starts, even when the emulator was already running from an earlier session:
  *  the exporter's own PID lockfile makes a duplicate instance a no-op. */
 function startAutoExporter(): void {
-  const child = spawn('npx', ['tsx', 'scripts/autoExportEmulator.ts'], { detached: true, stdio: 'ignore', shell: true });
+  // Spawns `node` directly on TSX_CLI (see above) instead of `npx tsx ...` through a shell — no
+  // cmd.exe/npx.cmd layer means no console window for Windows to pop open, full stop. (An earlier
+  // version of this tried shell:true + windowsHide:true; that combination turned out not to
+  // reliably suppress the window for a *detached* child, which is exactly the case here.)
+  const child = spawn(process.execPath, [TSX_CLI, 'scripts/autoExportEmulator.ts'], { detached: true, stdio: 'ignore', windowsHide: true });
   child.unref();
 }
 
@@ -79,15 +105,17 @@ async function main() {
   // stays at the repo root, so --import/--export-on-exit stay relative to this script's own cwd
   // (the repo root), unaffected by --config pointing elsewhere.
   //
-  // shell: true is required on Windows to spawn the `firebase.cmd` shim directly (without it, Node
-  // throws `spawn EINVAL` for .cmd files) — args stay a properly-escaped array rather than a
-  // concatenated string, and every argument here is a static literal, so this isn't a shell-
-  // injection risk despite Node's generic shell:true deprecation warning about unescaped args.
-  const child = spawn(
-    'firebase',
-    ['--config', 'database/firebase.json', 'emulators:start', '--import=./.emulator-data', '--export-on-exit=./.emulator-data'],
-    { detached: true, stdio: 'ignore', shell: true },
-  );
+  // Same direct-node-invocation approach as startAutoExporter() — resolve the real firebase-tools
+  // entry point (it's a global install here, not a project dependency, hence resolveGlobalBin
+  // rather than a fixed node_modules-relative path) and spawn `node` on it directly, with no shell
+  // in between to pop a console window open. Falls back to the old shell:true path (still
+  // windowsHide:true, best effort) only if that resolution fails — e.g. firebase-tools installed
+  // in some other, unanticipated way — so emulator autostart never breaks outright over this.
+  const firebaseEntry = resolveGlobalBin('firebase-tools/lib/bin/firebase.js');
+  const emulatorArgs = ['--config', 'database/firebase.json', 'emulators:start', '--import=./.emulator-data', '--export-on-exit=./.emulator-data'];
+  const child = firebaseEntry
+    ? spawn(process.execPath, [firebaseEntry, ...emulatorArgs], { detached: true, stdio: 'ignore', windowsHide: true })
+    : spawn('firebase', emulatorArgs, { detached: true, stdio: 'ignore', shell: true, windowsHide: true });
   child.unref();
 
   const ready = await waitForFirestore(Date.now() + READY_TIMEOUT_MS);

@@ -21,7 +21,7 @@ export function RequireSeller() {
   }
 
   if (!isSellerRole(user?.role)) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/unauthorized" replace />;
   }
 
   return <Outlet />;

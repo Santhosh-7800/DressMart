@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Heart, Menu, MapPin, Bell, ArrowLeft, User as UserIcon } from 'lucide-react';
+import { Heart, Menu, MapPin, Bell, ArrowLeft, ShoppingCart, User as UserIcon } from 'lucide-react';
 import { SearchBar } from '@/components/common/SearchBar';
 import { CategoryNav } from './CategoryNav';
 import { MobileMenu } from './MobileMenu';
@@ -8,6 +8,7 @@ import { DeliveryDropdown } from './DeliveryDropdown';
 import { Avatar } from '@/components/ui/Avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWishlist } from '@/hooks/useWishlist';
+import { useCart } from '@/hooks/useCart';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useOnClickOutside } from '@/hooks/useOnClickOutside';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
@@ -25,6 +26,7 @@ export function Header() {
   const mobileDeliveryRef = useRef<HTMLDivElement>(null);
   const { isAuthenticated, user, signOut } = useAuth();
   const { items: wishlistItems } = useWishlist();
+  const { totalItems: cartItemCount } = useCart();
   const { unreadCount } = useNotifications();
   const [pincode] = useLocalStorage('dressmart:pincode', '400001');
   // Keeps `pincode` above pinned to the user's actual default address (Addresses page, Checkout,
@@ -144,6 +146,15 @@ export function Header() {
             {wishlistItems.length > 0 && (
               <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-primary-900">
                 {wishlistItems.length}
+              </span>
+            )}
+          </Link>
+
+          <Link to="/cart" className="relative" aria-label="Cart">
+            <ShoppingCart size={20} />
+            {cartItemCount > 0 && (
+              <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-primary-900">
+                {cartItemCount}
               </span>
             )}
           </Link>

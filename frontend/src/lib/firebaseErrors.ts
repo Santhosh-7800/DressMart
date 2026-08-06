@@ -28,7 +28,11 @@ const FRIENDLY_MESSAGES: Record<string, string> = {
   'auth/network-request-failed': 'Unable to connect. Please check your internet connection.',
   'auth/requires-recent-login': 'Please sign in again to complete this action.',
   'auth/user-disabled': 'Your account has been disabled. Contact support.',
-  'auth/invalid-action-code': 'This link is invalid or has expired — request a new one.',
+  'auth/invalid-action-code': 'This reset link is invalid or has already been used — request a new one.',
+  'auth/expired-action-code': 'This reset link has expired — request a new one.',
+  'auth/operation-not-allowed': 'This sign-in method is not enabled for this app yet. Please contact support.',
+  'auth/popup-blocked': 'Your browser blocked the sign-in popup. Please allow popups for this site and try again.',
+  'auth/account-exists-with-different-credential': 'An account with this email already exists — try signing in a different way.',
 
   // Firestore / Functions
   unavailable: "Can't reach the server right now. Check your connection and try again.",
@@ -55,8 +59,17 @@ function extractCode(error: unknown): { code: string; isCallable: boolean } | nu
 
 /** Friendly message for any Firebase-originated error, with a caller-supplied fallback for anything unrecognized. */
 export function getFriendlyErrorMessage(error: unknown, fallback = 'Something went wrong. Please try again.'): string {
-  if (!navigator.onLine) return 'Unable to connect. Please check your internet connection.';
   const extracted = extractCode(error);
+  // Always log the exact code + message the SDK gave us — the UI only ever shows the mapped
+  // friendly string below, so this console line is what debugging an auth/Firestore failure
+  // actually depends on (e.g. "auth/operation-not-allowed" means the sign-in provider isn't
+  // enabled in the Firebase Console, which the friendly message alone can't tell you).
+  if (extracted) {
+    console.error(`[Firebase] ${extracted.code}${extracted.isCallable ? ' (callable)' : ''}:`, error);
+  } else if (error) {
+    console.error('[Error]', error);
+  }
+  if (!navigator.onLine) return 'Unable to connect. Please check your internet connection.';
   // Cloud Function callables (functions/*) throw HttpsError with a message the function author
   // wrote specifically for end users (e.g. `Insufficient stock for "Red Shirt, size M".`) — prefer
   // that actual message over the generic per-code mapping below, which would otherwise discard a

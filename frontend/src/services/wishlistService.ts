@@ -47,22 +47,28 @@ export const wishlistService = {
   },
 
   /** Adds if not already wishlisted, removes if it is. Firestore's wishlist rule has no `update`,
-   *  only create/delete, so toggling is always one of those two — never a field update. */
-  async toggle(userId: string, productId: string): Promise<{ items: WishlistItem[]; added: boolean }> {
+   *  only create/delete, so toggling is always one of those two — never a field update.
+   *  Deliberately does NOT re-fetch/re-hydrate the full list before returning — the only caller
+   *  (useWishlist's mutation) only reads `added` and separately invalidates its own React Query
+   *  cache to get the refreshed list, so doing it here too was a fully wasted second round-trip
+   *  (list + per-product hydrate) on every single click, which is what made the button feel slow. */
+  async toggle(userId: string, productId: string): Promise<{ added: boolean }> {
     const existing = await getDocs(
       query(collection(db, WISHLIST_COLLECTION), where('user_id', '==', userId), where('product_id', '==', productId)),
     );
     if (!existing.empty) {
       await Promise.all(existing.docs.map((d) => deleteDoc(d.ref)));
-      return { items: await this.list(userId), added: false };
+      return { added: false };
     }
     await addDoc(collection(db, WISHLIST_COLLECTION), { user_id: userId, product_id: productId, created_at: new Date().toISOString() });
-    return { items: await this.list(userId), added: true };
+    return { added: true };
   },
 
-  async remove(userId: string, wishlistItemId: string): Promise<WishlistItem[]> {
+  /** Same reasoning as toggle() above — the caller discards this method's return value entirely.
+   *  `_userId` is kept in the signature (unused) to match every other method here and because
+   *  Firestore's own security rule — not this call — is what actually enforces ownership. */
+  async remove(_userId: string, wishlistItemId: string): Promise<void> {
     await deleteDoc(doc(db, WISHLIST_COLLECTION, wishlistItemId));
-    return this.list(userId);
   },
 
   // --- Guest (pre-login) wishlist — pure localStorage, no Firestore doc (wishlist rules require

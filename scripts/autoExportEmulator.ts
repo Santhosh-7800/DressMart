@@ -61,7 +61,7 @@ function exportOnce(): Promise<void> {
     execFile(
       'firebase',
       ['--config', 'database/firebase.json', 'emulators:export', './.emulator-data', '--force'],
-      { shell: true, timeout: 60_000 },
+      { shell: true, timeout: 60_000, windowsHide: true },
       (error) => {
         if (error) console.error(`[auto-export] export failed: ${error.message}`);
         else console.log(`[auto-export] exported at ${new Date().toISOString()}`);

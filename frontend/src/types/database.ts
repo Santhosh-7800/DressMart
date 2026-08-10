@@ -570,9 +570,18 @@ export interface UserActivity {
   recently_viewed: { product_id: string; viewed_at: string }[];
   /** Most-recent-first, deduped by slug, capped — see userActivityService.MAX_CATEGORY_HISTORY. */
   category_history: string[];
-  /** Most-recent-first, deduped case-insensitively, capped — see userActivityService.MAX_RECENT_SEARCHES. */
-  recent_searches: string[];
+  /** Most-recent-first, deduped by normalized_query (re-searching the same thing bumps searched_at
+   *  instead of duplicating), capped — see userActivityService.MAX_RECENT_SEARCHES. Powers both the
+   *  search bar's "recent searches" chips and the search-based signal in personalizedRecommender.ts. */
+  recent_searches: SearchHistoryEntry[];
   updated_at: string;
+}
+
+export interface SearchHistoryEntry {
+  query: string;
+  normalized_query: string;
+  searched_at: string;
+  result_count: number;
 }
 
 /** Singleton doc (`platform_settings/config`) — Head Seller's Platform Settings page. */

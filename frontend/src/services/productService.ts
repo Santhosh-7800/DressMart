@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { slugify, calculateDiscount } from '@/lib/utils';
+import { buildProductSearchIndex, normalizePhrase, scoreProductMatch } from '@/lib/searchMatch';
 import { inventoryService } from './inventoryService';
 import { isActiveStatus } from '@/types';
 import type {
@@ -45,6 +46,16 @@ const CATALOG_FETCH_LIMIT = 500; // safety valve on the bounded client-side-filt
 let brandsPromise: Promise<Map<string, Brand>> | null = null;
 let categoriesPromise: Promise<Map<string, Category>> | null = null;
 
+// Same idea as the brand/category caches above, for the one Firestore read every list() call makes
+// regardless of search/color/size/price/etc. (see fetchActiveWindow) — those filters, including
+// free-text search, are all applied client-side afterward, so re-typing a search query character by
+// character would otherwise re-fetch the exact same active/gender/category window from Firestore on
+// every keystroke. Keyed on the only two inputs that actually change what fetchActiveWindow returns;
+// a short TTL (matching queryClient's own staleTime) rather than an unbounded cache, so a seller's
+// edit elsewhere still shows up within a few seconds even if primeCatalogCaches() isn't called.
+const ACTIVE_WINDOW_TTL_MS = 60_000;
+const activeWindowCache = new Map<string, { promise: Promise<Product[]>; cachedAt: number }>();
+
 async function getBrandsMap(): Promise<Map<string, Brand>> {
   if (!brandsPromise) {
     brandsPromise = getDocs(collection(db, 'brands')).then((snap) => new Map(snap.docs.map((d) => [d.id, d.data() as Brand])));
@@ -59,10 +70,12 @@ async function getCategoriesMap(): Promise<Map<string, Category>> {
   return categoriesPromise;
 }
 
-/** Clears the brand/category caches — call after seeding or after a Head Seller edits either. */
+/** Clears the brand/category/active-window caches — call after seeding or after a Head Seller
+ *  edits a brand/category, or after any product mutation (create/update/status/remove). */
 export function primeCatalogCaches(): void {
   brandsPromise = null;
   categoriesPromise = null;
+  activeWindowCache.clear();
 }
 
 async function hydrate(products: Product[]): Promise<Product[]> {
@@ -87,7 +100,7 @@ async function categoryIdsForSlugs(slugs: string[]): Promise<string[]> {
  * window and filtering client-side is fast and simple. Revisit if the catalog grows to the point
  * this window stops being "bounded".
  */
-async function fetchActiveWindow(gender?: Gender, categorySlugs?: string[]): Promise<Product[]> {
+async function fetchActiveWindowUncached(gender?: Gender, categorySlugs?: string[]): Promise<Product[]> {
   const constraints: QueryConstraint[] = [where('is_active', '==', true)];
   if (gender) constraints.push(where('gender', '==', gender));
   if (categorySlugs?.length) {
@@ -101,7 +114,21 @@ async function fetchActiveWindow(gender?: Gender, categorySlugs?: string[]): Pro
   return hydrated.filter((p) => !p.coverImage?.endsWith('.svg') && !p.imageUrl?.endsWith('.svg'));
 }
 
-function matchesRemainingFilters(p: Product, filters: ProductFilters): boolean {
+function fetchActiveWindow(gender?: Gender, categorySlugs?: string[]): Promise<Product[]> {
+  const key = `${gender ?? ''}|${[...(categorySlugs ?? [])].sort().join(',')}`;
+  const cached = activeWindowCache.get(key);
+  if (cached && Date.now() - cached.cachedAt < ACTIVE_WINDOW_TTL_MS) return cached.promise;
+
+  const promise = fetchActiveWindowUncached(gender, categorySlugs);
+  activeWindowCache.set(key, { promise, cachedAt: Date.now() });
+  // A failed fetch shouldn't poison the cache for the next attempt (e.g. a transient offline blip).
+  promise.catch(() => activeWindowCache.delete(key));
+  return promise;
+}
+
+/** Every filter except free-text search — search needs its own multi-field relevance pass (see
+ *  applySearch below), not a plain boolean predicate. */
+function matchesNonSearchFilters(p: Product, filters: ProductFilters): boolean {
   if (filters.brandIds?.length && !filters.brandIds.includes(p.brand_id)) return false;
   if (filters.colors?.length && !p.variants.some((v) => filters.colors!.includes(v.color))) return false;
   if (filters.sizes?.length && !p.variants.some((v) => filters.sizes!.includes(v.size))) return false;
@@ -109,15 +136,33 @@ function matchesRemainingFilters(p: Product, filters: ProductFilters): boolean {
   if (filters.maxPrice !== undefined && p.price > filters.maxPrice) return false;
   if (filters.minRating !== undefined && p.rating < filters.minRating) return false;
   if (filters.minDiscount !== undefined && p.discount_percent < filters.minDiscount) return false;
-  if (filters.search) {
-    const q = filters.search.trim().toLowerCase();
-    if (q) {
-      const colors = p.variants.map((v) => v.color).join(' ');
-      const haystack = `${p.name} ${p.sku} ${p.brand?.name ?? ''} ${p.category?.name ?? ''} ${p.subcategory ?? ''} ${colors} ${p.tags.join(' ')}`.toLowerCase();
-      if (!haystack.includes(q)) return false;
-    }
-  }
   return true;
+}
+
+/**
+ * Matches + ranks products against a free-text query across every searchable field (name, SKU,
+ * brand, category, subcategory, gender, every variant's color/size, tags, description,
+ * specifications — see lib/searchMatch.ts's buildProductSearchIndex), instead of the old
+ * "does the whole phrase appear as one literal substring somewhere" check, which made any
+ * multi-concept query ("blue shirt", "men black shirt") return nothing even when obviously
+ * relevant products existed — the query and the haystack rarely contain the exact same phrase
+ * verbatim, since color/category/brand live in different fields.
+ *
+ * Two-tier result: products matching EVERY distinct concept in the query (e.g. both "blue" AND
+ * "shirt") come back if any exist; only when nothing satisfies every concept does this fall back
+ * to "matches at least one concept", so a query mixing a real attribute with one the catalog
+ * genuinely doesn't have (e.g. a brand that isn't stocked) still surfaces the closest products
+ * instead of a hard empty result.
+ */
+function applySearch(items: Product[], rawQuery: string): { items: Product[]; relevance: Map<string, number> } {
+  const queryPhrase = normalizePhrase(rawQuery);
+  if (!queryPhrase) return { items, relevance: new Map() };
+
+  const scored = items.map((p) => ({ product: p, ...scoreProductMatch(buildProductSearchIndex(p), queryPhrase) }));
+  const fullMatches = scored.filter((s) => s.totalTokens > 0 && s.matchedTokenCount === s.totalTokens);
+  const chosen = fullMatches.length > 0 ? fullMatches : scored.filter((s) => s.matchedTokenCount > 0);
+
+  return { items: chosen.map((s) => s.product), relevance: new Map(chosen.map((s) => [s.product.id, s.score])) };
 }
 
 function sortProducts(items: Product[], sort: ProductFilters['sort']): Product[] {
@@ -230,14 +275,27 @@ export const productService = {
     const pageSize = filters.pageSize ?? 24;
 
     let items = await fetchActiveWindow(filters.gender, filters.categorySlugs);
-    items = items.filter((p) => matchesRemainingFilters(p, filters));
+    items = items.filter((p) => matchesNonSearchFilters(p, filters));
+
+    let relevance: Map<string, number> | null = null;
+    if (filters.search) {
+      const result = applySearch(items, filters.search);
+      items = result.items;
+      relevance = result.relevance;
+    }
 
     if (filters.inStockOnly) {
       const invMap = await inventoryService.getInventoryBatch(items.map((p) => p.id));
       items = items.filter((p) => (invMap[p.id]?.total_stock ?? 0) > 0);
     }
 
-    items = sortProducts(items, filters.sort);
+    // A search's own relevance ranking (see applySearch) takes precedence over the default
+    // "popularity" sort — an explicit price/rating/newest/discount choice still fully overrides it,
+    // same as browsing a category with no search text at all.
+    items =
+      relevance && (!filters.sort || filters.sort === 'popularity')
+        ? [...items].sort((a, b) => (relevance!.get(b.id) ?? 0) - (relevance!.get(a.id) ?? 0))
+        : sortProducts(items, filters.sort);
 
     const total = items.length;
     const start = (page - 1) * pageSize;
@@ -448,6 +506,7 @@ export const productService = {
 
     await setDoc(ref, product);
     await inventoryService.createInventory(ref.id, sellerId, variantStock, input.low_stock_threshold);
+    primeCatalogCaches();
 
     const [hydrated] = await hydrate([product]);
     return hydrated;
@@ -498,6 +557,7 @@ export const productService = {
     }
     await updateDoc(doc(db, PRODUCTS_COLLECTION, productId), updates);
     await inventoryService.updateStock(productId, variantStock, input.low_stock_threshold);
+    primeCatalogCaches();
 
     const product = await this.getById(productId);
     if (!product) throw new Error('Product not found after update.');
@@ -508,11 +568,13 @@ export const productService = {
    *  Products list's quick publish/hide actions and the Head Seller's "hide any product" action. */
   async setStatus(productId: string, status: ProductStatus): Promise<void> {
     await updateDoc(doc(db, PRODUCTS_COLLECTION, productId), { status, is_active: isActiveStatus(status), updated_at: new Date().toISOString() });
+    primeCatalogCaches();
   },
 
   /** Head-Seller-only "Feature this product" toggle. */
   async setFeatured(productId: string, featured: boolean): Promise<void> {
     await updateDoc(doc(db, PRODUCTS_COLLECTION, productId), { is_featured: featured, updated_at: new Date().toISOString() });
+    primeCatalogCaches();
   },
 
   /** Head-Seller-only "Deal of the Day" toggle — mirrors setFeatured. Clears deal_ends_at when turned off. */
@@ -522,10 +584,12 @@ export const productService = {
       deal_ends_at: isDeal ? dealEndsAt : null,
       updated_at: new Date().toISOString(),
     });
+    primeCatalogCaches();
   },
 
   async remove(productId: string): Promise<void> {
     await deleteDoc(doc(db, PRODUCTS_COLLECTION, productId));
+    primeCatalogCaches();
   },
 
   /** Duplicates an existing product into a new draft owned by the same seller. Images are

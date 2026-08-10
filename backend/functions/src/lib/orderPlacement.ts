@@ -38,6 +38,10 @@ export interface PlaceOrderArgs {
   paymentStatus: PaymentStatus;
   razorpayOrderId?: string | null;
   razorpayPaymentId?: string | null;
+  /** Client-generated, stable per checkout attempt (see PaymentPage) — guards against a double-
+   *  clicked "Place Order" / a retried network request creating two orders for the same checkout.
+   *  Optional only so any other future caller of placeOrderInternal isn't forced to supply one. */
+  clientRequestId?: string;
 }
 
 export interface PlaceOrderResult {
@@ -72,6 +76,7 @@ export async function placeOrderInternal(args: PlaceOrderArgs): Promise<PlaceOrd
     paymentStatus,
     razorpayOrderId = null,
     razorpayPaymentId = null,
+    clientRequestId,
   } = args;
 
   if (!addressId) {
@@ -79,6 +84,19 @@ export async function placeOrderInternal(args: PlaceOrderArgs): Promise<PlaceOrd
   }
   if (!Array.isArray(cart) || cart.length === 0) {
     throw new HttpsError('invalid-argument', 'Cart is empty.');
+  }
+
+  // Idempotency fast path: a prior call with this exact clientRequestId already completed (a
+  // double-clicked button, or the client retrying after a response was lost in transit) — return
+  // its result instead of placing a second order. The authoritative guard is the transactional
+  // check further down; this is just a cheap early-out for the overwhelmingly common case.
+  const requestRef = clientRequestId ? db.collection('order_requests').doc(clientRequestId) : null;
+  if (requestRef) {
+    const existing = await requestRef.get();
+    if (existing.exists) {
+      const data = existing.data() as { orderNumber: string; groupId: string };
+      return { orderNumber: data.orderNumber, groupId: data.groupId };
+    }
   }
 
   // Defensively aggregate duplicate (productId, variantId) lines so stock is only checked/decremented once per pair.
@@ -130,6 +148,14 @@ export async function placeOrderInternal(args: PlaceOrderArgs): Promise<PlaceOrd
     const product = products.get(line.productId)!;
     if (!product.is_active) {
       throw new HttpsError('failed-precondition', `"${product.name}" is no longer available.`);
+    }
+    // A cart line's variantId can go stale between "added to cart" and "checkout" — the seller
+    // edited/removed that size-color combination, or (in local dev) the catalog was reseeded with
+    // fresh variant ids. Without this check, the item-building step further down does a non-null
+    // `.find(...)!` on this same lookup and throws a raw TypeError, which is exactly the kind of
+    // unanticipated crash that used to surface to the customer as the bare "internal" error.
+    if (!product.variants.some((v) => v.id === line.variantId)) {
+      throw new HttpsError('failed-precondition', `"${product.name}" — the selected size/color is no longer available. Please remove it from your cart and re-add it.`);
     }
     const inventory = inventories.get(line.productId)!;
     const available = inventory.variant_stock[line.variantId] ?? 0;
@@ -226,8 +252,20 @@ export async function placeOrderInternal(args: PlaceOrderArgs): Promise<PlaceOrd
 
   const lowStockCandidates: { productId: string; productName: string; sellerId: string }[] = [];
   const createdOrders: { sellerId: string; orderId: string; total: number }[] = [];
+  // Set inside the transaction if a concurrent call already committed this exact clientRequestId
+  // between the fast-path check above and here — the closer of the idempotency race window.
+  let replay: { orderNumber: string; groupId: string } | null = null;
 
   await db.runTransaction(async (tx) => {
+    if (requestRef) {
+      const requestSnap = await tx.get(requestRef);
+      if (requestSnap.exists) {
+        const data = requestSnap.data() as { orderNumber: string; groupId: string };
+        replay = { orderNumber: data.orderNumber, groupId: data.groupId };
+        return;
+      }
+    }
+
     // Re-read inventory INSIDE the transaction so concurrent purchases can't both pass the
     // earlier (pre-transaction) stock check and both decrement past zero.
     const invRefs = productIds.map((id) => db.collection('inventory').doc(id));
@@ -348,7 +386,17 @@ export async function placeOrderInternal(args: PlaceOrderArgs): Promise<PlaceOrd
     if (couponRef) {
       tx.update(couponRef, { used_count: FieldValue.increment(1) });
     }
+
+    if (requestRef) {
+      tx.set(requestRef, { orderNumber, groupId, buyer_id: uid, created_at: nowIso });
+    }
   });
+
+  // A concurrent duplicate call won the race and already placed this order — return its result
+  // without re-sending notifications or re-evaluating low-stock alerts a second time.
+  if (replay) {
+    return replay;
+  }
 
   // Side-effect notifications — best-effort, run after the transaction has committed.
   await createNotification({

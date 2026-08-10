@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Heart, ShoppingCart } from 'lucide-react';
+import toast from 'react-hot-toast';
 import type { Product, Inventory } from '@/types';
 import { PriceTag } from '@/components/ui/PriceTag';
 import { Rating } from '@/components/ui/Rating';
@@ -89,6 +90,16 @@ function ProductCardImpl({ product, className, inventory: inventoryProp, skipOwn
     await addItem({ productId: product.id, variantId: quickAddVariant.id });
   };
 
+  const handleToggleWishlist = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!isAuthenticated) {
+      toast('Please log in to save items to your wishlist');
+      navigate('/login', { state: { from: `/product/${product.slug}` } });
+      return;
+    }
+    toggle(product.id);
+  };
+
   return (
     <motion.div
       className={cn('card-surface group relative overflow-hidden', className)}
@@ -97,14 +108,12 @@ function ProductCardImpl({ product, className, inventory: inventoryProp, skipOwn
       transition={{ duration: 0.2, ease: 'easeOut' }}
     >
       <button
-        onClick={(e) => {
-          e.preventDefault();
-          toggle(product.id);
-        }}
-        className="tap-target-48 absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-sm backdrop-blur transition-transform hover:scale-110 dark:bg-primary-800/90"
+        onClick={handleToggleWishlist}
+        className="tap-target-48 !absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-sm backdrop-blur transition-transform hover:scale-110 active:scale-95 dark:bg-primary-800/90"
         aria-label={wishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+        aria-pressed={wishlisted}
       >
-        <Heart size={15} className={cn(wishlisted ? 'fill-red-500 text-red-500' : 'text-primary-400')} />
+        <Heart size={15} className={cn(wishlisted ? 'fill-red-500 text-red-500' : 'text-primary-900 dark:text-white')} />
       </button>
 
       {product.discount_percent > 0 && (

@@ -50,6 +50,11 @@ export function PaymentPage() {
 
   const [method, setMethod] = useState<PaymentMethod>(state?.paymentMethod ?? 'razorpay');
   const [isProcessing, setIsProcessing] = useState(false);
+  // One id per mount of this page, reused across retries of the SAME checkout attempt — a
+  // double-clicked "Place Order"/"Pay Now", or a client retry after a response was lost in
+  // transit, resolves to the same server-side request instead of placing a second order. A fresh
+  // navigation to /checkout/payment (a genuinely new checkout) re-mounts the page and gets a new id.
+  const [clientRequestId] = useState(() => crypto.randomUUID());
 
   const coupon: Coupon | null = (() => {
     try {
@@ -85,6 +90,7 @@ export function PaymentPage() {
 
   const goToSuccess = (result: { orderNumber: string; groupId: string }) => {
     sessionStorage.removeItem('dressmart:checkout-coupon');
+    toast.success('Order placed successfully!');
     // Cart items: the Cloud Function already deleted the purchased docs server-side, and the cart's
     // realtime listener (useCart) reflects that on its own — nothing to invalidate client-side.
     // Buy Now never touched the cart at all; its temporary checkout session just needs clearing.
@@ -95,7 +101,7 @@ export function PaymentPage() {
   const handlePlaceCodOrder = async () => {
     setIsProcessing(true);
     try {
-      const result = await paymentService.placeCodOrder({ addressId, couponCode: coupon?.code, cart: cartPayload });
+      const result = await paymentService.placeCodOrder({ addressId, couponCode: coupon?.code, cart: cartPayload, clientRequestId });
       goToSuccess(result);
     } catch (error) {
       toast.error(getFriendlyErrorMessage(error, 'Could not place order. Please try again.'));
@@ -130,6 +136,7 @@ export function PaymentPage() {
               addressId,
               couponCode: coupon?.code,
               cart: cartPayload,
+              clientRequestId,
             });
             goToSuccess(result);
           } catch (error) {

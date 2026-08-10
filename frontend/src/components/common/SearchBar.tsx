@@ -5,7 +5,7 @@ import { Mic, ScanLine, Search, X, Clock, TrendingUp, Flame, LayoutGrid, Tag } f
 import { useSearch } from '@/hooks/useSearch';
 import { useOnClickOutside } from '@/hooks/useOnClickOutside';
 import { ProductImage } from '@/components/ui/ProductImage';
-import { formatCurrency } from '@/lib/utils';
+import { PriceTag } from '@/components/ui/PriceTag';
 
 interface SpeechRecognitionResultLike {
   transcript: string;
@@ -118,7 +118,7 @@ export function SearchBar() {
       </form>
 
       {isFocused && (
-        <div className="absolute left-0 right-0 top-full z-40 mt-2 max-h-[70vh] overflow-y-auto rounded-2xl bg-card p-3 shadow-popover dark:bg-card-dark">
+        <div className="absolute left-0 right-0 top-full z-40 mt-2 max-h-[70vh] overflow-y-auto rounded-2xl bg-card p-3 text-primary-900 shadow-popover dark:bg-card-dark dark:text-white">
           {query.trim().length > 1 ? (
             suggestions.length > 0 || categorySuggestions.length > 0 || brandSuggestions.length > 0 ? (
               <div className="space-y-3">
@@ -180,10 +180,13 @@ export function SearchBar() {
                             }}
                             className="flex w-full items-center gap-3 rounded-xl p-2 text-left hover:bg-primary-50 dark:hover:bg-primary-800"
                           >
-                            <ProductImage src={product.imageUrl ?? product.images[0]?.url} alt="" className="h-12 w-10 rounded-md" priority />
+                            <ProductImage src={product.imageUrl ?? product.images[0]?.url} alt="" className="h-12 w-10 shrink-0 rounded-md" priority />
                             <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-medium">{product.name}</p>
-                              <p className="text-xs text-primary-400">{formatCurrency(product.price)}</p>
+                              <p className="truncate text-sm font-medium" title={product.name}>
+                                {product.name}
+                              </p>
+                              {product.brand?.name && <p className="truncate text-xs text-primary-400">{product.brand.name}</p>}
+                              <PriceTag price={product.price} mrp={product.mrp} discountPercent={product.discount_percent} size="sm" className="mt-0.5" />
                             </div>
                           </button>
                         </li>

@@ -18,6 +18,7 @@ import {
   useNewArrivals,
   useBestSellers,
 } from '@/hooks/useProducts';
+import { usePersonalizedRecommendations } from '@/hooks/usePersonalizedRecommendations';
 import { Skeleton, ProductCardSkeleton } from '@/components/ui/Skeleton';
 import { queryKeys } from '@/lib/queryClient';
 import { cn } from '@/lib/utils';
@@ -261,6 +262,27 @@ function NewArrivalsGrid() {
   );
 }
 
+/** "Recommended for you" — built from recently-viewed/wishlist/orders/category-browsing/search
+ *  history (see usePersonalizedRecommendations.ts + lib/personalizedRecommender.ts); no dedicated
+ *  data fetch of its own here beyond that one hook. Title becomes "Because you searched for X" once
+ *  a strongest-matched category is known, otherwise the generic "Recommended for you" — same
+ *  "Recommended For You" wording already used on the Profile dashboard's version of this section. */
+function PersonalizedForYouSection() {
+  const { recommendations, topCategoryLabel, isLoading, isError, retry } = usePersonalizedRecommendations();
+  if (!isLoading && !isError && recommendations.length === 0) return null;
+
+  return (
+    <ProductCarousel
+      title={topCategoryLabel ? `Because you searched for ${topCategoryLabel}` : 'Recommended for you'}
+      products={recommendations}
+      isLoading={isLoading}
+      isError={isError}
+      onRetry={retry}
+      showAddToCartButtons
+    />
+  );
+}
+
 function FeaturedBrandsSection() {
   const { data: brands } = useFeaturedBrands();
   if (!brands?.length) return null;
@@ -343,6 +365,8 @@ export function HomePage() {
       <FlashSaleWidget />
 
       <NewArrivalsGrid />
+
+      <PersonalizedForYouSection />
 
       <ProductCarousel
         title="Best Sellers"

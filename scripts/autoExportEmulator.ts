@@ -17,13 +17,29 @@
  * `npm run dev`, so this script's own first job is to check whether a previous instance (from an
  * earlier, still-running dev session) is already exporting, and exit immediately if so.
  */
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
 const EXPORT_DIR = path.resolve(process.cwd(), '.emulator-data');
 const LOCK_PATH = path.join(EXPORT_DIR, '.autoexport.lock');
-const EXPORT_INTERVAL_MS = 5 * 60 * 1000;
+
+// Same reasoning/approach as ensureEmulatorRunning.ts's resolveGlobalBin: `firebase` is a global
+// install here, and invoking its `.cmd` shim requires `shell: true`, which — per that file's own
+// notes — does NOT reliably suppress the console window on Windows even with `windowsHide: true`.
+// Since this export runs on a recurring timer for as long as the emulator does, that unreliability
+// means a visible, empty console window popping up roughly once a minute for the whole dev session.
+// Resolving the real JS entry point and spawning `node` on it directly avoids the shell entirely.
+function resolveFirebaseEntry(): string | null {
+  try {
+    const globalRoot = execFileSync('npm', ['root', '-g'], { encoding: 'utf8', shell: true }).trim();
+    const resolved = path.join(globalRoot, 'firebase-tools/lib/bin/firebase.js');
+    return fs.existsSync(resolved) ? resolved : null;
+  } catch {
+    return null;
+  }
+}
+const EXPORT_INTERVAL_MS = 60 * 1000;
 
 function isPidAlive(pid: number): boolean {
   try {
@@ -57,11 +73,13 @@ function releaseLock(): void {
 }
 
 function exportOnce(): Promise<void> {
+  const args = ['--config', 'database/firebase.json', 'emulators:export', './.emulator-data', '--force'];
+  const firebaseEntry = resolveFirebaseEntry();
   return new Promise((resolve) => {
     execFile(
-      'firebase',
-      ['--config', 'database/firebase.json', 'emulators:export', './.emulator-data', '--force'],
-      { shell: true, timeout: 60_000, windowsHide: true },
+      firebaseEntry ? process.execPath : 'firebase',
+      firebaseEntry ? [firebaseEntry, ...args] : args,
+      { shell: !firebaseEntry, timeout: 60_000, windowsHide: true },
       (error) => {
         if (error) console.error(`[auto-export] export failed: ${error.message}`);
         else console.log(`[auto-export] exported at ${new Date().toISOString()}`);

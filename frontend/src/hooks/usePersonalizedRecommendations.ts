@@ -4,12 +4,14 @@ import { useRecentlyViewed } from './useRecentlyViewed';
 import { useWishlist } from './useWishlist';
 import { useOrders } from './useOrders';
 import { useCategoryHistory } from './useCategoryHistory';
-import { productService } from '@/services/productService';
+import { productService, categoryService, brandService } from '@/services/productService';
+import { userActivityService } from '@/services/userActivityService';
 import { buildPersonalizedRecommendations } from '@/lib/personalizedRecommender';
+import { queryKeys } from '@/lib/queryClient';
 import type { Product } from '@/types';
 
 export function usePersonalizedRecommendations() {
-  const { identityId } = useAuth();
+  const { identityId, isAuthenticated } = useAuth();
   const { recentlyViewed, isLoading: isLoadingRecent } = useRecentlyViewed();
   const { items: wishlistItems, isLoading: isLoadingWishlist } = useWishlist();
   const { data: orders, isLoading: isLoadingOrders } = useOrders();
@@ -24,8 +26,27 @@ export function usePersonalizedRecommendations() {
     enabled: orderProductIds.length > 0,
   });
 
-  const signalsReady = !isLoadingRecent && !isLoadingWishlist && !isLoadingOrders && (orderProductIds.length === 0 || orderedProductsQuery.isSuccess);
+  // Search history is a signed-in-only, permanent Firestore signal (see useSearch.ts/
+  // userActivityService.ts) — guests never get one, so they just fall back to the other three
+  // signals above, same as before this was added. Categories/brands reuse the exact same query
+  // keys useSearch.ts's suggestion dropdown already warms, so this is very often a cache hit and
+  // not an extra Firestore read at all.
+  const searchHistoryQuery = useQuery({
+    queryKey: ['user-activity', identityId, 'search-history'],
+    queryFn: () => userActivityService.get(identityId).then((activity) => activity.recent_searches),
+    enabled: isAuthenticated,
+  });
+  const categoriesQuery = useQuery({ queryKey: queryKeys.categories.all, queryFn: () => categoryService.list(), enabled: isAuthenticated });
+  const brandsQuery = useQuery({ queryKey: queryKeys.brands.all, queryFn: () => brandService.list(), enabled: isAuthenticated });
+
+  const signalsReady =
+    !isLoadingRecent &&
+    !isLoadingWishlist &&
+    !isLoadingOrders &&
+    (orderProductIds.length === 0 || orderedProductsQuery.isSuccess) &&
+    (!isAuthenticated || (searchHistoryQuery.isSuccess && categoriesQuery.isSuccess && brandsQuery.isSuccess));
   const orderedProducts = orderedProductsQuery.data ?? [];
+  const searchHistory = searchHistoryQuery.data ?? [];
 
   const recommendationsQuery = useQuery({
     queryKey: [
@@ -36,8 +57,18 @@ export function usePersonalizedRecommendations() {
       wishlistProducts.map((p) => p.id),
       orderedProducts.map((p) => p.id),
       categoryHistorySlugs,
+      searchHistory.map((s) => s.normalized_query),
     ],
-    queryFn: () => buildPersonalizedRecommendations({ recentlyViewed, wishlistProducts, orderedProducts, categoryHistorySlugs }),
+    queryFn: () =>
+      buildPersonalizedRecommendations({
+        recentlyViewed,
+        wishlistProducts,
+        orderedProducts,
+        categoryHistorySlugs,
+        searchHistory,
+        categories: categoriesQuery.data,
+        brands: brandsQuery.data,
+      }),
     enabled: signalsReady,
   });
 

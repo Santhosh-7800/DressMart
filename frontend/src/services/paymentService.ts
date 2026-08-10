@@ -29,12 +29,16 @@ export interface VerifyAndPlaceOrderInput {
   addressId: string;
   couponCode?: string;
   cart: CartLineForOrder[];
+  /** Stable per checkout attempt (see PaymentPage) — lets the server recognize and no-op a
+   *  duplicate submission (double-clicked button, retried request) instead of placing two orders. */
+  clientRequestId: string;
 }
 
 export interface PlaceCodOrderInput {
   addressId: string;
   couponCode?: string;
   cart: CartLineForOrder[];
+  clientRequestId: string;
 }
 
 let razorpayScriptPromise: Promise<void> | null = null;

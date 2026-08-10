@@ -27,6 +27,20 @@ if (!(env.firebase.apiKey && env.firebase.projectId)) {
   );
 }
 
+// Hard stop for the exact misconfiguration that silently resets every customer's cart/orders/
+// profile in production: VITE_USE_FIREBASE_EMULATOR=true leaking into a deployed build (e.g. left
+// on in a hosting provider's env vars). A real visitor's browser can't reach `localhost:8081` —
+// every Firestore/Storage/Functions call would fail against a project that doesn't actually exist
+// for them, while Auth (always real, see above) keeps working, which is exactly what makes this
+// look like "the account has no data" instead of an obvious outage. Fail loudly at boot instead.
+if (import.meta.env.PROD && env.useEmulators) {
+  throw new Error(
+    'Firebase is misconfigured: VITE_USE_FIREBASE_EMULATOR=true in a production build. ' +
+      'Remove that env var (or set it to false) in your hosting provider’s configuration — a ' +
+      'deployed app must never point Firestore/Storage/Functions at a local emulator.',
+  );
+}
+
 const app = initializeApp({
   apiKey: env.firebase.apiKey,
   authDomain: env.firebase.authDomain,

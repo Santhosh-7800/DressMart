@@ -1,11 +1,14 @@
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
 import toast from 'react-hot-toast';
 import { Mic, ScanLine, Search, X, Clock, TrendingUp, Flame, LayoutGrid, Tag } from 'lucide-react';
 import { useSearch } from '@/hooks/useSearch';
 import { useOnClickOutside } from '@/hooks/useOnClickOutside';
 import { ProductImage } from '@/components/ui/ProductImage';
 import { PriceTag } from '@/components/ui/PriceTag';
+import { scanBarcodeNative } from '@/lib/barcodeScanner';
+import { BarcodeScannerModal } from '@/components/common/BarcodeScannerModal';
 
 interface SpeechRecognitionResultLike {
   transcript: string;
@@ -19,6 +22,7 @@ export function SearchBar() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
   const {
     query,
     setQuery,
@@ -67,6 +71,29 @@ export function SearchBar() {
     recognition.start();
   };
 
+  const handleScanBarcode = async () => {
+    // Android shell: full-screen native ML Kit scanner, no camera-permission UI of our own to
+    // build. Kept as its own branch (rather than "try native, else open the web modal") so
+    // cancelling the native scanner doesn't then pop the web camera modal on top of it.
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const code = await scanBarcodeNative();
+        if (code) runSearch(code);
+      } catch {
+        toast.error("Couldn't open the scanner. Try searching instead.");
+      }
+      return;
+    }
+    setIsScannerOpen(true);
+  };
+
+  const handleScanResult = (code: string) => {
+    setIsScannerOpen(false);
+    // Deferred a tick so the modal's own close/camera-teardown state settles first, rather than
+    // racing the navigation against it.
+    setTimeout(() => runSearch(code), 0);
+  };
+
   return (
     <div ref={containerRef} className="relative w-full max-w-2xl">
       <form
@@ -105,7 +132,7 @@ export function SearchBar() {
         </button>
         <button
           type="button"
-          onClick={() => toast('Barcode scanning is coming soon', { icon: '📷' })}
+          onClick={handleScanBarcode}
           className="mr-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-700"
           aria-label="Scan barcode"
           title="Scan barcode"
@@ -249,6 +276,8 @@ export function SearchBar() {
           )}
         </div>
       )}
+
+      <BarcodeScannerModal isOpen={isScannerOpen} onClose={() => setIsScannerOpen(false)} onScan={handleScanResult} />
     </div>
   );
 }

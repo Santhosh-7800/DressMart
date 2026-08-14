@@ -67,6 +67,14 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  optimizeDeps: {
+    // @zxing/browser is only ever reached via a dynamic import() (BarcodeScannerModal.tsx, itself
+    // lazy-loaded from SearchBar.tsx) — Vite's dev server otherwise only discovers it the first
+    // time someone actually opens the scanner, and pre-bundling a newly-discovered dep on the fly
+    // forces a full page reload right in the middle of that interaction. Listing it here makes the
+    // dev server pre-bundle it at startup instead, same as everything reached via a static import.
+    include: ['@zxing/browser', '@zxing/library'],
+  },
   server: {
     port: 5173,
     open: true,

@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { User, Package, MapPin, Bell, Ticket, Heart, Settings, CreditCard, LogOut, type LucideIcon } from 'lucide-react';
+import { User, Package, MapPin, Bell, Ticket, Heart, Settings, CreditCard, History, LogOut, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAvatar } from '@/hooks/useAvatar';
@@ -13,6 +13,7 @@ const NAV_ITEMS: { to: string; label: string; icon: LucideIcon; end?: boolean }[
   { to: '/coupons', label: 'Coupons', icon: Ticket },
   { to: '/addresses', label: 'Addresses', icon: MapPin },
   { to: '/payments', label: 'Payments', icon: CreditCard },
+  { to: '/search-history', label: 'Search History', icon: History },
   { to: '/notifications', label: 'Notifications', icon: Bell },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];

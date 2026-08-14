@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Package, Heart, MapPin, Ticket, Settings, HelpCircle, LogOut, ChevronRight } from 'lucide-react';
+import { Package, Heart, MapPin, Ticket, Settings, History, HelpCircle, LogOut, ChevronRight } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import type { Profile } from '@/types';
 
@@ -14,6 +14,7 @@ const ROWS = [
   { to: '/wishlist', label: 'Wishlist', icon: Heart },
   { to: '/addresses', label: 'Addresses', icon: MapPin },
   { to: '/coupons', label: 'Coupons', icon: Ticket },
+  { to: '/search-history', label: 'Search History', icon: History },
   { to: '/settings', label: 'Settings', icon: Settings },
   { to: '/help-center', label: 'Help', icon: HelpCircle },
 ];

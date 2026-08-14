@@ -186,6 +186,9 @@ export function Header() {
                     <Link to="/payments" onClick={() => setIsAccountOpen(false)} className="block rounded-lg px-3 py-2 text-sm hover:bg-primary-50 dark:hover:bg-primary-800">
                       Payment Methods
                     </Link>
+                    <Link to="/search-history" onClick={() => setIsAccountOpen(false)} className="block rounded-lg px-3 py-2 text-sm hover:bg-primary-50 dark:hover:bg-primary-800">
+                      Search History
+                    </Link>
                     <Link to="/settings" onClick={() => setIsAccountOpen(false)} className="block rounded-lg px-3 py-2 text-sm hover:bg-primary-50 dark:hover:bg-primary-800">
                       Settings
                     </Link>

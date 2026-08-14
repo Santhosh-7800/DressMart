@@ -17,7 +17,9 @@ import { env } from './env';
 // emulator, in any environment, so signInWithPopup() always opens Google's real accounts.google.com
 // account chooser instead of the emulator's mock consent screen. Real VITE_FIREBASE_API_KEY /
 // VITE_FIREBASE_PROJECT_ID are therefore required unconditionally; main.tsx's bootstrap() catches
-// this throw and shows a generic, user-friendly message instead of a blank page.
+// this throw and shows a generic, user-friendly message instead of a blank page (the real message,
+// including exactly which var names are missing, still reaches the console for debugging — see
+// main.tsx's console.error before it swaps in the generic UI).
 if (!(env.firebase.apiKey && env.firebase.projectId)) {
   throw new Error(
     'Firebase is misconfigured: VITE_FIREBASE_API_KEY / VITE_FIREBASE_PROJECT_ID are missing. ' +
@@ -25,6 +27,34 @@ if (!(env.firebase.apiKey && env.firebase.projectId)) {
       '.env.example) — Firestore/Storage/Functions may still use the local emulator via ' +
       'VITE_USE_FIREBASE_EMULATOR=true, but Authentication does not.',
   );
+}
+
+// A production build must never fall back to an emulator/demo value for ANY of these (see the
+// storageBucket/messagingSenderId/appId fallbacks below, which only apply under env.useEmulators) —
+// unlike apiKey/projectId above, a missing storageBucket/messagingSenderId/appId in production
+// wouldn't throw on its own (initializeApp accepts empty strings) and would instead surface later as
+// a confusing runtime failure in Storage/Messaging/Functions. Fail loudly at boot with the exact
+// missing variable names instead, so a Vercel/hosting misconfiguration is obvious immediately.
+if (import.meta.env.PROD) {
+  const missing = (
+    [
+      ['VITE_FIREBASE_AUTH_DOMAIN', env.firebase.authDomain],
+      ['VITE_FIREBASE_STORAGE_BUCKET', env.firebase.storageBucket],
+      ['VITE_FIREBASE_MESSAGING_SENDER_ID', env.firebase.messagingSenderId],
+      ['VITE_FIREBASE_APP_ID', env.firebase.appId],
+    ] as const
+  )
+    .filter(([, value]) => !value)
+    .map(([name]) => name);
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Firebase is misconfigured: ${missing.join(', ')} ${missing.length > 1 ? 'are' : 'is'} missing. ` +
+        'A production build requires every VITE_FIREBASE_* variable to be set on the hosting ' +
+        "provider's environment variables (see .env.example) — none of them may be left unset in " +
+        'production, unlike local dev.',
+    );
+  }
 }
 
 // Hard stop for the exact misconfiguration that silently resets every customer's cart/orders/

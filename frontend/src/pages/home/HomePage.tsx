@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Zap, Truck, RotateCcw, ShieldCheck, Headphones, type LucideIcon } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { PullToRefresh } from '@/components/common/PullToRefresh';
+import { PromotionalCarousel, type PromoSlide } from '@/components/home/PromotionalCarousel';
 import { ProductCarousel } from '@/components/product/ProductCarousel';
 import { ProductGrid } from '@/components/product/ProductGrid';
 import { FlashSaleProductCard } from '@/components/product/FlashSaleProductCard';
@@ -130,6 +131,48 @@ function BannerSlider() {
     </div>
   );
 }
+
+/**
+ * Static "Featured Collection" campaign slides for the PromotionalCarousel below — content-only
+ * config, no fetch involved (unlike BannerSlider's seller-managed Firestore banners above). Add a
+ * future campaign by appending another entry here; the component itself needs no changes.
+ */
+const FEATURED_SLIDES: PromoSlide[] = [
+  {
+    id: 'kids-featured',
+    label: 'Featured',
+    title: 'Little Trendsetters',
+    subtitle: 'Kids styles from ₹299',
+    ctaLabel: 'Shop Kids',
+    href: '/kids',
+    image: '/images/banners/kids-featured.jpg',
+    imageAlt: 'Three boys in trendy graphic tees and casual jackets',
+  },
+  {
+    id: 'men-new-season',
+    label: 'New Season',
+    title: 'Sharp Looks, Everyday',
+    subtitle: "Men's fashion from ₹499",
+    ctaLabel: 'Shop Men',
+    href: '/men',
+    image: '/images/banners/men-new-season.jpg',
+    imageAlt: 'Man wearing a navy overshirt and sunglasses',
+  },
+  {
+    id: 'fashion-sale',
+    // A pre-designed graphic (text/CTA already baked into the image) rather than a lifestyle photo
+    // — label/title/subtitle/ctaLabel below are unused for rendering (see `flat`) but title still
+    // drives the sr-only announcement, indicator aria-labels, and the whole-slide link's aria-label.
+    label: 'Sale',
+    title: 'Fashion Sale — Special Offer',
+    subtitle: 'Top brands, best prices, secure shopping',
+    ctaLabel: 'Shop Deals',
+    href: '/deals',
+    image: '/images/banners/fashion-sale.jpg',
+    imageAlt: '',
+    flat: true,
+  },
+];
 
 /**
  * Circular category tiles, real product photography as the icon (see
@@ -359,6 +402,8 @@ export function HomePage() {
       <div className="container-app pt-6">
         <BannerSlider />
       </div>
+
+      <PromotionalCarousel slides={FEATURED_SLIDES} ariaLabel="Featured collections" />
 
       <CategoryShowcase />
 

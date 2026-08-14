@@ -51,6 +51,7 @@ const NotificationsPage = lazyWithRetry(() => import('@/pages/profile/Notificati
 const CouponsPage = lazyWithRetry(() => import('@/pages/profile/CouponsPage').then((m) => ({ default: m.CouponsPage })));
 const PaymentsPage = lazyWithRetry(() => import('@/pages/profile/PaymentsPage').then((m) => ({ default: m.PaymentsPage })));
 const SettingsPage = lazyWithRetry(() => import('@/pages/profile/SettingsPage').then((m) => ({ default: m.SettingsPage })));
+const SearchHistoryPage = lazyWithRetry(() => import('@/pages/profile/SearchHistoryPage').then((m) => ({ default: m.SearchHistoryPage })));
 
 const HelpCenterPage = lazyWithRetry(() => import('@/pages/static/HelpCenterPage').then((m) => ({ default: m.HelpCenterPage })));
 const PrivacyPolicyPage = lazyWithRetry(() => import('@/pages/static/PrivacyPolicyPage').then((m) => ({ default: m.PrivacyPolicyPage })));
@@ -169,6 +170,7 @@ export function AppRoutes() {
               <Route path="/notifications" element={<NotificationsPage />} />
               <Route path="/coupons" element={<CouponsPage />} />
               <Route path="/payments" element={<PaymentsPage />} />
+              <Route path="/search-history" element={<SearchHistoryPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Route>
           </Route>

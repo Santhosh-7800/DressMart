@@ -57,14 +57,14 @@ export function LoginPage() {
   return (
     <div>
       <Seo title="Login" />
-      <h1 className="text-2xl font-bold">Welcome back</h1>
-      <p className="mt-1 text-sm text-primary-400">Login to continue to DressMart</p>
+      <h1 className="text-2xl font-bold tracking-tight text-primary-900 dark:text-white sm:text-3xl">Welcome back</h1>
+      <p className="mt-2 text-sm text-primary-400">Login to continue to DressMart</p>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-5">
         <Input label="Email Address" type="email" placeholder="you@example.com" leftIcon={<Mail size={16} />} error={errors.email?.message} {...register('email')} />
         <PasswordInput label="Password" placeholder="••••••••" leftIcon={<Lock size={16} />} error={errors.password?.message} {...register('password')} />
         <div className="flex justify-end">
-          <Link to="/forgot-password" className="text-sm text-accent-600 hover:underline">
+          <Link to="/forgot-password" className="text-sm font-medium text-accent-600 transition-colors hover:text-accent-700 hover:underline">
             Forgot password?
           </Link>
         </div>
@@ -73,9 +73,9 @@ export function LoginPage() {
         </Button>
       </form>
 
-      <div className="my-6 flex items-center gap-3">
+      <div className="my-7 flex items-center gap-3">
         <div className="h-px flex-1 bg-primary-100 dark:bg-primary-700" />
-        <span className="text-xs text-primary-400">OR</span>
+        <span className="text-xs font-medium tracking-wide text-primary-400">OR</span>
         <div className="h-px flex-1 bg-primary-100 dark:bg-primary-700" />
       </div>
 
@@ -91,9 +91,9 @@ export function LoginPage() {
         Continue with Google
       </Button>
 
-      <p className="mt-6 text-center text-sm text-primary-400">
+      <p className="mt-7 text-center text-sm text-primary-400">
         Don't have an account?{' '}
-        <Link to="/signup" className="font-medium text-accent-600 hover:underline">
+        <Link to="/signup" className="font-semibold text-accent-600 transition-colors hover:text-accent-700 hover:underline">
           Sign up
         </Link>
       </p>

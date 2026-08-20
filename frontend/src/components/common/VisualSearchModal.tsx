@@ -35,10 +35,10 @@ function friendlyErrorMessage(err: unknown): string {
 }
 
 /**
- * "DressMart AI Visual Search" entry point — mirrors BarcodeScannerModal's shape (isOpen/onClose,
- * the modal itself never navigates) but drives the analyzeClothingImage flow instead of a barcode
- * decode: pick/take a photo -> compress + send to the Cloud Function -> resolve relevant category
- * slugs -> hand the result back to the caller, which commits search history and navigates.
+ * "DressMart AI Visual Search" entry point — the modal itself never navigates, just drives the
+ * analyzeClothingImage flow: pick/take a photo -> compress + send to the Cloud Function -> resolve
+ * relevant category slugs -> hand the result back to the caller, which commits search history and
+ * navigates to the results page.
  */
 export function VisualSearchModal({ isOpen, onClose, onAnalyzed }: VisualSearchModalProps) {
   const [status, setStatus] = useState<Status>('idle');

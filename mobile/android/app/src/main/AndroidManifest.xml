@@ -46,8 +46,9 @@
     <!-- Required on Android 13+ (targetSdk 33+) to show any notification, including push. Runtime
          request happens in src/lib/pushNotifications.ts via PushNotifications.requestPermissions(). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- Barcode scanning (search bar's "Scan barcode" button) via @capacitor-mlkit/barcode-scanning.
-         Runtime request happens through the plugin's own scan() call in src/lib/barcodeScanner.ts. -->
+    <!-- Visual search (search bar's camera icon) uses a plain <input capture> file picker, which
+         delegates to the system camera app rather than requesting this permission directly — kept
+         here as a hint to Android that the app meaningfully uses a camera. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 </manifest>

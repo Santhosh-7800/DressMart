@@ -1,14 +1,10 @@
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Capacitor } from '@capacitor/core';
-import toast from 'react-hot-toast';
-import { Mic, ScanLine, Camera, Search, X, Clock, TrendingUp, Flame, LayoutGrid, Tag } from 'lucide-react';
+import { Mic, Camera, Search, X, Clock, TrendingUp, Flame, LayoutGrid, Tag } from 'lucide-react';
 import { useSearch } from '@/hooks/useSearch';
 import { useOnClickOutside } from '@/hooks/useOnClickOutside';
 import { ProductImage } from '@/components/ui/ProductImage';
 import { PriceTag } from '@/components/ui/PriceTag';
-import { scanBarcodeNative } from '@/lib/barcodeScanner';
-import { BarcodeScannerModal } from '@/components/common/BarcodeScannerModal';
 import { VisualSearchModal, type VisualSearchResult } from '@/components/common/VisualSearchModal';
 import { visualSearchService } from '@/services/visualSearchService';
 
@@ -24,7 +20,6 @@ export function SearchBar() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isVisualSearchOpen, setIsVisualSearchOpen] = useState(false);
   const {
     query,
@@ -72,29 +67,6 @@ export function SearchBar() {
     };
     recognition.onend = () => setIsListening(false);
     recognition.start();
-  };
-
-  const handleScanBarcode = async () => {
-    // Android shell: full-screen native ML Kit scanner, no camera-permission UI of our own to
-    // build. Kept as its own branch (rather than "try native, else open the web modal") so
-    // cancelling the native scanner doesn't then pop the web camera modal on top of it.
-    if (Capacitor.isNativePlatform()) {
-      try {
-        const code = await scanBarcodeNative();
-        if (code) runSearch(code);
-      } catch {
-        toast.error("Couldn't open the scanner. Try searching instead.");
-      }
-      return;
-    }
-    setIsScannerOpen(true);
-  };
-
-  const handleScanResult = (code: string) => {
-    setIsScannerOpen(false);
-    // Deferred a tick so the modal's own close/camera-teardown state settles first, rather than
-    // racing the navigation against it.
-    setTimeout(() => runSearch(code), 0);
   };
 
   const handleVisualSearchAnalyzed = (result: VisualSearchResult) => {
@@ -147,15 +119,6 @@ export function SearchBar() {
           title="Voice search"
         >
           <Mic size={16} />
-        </button>
-        <button
-          type="button"
-          onClick={handleScanBarcode}
-          className="mr-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-700"
-          aria-label="Scan barcode"
-          title="Scan barcode"
-        >
-          <ScanLine size={16} />
         </button>
         <button
           type="button"
@@ -304,7 +267,6 @@ export function SearchBar() {
         </div>
       )}
 
-      <BarcodeScannerModal isOpen={isScannerOpen} onClose={() => setIsScannerOpen(false)} onScan={handleScanResult} />
       <VisualSearchModal isOpen={isVisualSearchOpen} onClose={() => setIsVisualSearchOpen(false)} onAnalyzed={handleVisualSearchAnalyzed} />
     </div>
   );

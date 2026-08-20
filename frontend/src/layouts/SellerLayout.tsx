@@ -243,39 +243,39 @@ export function SellerLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-acc-bg dark:bg-surface-dark">
-      <div className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-6 lg:px-8">
-        <div className="flex gap-6">
-          {/* Desktop: full labeled sidebar, 260px. The `aside` itself (not the visual `nav` card)
-              owns the sticky positioning — position:sticky, top:0, full viewport height — so the
-              whole page scrolls as one unit under a single browser scrollbar; the nav card keeps
-              its own natural compact height/visual styling unchanged inside that sticky column. */}
-          <aside className="hidden shrink-0 lg:sticky lg:top-0 lg:block lg:h-screen lg:w-[260px]">
-            <nav className="flex flex-col gap-1.5 rounded-[20px] border border-acc-border bg-white p-3 shadow-[0_2px_16px_rgba(17,24,39,0.06)] dark:border-primary-700 dark:bg-card-dark">
-              <div className="mb-1 flex items-center gap-2 px-1 pb-2">
-                <Store size={16} className="text-acc-primary" />
-                <span className="text-xs font-bold uppercase tracking-wide text-acc-text-secondary">Seller Dashboard</span>
-              </div>
-              <SellerSummary />
-              <NavItems />
-            </nav>
-          </aside>
+    <div className="min-h-screen bg-acc-bg dark:bg-surface-dark md:h-screen md:overflow-hidden">
+      <div className="mx-auto flex w-full max-w-[1200px] gap-6 px-4 sm:px-6 lg:px-8 md:h-screen">
+        {/* Desktop: full labeled sidebar, 260px. The outer shell above is height-locked to the
+            viewport on md+ (md:h-screen md:overflow-hidden) and this aside stretches to match it
+            (flex's default align-items:stretch), then scrolls independently via its own
+            overflow-y-auto — that's what actually keeps the sidebar in place while only the content
+            pane scrolls. The previous `position:sticky` on the aside let the whole page (sidebar
+            included) scroll together as one unit instead, which was the "both panels move" bug. */}
+        <aside className="scrollbar-thin hidden shrink-0 overflow-y-auto px-1 py-8 lg:block lg:w-[260px]">
+          <nav className="flex flex-col gap-1.5 rounded-[20px] border border-acc-border bg-white p-3 shadow-[0_2px_16px_rgba(17,24,39,0.06)] dark:border-primary-700 dark:bg-card-dark">
+            <div className="mb-1 flex items-center gap-2 px-1 pb-2">
+              <Store size={16} className="text-acc-primary" />
+              <span className="text-xs font-bold uppercase tracking-wide text-acc-text-secondary">Seller Dashboard</span>
+            </div>
+            <SellerSummary />
+            <NavItems />
+          </nav>
+        </aside>
 
-          {/* Tablet: collapsed icon-only rail — same sticky-on-the-wrapper pattern as desktop. */}
-          <aside className="hidden shrink-0 md:sticky md:top-0 md:block md:h-screen md:w-[76px] lg:hidden">
-            <nav className="flex flex-col items-center gap-1.5 rounded-[20px] border border-acc-border bg-white p-2 shadow-[0_2px_16px_rgba(17,24,39,0.06)] dark:border-primary-700 dark:bg-card-dark">
-              {user && <Avatar src={avatarUrl} name={user.full_name} size="sm" className="mb-1" />}
-              <NavItems collapsed />
-            </nav>
-          </aside>
+        {/* Tablet: collapsed icon-only rail — same independent-scroll pattern as desktop. */}
+        <aside className="scrollbar-thin hidden shrink-0 overflow-y-auto px-1 py-8 md:block md:w-[76px] lg:hidden">
+          <nav className="flex flex-col items-center gap-1.5 rounded-[20px] border border-acc-border bg-white p-2 shadow-[0_2px_16px_rgba(17,24,39,0.06)] dark:border-primary-700 dark:bg-card-dark">
+            {user && <Avatar src={avatarUrl} name={user.full_name} size="sm" className="mb-1" />}
+            <NavItems collapsed />
+          </nav>
+        </aside>
 
-          {/* Content — always centered within the 1200px shell, fluid width. No overflow/height
-              constraint of its own: it grows with its content and the single browser scrollbar
-              scrolls the whole page (sidebar + content) together. */}
-          <div className="min-w-0 flex-1 overflow-visible pb-24 md:pb-0">
-            {user?.seller_status === 'pending' && <PendingApprovalBanner />}
-            <AnimatedOutlet />
-          </div>
+        {/* Content — its own independent scroll pane on md+ (see aside comment above). On mobile
+            there's no sidebar at all (just the bottom tab bar), so this is simply the page and
+            scrolls normally with the browser's single scrollbar. */}
+        <div className="scrollbar-thin min-w-0 flex-1 overflow-visible pt-8 pb-24 md:overflow-y-auto md:pb-8">
+          {user?.seller_status === 'pending' && <PendingApprovalBanner />}
+          <AnimatedOutlet />
         </div>
       </div>
 

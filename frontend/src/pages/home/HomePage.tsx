@@ -1,8 +1,8 @@
 import { useMemo, useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Zap, Truck, RotateCcw, ShieldCheck, Headphones, type LucideIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Zap, Truck, RotateCcw, ShieldCheck, Headphones, Camera, type LucideIcon } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { PullToRefresh } from '@/components/common/PullToRefresh';
 import { PromotionalCarousel, type PromoSlide } from '@/components/home/PromotionalCarousel';
@@ -10,6 +10,7 @@ import { ProductCarousel } from '@/components/product/ProductCarousel';
 import { ProductGrid } from '@/components/product/ProductGrid';
 import { FlashSaleProductCard } from '@/components/product/FlashSaleProductCard';
 import { CountdownTimer } from '@/components/product/CountdownTimer';
+import { VisualSearchModal, type VisualSearchResult } from '@/components/common/VisualSearchModal';
 import {
   useBanners,
   useCategories,
@@ -20,6 +21,8 @@ import {
   useBestSellers,
 } from '@/hooks/useProducts';
 import { usePersonalizedRecommendations } from '@/hooks/usePersonalizedRecommendations';
+import { useSearch } from '@/hooks/useSearch';
+import { visualSearchService } from '@/services/visualSearchService';
 import { Skeleton, ProductCardSkeleton } from '@/components/ui/Skeleton';
 import { queryKeys } from '@/lib/queryClient';
 import { cn } from '@/lib/utils';
@@ -227,6 +230,47 @@ function CategoryShowcase() {
   );
 }
 
+/** Small homepage entry point into the same visual search flow the header's camera icon opens (see
+ *  SearchBar.tsx's handleVisualSearchAnalyzed — this mirrors that exact commit-search + navigate
+ *  logic rather than a second implementation) — kept to a single slim strip so it never competes
+ *  with the primary shopping sections above/below it. */
+function VisualSearchBanner() {
+  const navigate = useNavigate();
+  const { commitSearch } = useSearch();
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleAnalyzed = (result: VisualSearchResult) => {
+    setIsOpen(false);
+    commitSearch(visualSearchService.toSearchPhrase(result.attrs));
+    setTimeout(
+      () =>
+        navigate('/visual-search', {
+          state: { attrs: result.attrs, previewDataUrl: result.previewDataUrl, categorySlugs: result.categorySlugs },
+        }),
+      0,
+    );
+  };
+
+  return (
+    <section className="container-app py-3">
+      <button
+        onClick={() => setIsOpen(true)}
+        className="flex w-full items-center justify-between gap-4 rounded-2xl bg-white p-4 text-left shadow-soft transition-shadow duration-200 hover:shadow-card dark:bg-card-dark"
+      >
+        <div>
+          <p className="font-semibold text-[#111827] dark:text-white">Find your style</p>
+          <p className="text-xs text-primary-500 dark:text-primary-300">Upload a dress photo and find similar products</p>
+        </div>
+        <span className="flex shrink-0 items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-[#111827]">
+          <Camera size={15} /> Search by Image
+        </span>
+      </button>
+
+      <VisualSearchModal isOpen={isOpen} onClose={() => setIsOpen(false)} onAnalyzed={handleAnalyzed} />
+    </section>
+  );
+}
+
 function FlashSaleWidget() {
   const { data, isLoading, isError, refetch } = useFlashSales();
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
@@ -406,6 +450,8 @@ export function HomePage() {
       <PromotionalCarousel slides={FEATURED_SLIDES} ariaLabel="Featured collections" />
 
       <CategoryShowcase />
+
+      <VisualSearchBanner />
 
       <FlashSaleWidget />
 

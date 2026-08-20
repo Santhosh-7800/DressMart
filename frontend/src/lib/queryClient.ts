@@ -41,7 +41,7 @@ export const queryKeys = {
     listInfinite: (filtersWithoutPage: unknown) => ['products', 'list-infinite', filtersWithoutPage] as const,
     detail: (slug: string) => ['products', 'detail', slug] as const,
     related: (productId: string) => ['products', 'related', productId] as const,
-    facets: (gender?: string, categorySlug?: string) => ['products', 'facets', gender, categorySlug] as const,
+    facets: (gender?: string, categorySlugs?: string[]) => ['products', 'facets', gender, categorySlugs] as const,
     bySeller: (sellerId: string) => ['products', 'seller', sellerId] as const,
   },
   inventory: {

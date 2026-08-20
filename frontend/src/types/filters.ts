@@ -8,6 +8,23 @@ export type SortOption =
   | 'rating'
   | 'discount';
 
+/** Normalized clothing attributes from visual search's AI image analysis (see
+ *  services/visualSearchService.ts) — already mapped onto DressMart's actual catalog color/garment
+ *  vocabulary by the time this reaches ProductFilters. `style` corresponds to
+ *  `product.specifications.occasion` (Formal/Casual/Party/Everyday/Sports/Ethnic), the closest
+ *  existing schema field to "style". */
+export interface DetectedClothingAttributes {
+  garmentType: string;
+  gender: Gender | null;
+  primaryColor: string;
+  secondaryColor: string | null;
+  pattern: string | null;
+  style: string | null;
+  sleeveType: string | null;
+  fit: string | null;
+  confidence: number;
+}
+
 export interface ProductFilters {
   gender?: Gender;
   categorySlugs?: string[];
@@ -20,6 +37,9 @@ export interface ProductFilters {
   minDiscount?: number;
   inStockOnly?: boolean;
   search?: string;
+  /** Set by visual search instead of `search` — see productService.ts's applyVisualSearch, which
+   *  scores/ranks products against these attributes the same way applySearch does for free text. */
+  visualAttributes?: DetectedClothingAttributes;
   sort?: SortOption;
   page?: number;
   pageSize?: number;

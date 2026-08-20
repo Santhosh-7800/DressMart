@@ -85,10 +85,10 @@ export function useCompleteTheLook(product: Product | null | undefined) {
   });
 }
 
-export function useProductFacets(gender?: string, categorySlug?: string) {
+export function useProductFacets(gender?: string, categorySlugs?: string[]) {
   return useQuery({
-    queryKey: queryKeys.products.facets(gender, categorySlug),
-    queryFn: () => productService.getFacets(gender, categorySlug),
+    queryKey: queryKeys.products.facets(gender, categorySlugs),
+    queryFn: () => productService.getFacets(gender, categorySlugs),
   });
 }
 

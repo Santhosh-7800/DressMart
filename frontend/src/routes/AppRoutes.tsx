@@ -16,6 +16,9 @@ import { useAuth } from '@/contexts/AuthContext';
 
 const HomePage = lazyWithRetry(() => import('@/pages/home/HomePage').then((m) => ({ default: m.HomePage })));
 const SearchResultsPage = lazyWithRetry(() => import('@/pages/home/SearchResultsPage').then((m) => ({ default: m.SearchResultsPage })));
+const VisualSearchResultsPage = lazyWithRetry(() =>
+  import('@/pages/home/VisualSearchResultsPage').then((m) => ({ default: m.VisualSearchResultsPage })),
+);
 const DealsPage = lazyWithRetry(() => import('@/pages/home/DealsPage').then((m) => ({ default: m.DealsPage })));
 const FlashSalesPage = lazyWithRetry(() => import('@/pages/home/FlashSalesPage').then((m) => ({ default: m.FlashSalesPage })));
 const NewArrivalsPage = lazyWithRetry(() => import('@/pages/home/NewArrivalsPage').then((m) => ({ default: m.NewArrivalsPage })));
@@ -132,6 +135,7 @@ export function AppRoutes() {
         <Route element={<MainLayout />}>
           <Route path="/" element={<RootGate />} />
           <Route path="/search" element={<SearchResultsPage />} />
+          <Route path="/visual-search" element={<VisualSearchResultsPage />} />
           <Route path="/deals" element={<DealsPage />} />
           <Route path="/flash-sales" element={<FlashSalesPage />} />
           <Route path="/new-arrivals" element={<NewArrivalsPage />} />

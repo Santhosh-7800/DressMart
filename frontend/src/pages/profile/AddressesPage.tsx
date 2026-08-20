@@ -5,45 +5,52 @@ import { Seo } from '@/components/common/Seo';
 import { useAddresses } from '@/hooks/useAddresses';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
-import { Input } from '@/components/ui/Input';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { AddressFormFields } from '@/components/address/AddressFormFields';
+import { EMPTY_ADDRESS_FORM, isAddressFormValid, type AddressFormValues } from '@/lib/addressValidation';
 import { cn } from '@/lib/utils';
 import type { Address } from '@/types';
-
-type AddressFormState = Omit<Address, 'id' | 'user_id' | 'is_default'>;
-
-const EMPTY_FORM: AddressFormState = { full_name: '', phone: '', line1: '', line2: '', city: '', state: '', pincode: '', landmark: '', type: 'home' };
 
 export function AddressesPage() {
   const { addresses, addAddress, updateAddress, removeAddress } = useAddresses();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<AddressFormState>(EMPTY_FORM);
+  const [form, setForm] = useState<AddressFormValues>(EMPTY_ADDRESS_FORM);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const openAddModal = () => {
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    setForm(EMPTY_ADDRESS_FORM);
+    setSubmitAttempted(false);
     setIsModalOpen(true);
   };
 
   const openEditModal = (address: Address) => {
     setEditingId(address.id);
     setForm({ full_name: address.full_name, phone: address.phone, line1: address.line1, line2: address.line2 ?? '', city: address.city, state: address.state, pincode: address.pincode, landmark: address.landmark ?? '', type: address.type });
+    setSubmitAttempted(false);
     setIsModalOpen(true);
   };
 
   const handleSave = async () => {
-    if (!form.full_name || !form.phone || !form.line1 || !form.city || !form.state || !form.pincode) {
-      toast.error('Please fill in all required fields');
+    if (!isAddressFormValid(form)) {
+      setSubmitAttempted(true);
+      toast.error('Please fix the highlighted fields');
       return;
     }
-    const payload = { ...form, line2: form.line2 || null, landmark: form.landmark || null };
-    if (editingId) {
-      await updateAddress({ addressId: editingId, updates: payload });
-    } else {
-      await addAddress({ ...payload, is_default: addresses.length === 0 });
+    setIsSaving(true);
+    try {
+      const payload = { ...form, line2: form.line2 || null, landmark: form.landmark || null };
+      if (editingId) {
+        await updateAddress({ addressId: editingId, updates: payload });
+      } else {
+        await addAddress({ ...payload, is_default: addresses.length === 0 });
+      }
+      setIsModalOpen(false);
+    } finally {
+      setIsSaving(false);
     }
-    setIsModalOpen(false);
   };
 
   return (
@@ -91,37 +98,10 @@ export function AddressesPage() {
       )}
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingId ? 'Edit Address' : 'Add New Address'}>
-        <div className="space-y-3">
-          <Input name="full_name" label="Full Name" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
-          <Input name="phone" label="Phone Number" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-          <Input name="line1" label="Address Line 1" value={form.line1} onChange={(e) => setForm({ ...form, line1: e.target.value })} />
-          <Input name="line2" label="Address Line 2 (optional)" value={form.line2 ?? ''} onChange={(e) => setForm({ ...form, line2: e.target.value })} />
-          <div className="grid grid-cols-2 gap-3">
-            <Input name="city" label="City" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
-            <Input name="state" label="State" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Input name="pincode" label="Pincode" value={form.pincode} onChange={(e) => setForm({ ...form, pincode: e.target.value })} />
-            <Input name="landmark" label="Landmark (optional)" value={form.landmark ?? ''} onChange={(e) => setForm({ ...form, landmark: e.target.value })} />
-          </div>
-          <div>
-            <p className="mb-1.5 text-sm font-medium">Address Type</p>
-            <div className="flex gap-2">
-              {(['home', 'work', 'other'] as const).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setForm({ ...form, type })}
-                  className={cn('rounded-lg border px-3 py-1.5 text-xs capitalize', form.type === type ? 'border-accent bg-accent-50 dark:bg-accent-900/10' : 'border-primary-200 dark:border-primary-600')}
-                >
-                  {type}
-                </button>
-              ))}
-            </div>
-          </div>
-          <Button variant="accent" fullWidth onClick={handleSave}>
-            Save Address
-          </Button>
-        </div>
+        <AddressFormFields value={form} onChange={setForm} submitAttempted={submitAttempted} />
+        <Button variant="accent" fullWidth className="mt-3" onClick={handleSave} isLoading={isSaving} disabled={!isAddressFormValid(form)}>
+          Save Address
+        </Button>
       </Modal>
     </div>
   );

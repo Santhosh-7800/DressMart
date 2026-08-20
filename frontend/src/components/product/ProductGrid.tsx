@@ -18,9 +18,12 @@ interface ProductGridProps {
   /** Forwarded to every ProductCard — see its own doc comment. Opt-in, unset everywhere except
    *  the homepage's premium card treatment. */
   showAddToCartButtons?: boolean;
+  /** Product id -> visual-search similarity score (0-100) — forwarded to each ProductCard as its
+   *  `similarityScore`. Omitted everywhere except visual search results. */
+  similarityScores?: Map<string, number>;
 }
 
-export function ProductGrid({ products, isLoading, isError, onRetry, emptyMessage, showAddToCartButtons }: ProductGridProps) {
+export function ProductGrid({ products, isLoading, isError, onRetry, emptyMessage, showAddToCartButtons, similarityScores }: ProductGridProps) {
   debugLog('ProductGrid', 'render', { isLoading, isError, count: products.length });
   // One batched inventory read for the whole grid instead of each ProductCard firing its own —
   // see useInventoryBatch's docstring.
@@ -65,6 +68,7 @@ export function ProductGrid({ products, isLoading, isError, onRetry, emptyMessag
           inventory={inventoryMap ? (inventoryMap[product.id] ?? null) : undefined}
           skipOwnFetch
           showAddToCartButton={showAddToCartButtons}
+          similarityScore={similarityScores?.get(product.id)}
         />
       ))}
     </motion.div>

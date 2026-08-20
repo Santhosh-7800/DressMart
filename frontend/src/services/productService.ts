@@ -16,6 +16,7 @@ import {
 import { db } from '@/lib/firebase';
 import { slugify, calculateDiscount } from '@/lib/utils';
 import { buildProductSearchIndex, normalizePhrase, scoreProductMatch } from '@/lib/searchMatch';
+import { scoreVisualMatch } from '@/lib/visualSearchMatch';
 import { inventoryService } from './inventoryService';
 import { isActiveStatus } from '@/types';
 import type {
@@ -165,6 +166,18 @@ function applySearch(items: Product[], rawQuery: string): { items: Product[]; re
   return { items: chosen.map((s) => s.product), relevance: new Map(chosen.map((s) => [s.product.id, s.score])) };
 }
 
+/** Visual search's counterpart to applySearch above — same `{items, relevance}` shape (so it slots
+ *  into list()'s existing relevance-sort branch unchanged), scored via
+ *  lib/visualSearchMatch.ts's scoreVisualMatch instead of free-text token matching. No separate
+ *  "relax the query" tiers: the candidate pool passed in is already scoped to categories related to
+ *  the detected garment (see visualSearchService.getRelevantCategorySlugs), so every item here is
+ *  already topically relevant — this just ranks them by how many detected attributes each matches. */
+function applyVisualSearch(items: Product[], attrs: ProductFilters['visualAttributes']): { items: Product[]; relevance: Map<string, number> } {
+  if (!attrs) return { items, relevance: new Map() };
+  const scored = items.map((p) => ({ product: p, score: scoreVisualMatch(p, attrs) })).sort((a, b) => b.score - a.score);
+  return { items: scored.map((s) => s.product), relevance: new Map(scored.map((s) => [s.product.id, s.score])) };
+}
+
 function sortProducts(items: Product[], sort: ProductFilters['sort']): Product[] {
   const sorted = [...items];
   switch (sort) {
@@ -282,6 +295,10 @@ export const productService = {
       const result = applySearch(items, filters.search);
       items = result.items;
       relevance = result.relevance;
+    } else if (filters.visualAttributes) {
+      const result = applyVisualSearch(items, filters.visualAttributes);
+      items = result.items;
+      relevance = result.relevance;
     }
 
     if (filters.inStockOnly) {
@@ -289,7 +306,7 @@ export const productService = {
       items = items.filter((p) => (invMap[p.id]?.total_stock ?? 0) > 0);
     }
 
-    // A search's own relevance ranking (see applySearch) takes precedence over the default
+    // A search's own relevance ranking (see applySearch/applyVisualSearch) takes precedence over the default
     // "popularity" sort — an explicit price/rating/newest/discount choice still fully overrides it,
     // same as browsing a category with no search text at all.
     items =
@@ -334,8 +351,11 @@ export const productService = {
     return items.filter((p) => p.category_id !== product.category_id).slice(0, 3);
   },
 
-  async getFacets(gender?: string, categorySlug?: string): Promise<ProductFacets> {
-    const scoped = await fetchActiveWindow(gender as Gender | undefined, categorySlug ? [categorySlug] : undefined);
+  /** `categorySlugs` accepts multiple slugs so visual search's results page (scoped to every
+   *  category related to the detected garment, not just one) gets accurate facet counts too — a
+   *  single category listing page just passes a one-element array. */
+  async getFacets(gender?: string, categorySlugs?: string[]): Promise<ProductFacets> {
+    const scoped = await fetchActiveWindow(gender as Gender | undefined, categorySlugs);
 
     const brandCounts = new Map<string, number>();
     const colorCounts = new Map<string, number>();

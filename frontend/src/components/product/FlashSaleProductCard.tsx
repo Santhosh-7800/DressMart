@@ -41,6 +41,9 @@ function FlashSaleProductCardImpl({ product, onExpire, className, showAddToCartB
   const { isAuthenticated } = useAuth();
   const { addItem } = useCart();
   const primaryImage = product.coverImage || product.thumbnailUrl || product.imageUrl || product.images[0]?.url;
+  // Same-colorway second photo — see ProductCard.tsx's identical comment for the rationale.
+  const primaryColor = product.images[0]?.color ?? null;
+  const hoverImage = product.images.filter((img) => img.color === primaryColor)[1];
 
   const totalStock = inventory?.total_stock ?? 0;
   const isSoldOut = inventory !== undefined && inventory !== null && totalStock <= 0;
@@ -101,10 +104,19 @@ function FlashSaleProductCardImpl({ product, onExpire, className, showAddToCartB
           <ProductImage
             src={primaryImage}
             alt={product.images[0]?.alt ?? product.name}
-            className="h-full w-full"
+            className={cn('h-full w-full', hoverImage && 'transition-opacity duration-300 group-hover:opacity-0')}
             imgClassName={cn('transition-transform duration-300 group-hover:scale-105', isSoldOut && 'opacity-50 grayscale')}
             sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
           />
+          {hoverImage && (
+            <ProductImage
+              src={hoverImage.url}
+              alt={hoverImage.alt ?? product.name}
+              className="absolute inset-0 h-full w-full opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+              imgClassName="transition-transform duration-300 group-hover:scale-105"
+              sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+            />
+          )}
           {isSoldOut && (
             <div className="absolute inset-0 flex items-center justify-center bg-primary-950/40">
               <span className="rounded-full bg-primary-950/80 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">Sold Out</span>

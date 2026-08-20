@@ -7,6 +7,9 @@ export interface RecommendationInputs {
   recentlyViewed: Product[];
   wishlistProducts: Product[];
   orderedProducts: Product[];
+  /** Products currently in the active cart — a stronger buying-intent signal than a recent view or
+   *  even a wishlist add, since the user has already committed to a specific size/color. */
+  cartProducts: Product[];
   categoryHistorySlugs: string[];
   /** Most-recent-first. Optional — omitted (or empty) for guests, who never get a Firestore search
    *  history (see useSearch.ts). */
@@ -23,10 +26,11 @@ export interface RecommendationResult {
   topCategoryLabel: string | null;
 }
 
-// Orders are the strongest signal (money-backed intent), then wishlist (explicit "I want this"),
-// then category browsing/search, then casual product views last.
-const CATEGORY_WEIGHTS = { recentlyViewed: 2, wishlist: 3, ordered: 4, categoryHistory: 2, search: 2 };
-const BRAND_WEIGHTS = { recentlyViewed: 1, wishlist: 2, ordered: 3, search: 2 };
+// Orders are the strongest signal (money-backed intent), then cart (already committed to a
+// size/color, just short of paying), then wishlist (explicit "I want this"), then category
+// browsing/search, then casual product views last.
+const CATEGORY_WEIGHTS = { recentlyViewed: 2, wishlist: 3, cart: 3, ordered: 4, categoryHistory: 2, search: 2 };
+const BRAND_WEIGHTS = { recentlyViewed: 1, wishlist: 2, cart: 2, ordered: 3, search: 2 };
 const MAX_RECOMMENDATIONS = 12;
 const MAX_SEED_CATEGORIES = 4;
 const CANDIDATE_POOL_SIZE = 48;
@@ -110,6 +114,7 @@ export async function buildPersonalizedRecommendations(inputs: RecommendationInp
 
   applySignal(inputs.recentlyViewed, CATEGORY_WEIGHTS.recentlyViewed, BRAND_WEIGHTS.recentlyViewed);
   applySignal(inputs.wishlistProducts, CATEGORY_WEIGHTS.wishlist, BRAND_WEIGHTS.wishlist);
+  applySignal(inputs.cartProducts, CATEGORY_WEIGHTS.cart, BRAND_WEIGHTS.cart);
   applySignal(inputs.orderedProducts, CATEGORY_WEIGHTS.ordered, BRAND_WEIGHTS.ordered);
   inputs.categoryHistorySlugs.forEach((slug) => bump(categoryScores, slug, CATEGORY_WEIGHTS.categoryHistory));
 

@@ -12,3 +12,10 @@ import { defineSecret, defineString } from 'firebase-functions/params';
 
 export const razorpayKeyId = defineString('RAZORPAY_KEY_ID');
 export const razorpayKeySecret = defineSecret('RAZORPAY_KEY_SECRET');
+
+/**
+ * Google AI Studio (Gemini) API key — powers visual search's clothing image analysis
+ * (analyzeClothingImage.ts). Secret for the same reason RAZORPAY_KEY_SECRET is: it authorizes
+ * paid API calls, so it must never reach the client. See README.md for how to obtain and set it.
+ */
+export const geminiApiKey = defineSecret('GEMINI_API_KEY');

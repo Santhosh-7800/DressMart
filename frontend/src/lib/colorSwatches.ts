@@ -77,6 +77,39 @@ function isKnownColorName(name: string): boolean {
 }
 
 /**
+ * Maps a free-text color guess (e.g. from AI image analysis — "navy", "off-white", "denim") onto
+ * one of the catalog's actual color values, Title Cased to match how `variant.color` is stored
+ * (see catalogSource.ts's COLOR_PALETTE, seeded with exactly these names). This is the single
+ * source of truth for "known" catalog colors (COLOR_HEX_TABLE) — visual search reuses it instead
+ * of maintaining a second color vocabulary/synonym table.
+ *
+ * Exact match wins; otherwise the known color name sharing the most words with the input wins
+ * (so "dark navy blue shirt" still resolves to "Navy Blue" via the shared "navy"/"blue" words).
+ * Falls back to Title Casing the raw input unchanged when nothing matches closely enough — an
+ * unrecognized color should still flow through search/display as *something* readable, not be
+ * silently dropped.
+ */
+export function matchToKnownColor(rawGuess: string): string {
+  const toTitleCase = (s: string) => s.replace(/\w\S*/g, (w) => w[0].toUpperCase() + w.slice(1).toLowerCase());
+  const normalized = normalizeSpelling(rawGuess).toLowerCase();
+  if (!normalized) return rawGuess;
+  if (isKnownColorName(normalized)) return toTitleCase(normalized);
+
+  const guessWords = new Set(normalized.split(' ').filter(Boolean));
+  let bestMatch: string | null = null;
+  let bestOverlap = 0;
+  for (const knownName of Object.keys(COLOR_HEX_TABLE)) {
+    const knownWords = knownName.split(' ');
+    const overlap = knownWords.filter((w) => guessWords.has(w)).length;
+    if (overlap > bestOverlap) {
+      bestOverlap = overlap;
+      bestMatch = knownName;
+    }
+  }
+  return bestMatch ? toTitleCase(bestMatch) : toTitleCase(rawGuess);
+}
+
+/**
  * Collapses cosmetic variants of the same color into one canonical display name — e.g.
  * "Purple (Variant)" / "Red Variant" / "Red1" / "Navy Blue 2" -> "Purple" / "Red" / "Red" / "Navy Blue".
  * A "Light X" prefix only collapses into "X" when "Light X" isn't itself a distinct named color

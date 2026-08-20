@@ -33,9 +33,12 @@ interface ProductCardProps {
    *  compact icon-only quick add exactly as before; only the homepage's premium card treatment
    *  passes this. */
   showAddToCartButton?: boolean;
+  /** 0-100 visual-search similarity score (see lib/visualSearchMatch.ts) — renders a small "N%
+   *  Match" badge when present. Omitted everywhere except visual search results. */
+  similarityScore?: number;
 }
 
-function ProductCardImpl({ product, className, inventory: inventoryProp, skipOwnFetch, showAddToCartButton }: ProductCardProps) {
+function ProductCardImpl({ product, className, inventory: inventoryProp, skipOwnFetch, showAddToCartButton, similarityScore }: ProductCardProps) {
   debugLog('ProductCard', 'render', product.id, product.slug);
   const { isWishlisted, toggle } = useWishlist();
   const wishlisted = isWishlisted(product.id);
@@ -61,6 +64,11 @@ function ProductCardImpl({ product, className, inventory: inventoryProp, skipOwn
   // coverImage (first image, denormalized) is the fast-path thumbnail source; fall back to the
   // pre-existing chain for older seed data that never got a coverImage populated.
   const primaryImage = product.coverImage || product.thumbnailUrl || product.imageUrl || product.images[0]?.url;
+  // Second photo of the SAME colorway (never a different color's photo, which would misrepresent
+  // what hovering "shows more of") — e.g. a front view swapping to a back/detail shot on hover.
+  // Undefined when the product only has one photo for that color, in which case no swap happens.
+  const primaryColor = product.images[0]?.color ?? null;
+  const hoverImage = product.images.filter((img) => img.color === primaryColor)[1];
   // A seller can mark a product out_of_stock explicitly (still buyer-visible per is_active) even
   // before the inventory doc itself reads zero — check both so the badge never lags.
   const isOutOfStock = product.status === 'out_of_stock' || (inventory !== undefined && inventory !== null && inventory.total_stock <= 0);
@@ -125,14 +133,28 @@ function ProductCardImpl({ product, className, inventory: inventoryProp, skipOwn
           <ProductImage
             src={primaryImage}
             alt={product.images[0]?.alt ?? product.name}
-            className="aspect-[4/5] w-full bg-primary-50 dark:bg-primary-800"
+            className={cn('aspect-[4/5] w-full bg-primary-50 dark:bg-primary-800', hoverImage && 'transition-opacity duration-300 group-hover:opacity-0')}
             imgClassName={cn('transition-transform duration-300 group-hover:scale-105', isOutOfStock && 'opacity-50 grayscale')}
             sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
           />
+          {hoverImage && (
+            <ProductImage
+              src={hoverImage.url}
+              alt={hoverImage.alt ?? product.name}
+              className="absolute inset-0 aspect-[4/5] w-full opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+              imgClassName="transition-transform duration-300 group-hover:scale-105"
+              sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+            />
+          )}
           {isOutOfStock && (
             <div className="absolute inset-0 flex items-center justify-center bg-primary-950/40">
               <span className="rounded-full bg-primary-950/80 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">Out of Stock</span>
             </div>
+          )}
+          {similarityScore !== undefined && (
+            <span className="absolute bottom-2 left-2 z-10 rounded-full bg-primary-900/80 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur">
+              {Math.round(similarityScore)}% Match
+            </span>
           )}
         </div>
         <div className="space-y-1 p-3">

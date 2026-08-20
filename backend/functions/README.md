@@ -14,17 +14,19 @@ cd functions
 npm install
 ```
 
-## Required config/secrets (Razorpay)
+## Required config/secrets
 
-Two values are needed, read via `firebase-functions/params` (see `src/lib/config.ts`):
+Read via `firebase-functions/params` (see `src/lib/config.ts`):
 
 | Param | Sensitivity | Purpose |
 |---|---|---|
 | `RAZORPAY_KEY_ID` | Not secret — echoed back to the client to init Razorpay Checkout | Public key id |
 | `RAZORPAY_KEY_SECRET` | Secret | Used to create orders server-side and verify payment signatures |
+| `GEMINI_API_KEY` | Secret | Used by `analyzeClothingImage` (visual search) to call the Gemini vision API |
 
 **Local emulator:** copy `.env.example` to `.env` (git-ignored) inside `backend/functions/` and
-fill in your Razorpay **test** keys:
+fill in your Razorpay **test** keys and a Gemini API key (free at
+[aistudio.google.com/apikey](https://aistudio.google.com/apikey)):
 
 ```bash
 # from the repo root
@@ -34,8 +36,9 @@ cp backend/functions/.env.example backend/functions/.env
 **Deployed (production):**
 
 ```bash
-# One-time, or whenever the secret rotates:
+# One-time, or whenever a secret rotates:
 firebase --config database/firebase.json functions:secrets:set RAZORPAY_KEY_SECRET
+firebase --config database/firebase.json functions:secrets:set GEMINI_API_KEY
 
 # RAZORPAY_KEY_ID isn't sensitive; set it as a plain deployed param via a project-scoped .env file,
 # e.g. backend/functions/.env.<project-id> (also git-ignored), or export it as a build-time env var:
@@ -43,8 +46,10 @@ firebase --config database/firebase.json functions:secrets:set RAZORPAY_KEY_SECR
 #     RAZORPAY_KEY_ID=rzp_live_xxxxxxxxxxxx
 ```
 
-Without both of these set, `createRazorpayOrder` and `verifyAndPlaceOrder` will throw at runtime
-when they call `.value()`.
+Without `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` set, `createRazorpayOrder` and
+`verifyAndPlaceOrder` will throw at runtime when they call `.value()`. Without `GEMINI_API_KEY`
+set, Gemini rejects the request (invalid/empty key) and `analyzeClothingImage` maps that to a
+friendly "visual search isn't available right now" error instead of a raw 401.
 
 ## Local development
 
@@ -71,7 +76,34 @@ before every deploy, so a manual `npm run build` isn't required before `firebase
 
 ## Callables
 
-All callables require `request.auth` to be set (throw `unauthenticated` otherwise).
+All callables require `request.auth` to be set (throw `unauthenticated` otherwise), **except**
+`analyzeClothingImage`, which is guest-usable — same as DressMart's existing text search, where
+only *recording* search history (done client-side) requires sign-in, not the act of searching.
+
+### `analyzeClothingImage`
+```ts
+data: { imageBase64: string /* no data: URL prefix */, mimeType: 'image/jpeg' | 'image/png' | 'image/webp' }
+returns: {
+  garmentType: string;
+  gender: 'men' | 'kids' | 'unisex' | null;
+  primaryColor: string;
+  secondaryColor: string | null;
+  pattern: string | null;
+  style: string | null;
+  sleeveType: string | null;
+  fit: string | null;
+  confidence: number; // 0-1
+}
+```
+Visual search's AI step. Sends the image to Gemini (`gemini-2.0-flash`) with a strict JSON response
+schema and asks it to identify the single primary garment (ignoring background/other people).
+Returns attributes **as the AI phrased them** (e.g. `"navy"`, not `"Navy Blue"`) — normalizing
+those onto DressMart's actual catalog vocabulary and ranking/searching products happens client-side
+in `frontend/src/services/visualSearchService.ts`, which already owns that catalog knowledge; this
+callable stays a thin, reusable "photo → clothing attributes" boundary with no product-schema
+knowledge of its own. Never persists the uploaded image anywhere (not to Storage, not to Firestore)
+— the base64 payload only ever lives in the request body and this function's memory for the
+duration of the call.
 
 ### `createRazorpayOrder`
 ```ts
@@ -172,10 +204,10 @@ deliberately ignores the `cancelled` transition — see inline comment).
   a buyer-facing push after the initial `placed` status (`confirmed`, `packed`, `shipped`,
   `out_for_delivery`, `delivered`, `returned`); `placed` itself is skipped because it's a
   document *create*, not an *update*, and is already notified inside `placeOrderInternal`.
-- **No idempotency key** on `placeCodOrder`/`verifyAndPlaceOrder` beyond Razorpay's own
-  order/payment ids — a double-submit from a flaky client network retry could in theory place two
-  orders. Not handled, since the client is expected to disable the checkout button while the
-  callable is in flight; revisit if that assumption changes.
+- **`placeCodOrder`/`verifyAndPlaceOrder` are idempotent** via a client-generated `clientRequestId`
+  (see `PaymentPage.tsx` / `src/lib/orderPlacement.ts`): a fast-path `order_requests/{id}` doc check
+  before the transaction, plus an authoritative re-check inside it, so a double-clicked button or a
+  retried network request replays the original result instead of placing a second order.
 - The obsolete `supabase/functions/place-order/` (Deno/Supabase, not portable) has been deleted —
   its only useful nuance (a flat-rate tax model) was intentionally **not** carried over, since this
   spec calls for per-line `gst_percent` tax instead.

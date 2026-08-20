@@ -4,6 +4,7 @@
  */
 
 // Callables
+export { analyzeClothingImage } from './callables/analyzeClothingImage';
 export { createRazorpayOrder } from './callables/createRazorpayOrder';
 export { placeCodOrder } from './callables/placeCodOrder';
 export { verifyAndPlaceOrder } from './callables/verifyAndPlaceOrder';

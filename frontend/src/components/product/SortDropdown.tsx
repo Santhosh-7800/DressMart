@@ -3,6 +3,10 @@ import type { SortOption } from '@/types';
 interface SortDropdownProps {
   value: SortOption;
   onChange: (value: SortOption) => void;
+  /** 'popularity' is also the code path productService.list() uses for "relevance" ranking when a
+   *  free-text search or visual-search attributes are present (see applySearch/applyVisualSearch) —
+   *  same value, contextual label. Defaults to "Popularity" for plain category browsing. */
+  popularityLabel?: string;
 }
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
@@ -14,7 +18,7 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: 'discount', label: 'Biggest Discount' },
 ];
 
-export function SortDropdown({ value, onChange }: SortDropdownProps) {
+export function SortDropdown({ value, onChange, popularityLabel }: SortDropdownProps) {
   return (
     <label className="flex items-center gap-2 text-sm">
       <span className="hidden text-primary-500 sm:inline">Sort by</span>
@@ -25,7 +29,7 @@ export function SortDropdown({ value, onChange }: SortDropdownProps) {
       >
         {SORT_OPTIONS.map((opt) => (
           <option key={opt.value} value={opt.value}>
-            {opt.label}
+            {opt.value === 'popularity' ? (popularityLabel ?? opt.label) : opt.label}
           </option>
         ))}
       </select>

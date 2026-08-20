@@ -12,10 +12,11 @@ import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { OrderSummary } from '@/components/cart/OrderSummary';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
-import { Input } from '@/components/ui/Input';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ProductImage } from '@/components/ui/ProductImage';
 import { Avatar } from '@/components/ui/Avatar';
+import { AddressFormFields } from '@/components/address/AddressFormFields';
+import { EMPTY_ADDRESS_FORM, isAddressFormValid, type AddressFormValues } from '@/lib/addressValidation';
 import { db } from '@/lib/firebase';
 import { cn, formatCurrency } from '@/lib/utils';
 import type { Address, Coupon, PaymentMethod } from '@/types';
@@ -23,20 +24,6 @@ import type { Address, Coupon, PaymentMethod } from '@/types';
 const FREE_SHIPPING_THRESHOLD = 999;
 const SHIPPING_FEE = 79;
 const TAX_RATE = 0.05;
-
-interface AddressFormState {
-  full_name: string;
-  phone: string;
-  line1: string;
-  line2: string;
-  city: string;
-  state: string;
-  pincode: string;
-  landmark: string;
-  type: 'home' | 'work' | 'other';
-}
-
-const EMPTY_ADDRESS: AddressFormState = { full_name: '', phone: '', line1: '', line2: '', city: '', state: '', pincode: '', landmark: '', type: 'home' };
 
 /**
  * Address CRUD is read/written directly against Firestore here rather than through
@@ -59,7 +46,8 @@ export function CheckoutPage() {
 
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [form, setForm] = useState<AddressFormState>(EMPTY_ADDRESS);
+  const [form, setForm] = useState<AddressFormValues>(EMPTY_ADDRESS_FORM);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
   // Pre-selects whatever the shopper last picked as their default on the Payments page (see
   // PaymentsPage.tsx) — a plain local preference, not a Firestore field. Still fully overridable
   // per order via the buttons below.
@@ -109,13 +97,15 @@ export function CheckoutPage() {
   const effectiveAddressId = selectedAddressId ?? addresses.find((a) => a.is_default)?.id ?? addresses[0]?.id ?? null;
 
   const handleAddAddress = async () => {
-    if (!form.full_name || !form.phone || !form.line1 || !form.city || !form.state || !form.pincode) {
-      toast.error('Please fill in all required fields');
+    if (!isAddressFormValid(form)) {
+      setSubmitAttempted(true);
+      toast.error('Please fix the highlighted fields');
       return;
     }
     await addAddressMutation.mutateAsync({ ...form, line2: form.line2 || null, landmark: form.landmark || null, is_default: addresses.length === 0 });
     setIsModalOpen(false);
-    setForm(EMPTY_ADDRESS);
+    setForm(EMPTY_ADDRESS_FORM);
+    setSubmitAttempted(false);
   };
 
   const handleContinue = () => {
@@ -165,7 +155,7 @@ export function CheckoutPage() {
                       effectiveAddressId === address.id ? 'border-accent bg-accent-50 dark:bg-accent-900/10' : 'border-primary-200 dark:border-primary-600',
                     )}
                   >
-                    <div className={cn('mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2', effectiveAddressId === address.id ? 'border-accent bg-accent' : 'border-primary-300')}>
+                    <div className={cn('mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2', effectiveAddressId === address.id ? 'border-accent bg-accent' : 'border-primary-300 dark:border-primary-600')}>
                       {effectiveAddressId === address.id && <CheckCircle2 size={14} className="text-white" />}
                     </div>
                     <div className="text-sm">
@@ -267,37 +257,17 @@ export function CheckoutPage() {
       </div>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add New Address">
-        <div className="space-y-3">
-          <Input name="full_name" label="Full Name" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
-          <Input name="phone" label="Phone Number" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-          <Input name="line1" label="Address Line 1" value={form.line1} onChange={(e) => setForm({ ...form, line1: e.target.value })} />
-          <Input name="line2" label="Address Line 2 (optional)" value={form.line2} onChange={(e) => setForm({ ...form, line2: e.target.value })} />
-          <div className="grid grid-cols-2 gap-3">
-            <Input name="city" label="City" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
-            <Input name="state" label="State" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Input name="pincode" label="Pincode" value={form.pincode} onChange={(e) => setForm({ ...form, pincode: e.target.value })} />
-            <Input name="landmark" label="Landmark (optional)" value={form.landmark} onChange={(e) => setForm({ ...form, landmark: e.target.value })} />
-          </div>
-          <div>
-            <p className="mb-1.5 text-sm font-medium">Address Type</p>
-            <div className="flex gap-2">
-              {(['home', 'work', 'other'] as const).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setForm({ ...form, type })}
-                  className={cn('rounded-lg border px-3 py-1.5 text-xs capitalize', form.type === type ? 'border-accent bg-accent-50 dark:bg-accent-900/10' : 'border-primary-200 dark:border-primary-600')}
-                >
-                  {type}
-                </button>
-              ))}
-            </div>
-          </div>
-          <Button variant="accent" fullWidth onClick={handleAddAddress} isLoading={addAddressMutation.isPending}>
-            Save Address
-          </Button>
-        </div>
+        <AddressFormFields value={form} onChange={setForm} submitAttempted={submitAttempted} />
+        <Button
+          variant="accent"
+          fullWidth
+          className="mt-3"
+          onClick={handleAddAddress}
+          isLoading={addAddressMutation.isPending}
+          disabled={!isAddressFormValid(form)}
+        >
+          Save Address
+        </Button>
       </Modal>
     </div>
   );

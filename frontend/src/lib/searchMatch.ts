@@ -1,4 +1,12 @@
+import { COLOR_PALETTE } from '@/data/catalogSource';
 import type { Product } from '@/types';
+
+/** Single-word tokens derived from the catalog's actual color names (e.g. "Navy Blue", "Charcoal
+ *  Grey" -> "navy", "blue", "charcoal", "grey") — the same palette variant.color values are drawn
+ *  from, so this recognizes exactly the color words a real search could mean. Used below to require
+ *  a color-shaped query word to match a product's actual variant color, not merely appear somewhere
+ *  in its tags/description (see scoreProductMatch's matchedTokenCount loop). */
+const KNOWN_COLOR_WORDS = new Set(COLOR_PALETTE.flatMap((c) => tokenize(c.name)));
 
 /**
  * Shared free-text matching primitives, used by both productService.list()'s search filter and
@@ -117,9 +125,17 @@ export function scoreProductMatch(index: ProductSearchIndex, queryPhrase: string
   // Priority 6: multi-field/multi-token coverage — how many distinct query concepts (brand, color,
   // category, gender, ...) this product actually satisfies, e.g. "blue puma shirt" rewards a
   // product that's simultaneously blue AND a shirt over one that's merely blue.
+  //
+  // A color-shaped token (e.g. "black") is checked ONLY against the product's actual variant
+  // colors, never against the generic token set — otherwise a red shirt merely tagged
+  // "black-friday" or described as "pairs well with black trousers" would satisfy a "black" search,
+  // surfacing a product whose real color has nothing to do with the query.
   let matchedTokenCount = 0;
   for (const qt of queryTokens) {
-    if ([...index.tokens].some((t) => wordsRelated(t, qt))) matchedTokenCount += 1;
+    const matched = KNOWN_COLOR_WORDS.has(qt)
+      ? index.colorsLower.some((c) => tokenize(c).some((ct) => wordsRelated(ct, qt)))
+      : [...index.tokens].some((t) => wordsRelated(t, qt));
+    if (matched) matchedTokenCount += 1;
   }
   score += matchedTokenCount * 150;
 

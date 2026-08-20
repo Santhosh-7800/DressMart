@@ -55,7 +55,7 @@ export function ProductListingPage({ gender }: ProductListingPageProps) {
   };
 
   const productsQuery = useInfiniteProductListing(filters, persistLoadedPages);
-  const facetsQuery = useProductFacets(gender, categorySlug);
+  const facetsQuery = useProductFacets(gender, categorySlug ? [categorySlug] : undefined);
   const { recordCategoryView } = useCategoryHistory();
 
   useEffect(() => {

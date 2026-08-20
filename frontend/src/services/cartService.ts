@@ -1,5 +1,4 @@
 import {
-  addDoc,
   collection,
   deleteDoc,
   doc,
@@ -7,6 +6,7 @@ import {
   getDocs,
   onSnapshot,
   query,
+  runTransaction,
   updateDoc,
   where,
   type Unsubscribe,
@@ -61,11 +61,14 @@ async function fetchRaw(userId: string, savedForLater: boolean): Promise<CartIte
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as CartItem);
 }
 
-async function findExisting(userId: string, productId: string, variantId: string, savedForLater: boolean) {
-  const snap = await getDocs(
-    query(cartCollection(userId), where('productId', '==', productId), where('variantId', '==', variantId), where('savedForLater', '==', savedForLater)),
-  );
-  return snap.empty ? null : snap.docs[0];
+/** Deterministic per-(product, variant, saved-for-later) cart doc ID, used instead of a
+ *  query-then-write "find existing or create" — that pattern raced: two near-simultaneous
+ *  "Add to Cart" calls (double-click, two open tabs) could both see no existing doc and each
+ *  `addDoc` a separate line for the same variant. A fixed ID lets addItem run the whole
+ *  read-check-write as one Firestore transaction (transaction.get only works on a specific doc
+ *  reference, not a query), which Firestore correctly serializes even under concurrent calls. */
+function cartItemDocId(productId: string, variantId: string, savedForLater: boolean): string {
+  return `${productId}_${variantId}_${savedForLater ? 'saved' : 'active'}`;
 }
 
 export const cartService = {
@@ -105,28 +108,42 @@ export const cartService = {
     const stock = inventorySnap.exists() ? ((inventorySnap.data() as Inventory).variant_stock?.[variantId] ?? 0) : 0;
     if (stock <= 0) throw new Error('This size is out of stock.');
 
-    const existing = await findExisting(userId, productId, variantId, false);
-    if (existing) {
-      const currentQty = (existing.data().quantity as number) ?? 0;
-      const nextQty = currentQty + quantity;
-      if (nextQty > stock) throw new Error(`Only ${stock} left in stock.`);
-      await updateDoc(existing.ref, { quantity: nextQty });
-    } else {
-      if (quantity > stock) throw new Error(`Only ${stock} left in stock.`);
-      const image = product.images.find((img) => img.color === variant.color)?.url ?? product.coverImage ?? product.imageUrl ?? '';
-      await addDoc(cartCollection(userId), {
-        productId,
-        variantId,
-        sellerId: product.seller_id,
-        size: variant.size,
-        color: variant.color,
-        quantity,
-        price: variant.price_override ?? product.price,
-        image,
-        addedAt: new Date().toISOString(),
-        savedForLater: false,
-      });
-    }
+    const itemRef = doc(cartCollection(userId), cartItemDocId(productId, variantId, false));
+    await runTransaction(db, async (tx) => {
+      const existingSnap = await tx.get(itemRef);
+      if (existingSnap.exists()) {
+        const currentQty = (existingSnap.data().quantity as number) ?? 0;
+        const nextQty = currentQty + quantity;
+        if (nextQty > stock) throw new Error(`Only ${stock} left in stock.`);
+        tx.update(itemRef, { quantity: nextQty });
+      } else {
+        if (quantity > stock) throw new Error(`Only ${stock} left in stock.`);
+        const image = product.images.find((img) => img.color === variant.color)?.url ?? product.coverImage ?? product.imageUrl ?? '';
+        // { merge: true } is load-bearing, not stylistic: a plain tx.set() on a doc this same
+        // transaction just read as "not existing" carries an implicit not-already-there
+        // precondition. Two concurrent addItem calls that both read "doesn't exist" and both plain
+        // tx.set() race — the second commit fails with ALREADY_EXISTS, which (unlike the
+        // version-conflict ABORTED error tx.update() below gets) the SDK does not automatically
+        // retry, so the second add silently fails instead of falling back to an update. A
+        // merge-set has no such precondition, so it can never hit this.
+        tx.set(
+          itemRef,
+          {
+            productId,
+            variantId,
+            sellerId: product.seller_id,
+            size: variant.size,
+            color: variant.color,
+            quantity,
+            price: variant.price_override ?? product.price,
+            image,
+            addedAt: new Date().toISOString(),
+            savedForLater: false,
+          },
+          { merge: true },
+        );
+      }
+    });
     return this.list(userId);
   },
 
@@ -140,8 +157,37 @@ export const cartService = {
     return this.list(userId);
   },
 
+  /** Moves the item to the doc ID matching its new saved/active state (rather than just flipping
+   *  the field in place) so cartItemDocId's invariant — the ID always matches its own
+   *  savedForLater value — holds for addItem's transaction. Merges into an existing line at the
+   *  destination (e.g. moving a saved item back to an active cart that already has that variant)
+   *  instead of leaving two docs for the same product/variant. */
   async saveForLater(userId: string, cartItemId: string, saved: boolean): Promise<CartLineItem[]> {
-    await updateDoc(doc(db, 'users', userId, 'cart', cartItemId), { savedForLater: saved });
+    const sourceRef = doc(db, 'users', userId, 'cart', cartItemId);
+    await runTransaction(db, async (tx) => {
+      const sourceSnap = await tx.get(sourceRef);
+      if (!sourceSnap.exists()) return;
+      const data = sourceSnap.data() as CartItem;
+      const destId = cartItemDocId(data.productId, data.variantId, saved);
+
+      if (destId === cartItemId) {
+        tx.update(sourceRef, { savedForLater: saved });
+        return;
+      }
+
+      const destRef = doc(db, 'users', userId, 'cart', destId);
+      const destSnap = await tx.get(destRef);
+      if (destSnap.exists()) {
+        const destQty = (destSnap.data().quantity as number) ?? 0;
+        tx.update(destRef, { quantity: destQty + data.quantity });
+      } else {
+        // { merge: true } for the same reason as addItem's create branch above — avoids an
+        // unretried ALREADY_EXISTS if this races with a concurrent addItem/saveForLater targeting
+        // the same destination doc.
+        tx.set(destRef, { ...data, savedForLater: saved }, { merge: true });
+      }
+      tx.delete(sourceRef);
+    });
     return this.list(userId);
   },
 

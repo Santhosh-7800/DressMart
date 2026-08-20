@@ -2,13 +2,15 @@ import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import toast from 'react-hot-toast';
-import { Mic, ScanLine, Search, X, Clock, TrendingUp, Flame, LayoutGrid, Tag } from 'lucide-react';
+import { Mic, ScanLine, Camera, Search, X, Clock, TrendingUp, Flame, LayoutGrid, Tag } from 'lucide-react';
 import { useSearch } from '@/hooks/useSearch';
 import { useOnClickOutside } from '@/hooks/useOnClickOutside';
 import { ProductImage } from '@/components/ui/ProductImage';
 import { PriceTag } from '@/components/ui/PriceTag';
 import { scanBarcodeNative } from '@/lib/barcodeScanner';
 import { BarcodeScannerModal } from '@/components/common/BarcodeScannerModal';
+import { VisualSearchModal, type VisualSearchResult } from '@/components/common/VisualSearchModal';
+import { visualSearchService } from '@/services/visualSearchService';
 
 interface SpeechRecognitionResultLike {
   transcript: string;
@@ -23,6 +25,7 @@ export function SearchBar() {
   const [isFocused, setIsFocused] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isVisualSearchOpen, setIsVisualSearchOpen] = useState(false);
   const {
     query,
     setQuery,
@@ -94,6 +97,21 @@ export function SearchBar() {
     setTimeout(() => runSearch(code), 0);
   };
 
+  const handleVisualSearchAnalyzed = (result: VisualSearchResult) => {
+    setIsVisualSearchOpen(false);
+    commitSearch(visualSearchService.toSearchPhrase(result.attrs));
+    setIsFocused(false);
+    // Same deferral as handleScanResult above — let the modal's own close animation settle before
+    // navigating away underneath it.
+    setTimeout(
+      () =>
+        navigate('/visual-search', {
+          state: { attrs: result.attrs, previewDataUrl: result.previewDataUrl, categorySlugs: result.categorySlugs },
+        }),
+      0,
+    );
+  };
+
   return (
     <div ref={containerRef} className="relative w-full max-w-2xl">
       <form
@@ -138,6 +156,15 @@ export function SearchBar() {
           title="Scan barcode"
         >
           <ScanLine size={16} />
+        </button>
+        <button
+          type="button"
+          onClick={() => setIsVisualSearchOpen(true)}
+          className="mr-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-700"
+          aria-label="Search by image"
+          title="Search by image"
+        >
+          <Camera size={16} />
         </button>
         <button type="submit" className="hidden bg-accent px-5 py-2.5 text-sm font-semibold text-primary-900 sm:block">
           Search
@@ -278,6 +305,7 @@ export function SearchBar() {
       )}
 
       <BarcodeScannerModal isOpen={isScannerOpen} onClose={() => setIsScannerOpen(false)} onScan={handleScanResult} />
+      <VisualSearchModal isOpen={isVisualSearchOpen} onClose={() => setIsVisualSearchOpen(false)} onAnalyzed={handleVisualSearchAnalyzed} />
     </div>
   );
 }

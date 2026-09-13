@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Heart, Share2, Truck, RotateCcw, ShieldCheck, ChevronDown, Info, AlertTriangle, Store } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
+import { Heart, Share2, Truck, RotateCcw, ShieldCheck, ChevronDown, Info, AlertTriangle, Store, Search, Tag, Gift, PackageCheck } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { ProductGallery } from '@/components/product/ProductGallery';
 import { ColorSwatches } from '@/components/product/ColorSwatches';
@@ -18,13 +19,26 @@ import { ReviewCard } from '@/components/product/ReviewCard';
 import { WriteReviewForm } from '@/components/product/WriteReviewForm';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ProductImage } from '@/components/ui/ProductImage';
-import { useFrequentlyBoughtTogether, useProduct, useProductRealtime, useRatingSummary, useRelatedProducts, useReviews } from '@/hooks/useProducts';
+import { QuantitySelector } from '@/components/ui/QuantitySelector';
+import {
+  useBestSellers,
+  useFrequentlyBoughtTogether,
+  useProduct,
+  useProductRealtime,
+  useRatingSummary,
+  useRelatedProducts,
+  useReviews,
+  useTopRated,
+} from '@/hooks/useProducts';
 import { useInventoryRealtime } from '@/hooks/useInventory';
 import { useRecentlyViewed } from '@/hooks/useRecentlyViewed';
 import { useCart } from '@/hooks/useCart';
 import { useWishlist } from '@/hooks/useWishlist';
+import { useCoupons } from '@/hooks/useCoupons';
+import { useDefaultAddress } from '@/hooks/useDefaultAddress';
+import { usePlatformSettings } from '@/hooks/useDashboardData';
 import { useAuth } from '@/contexts/AuthContext';
-import { formatDate, estimatedDeliveryFor } from '@/lib/utils';
+import { formatCurrency, formatDate, estimatedDeliveryFor } from '@/lib/utils';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { productViewService } from '@/services/productViewService';
 import { setBuyNowItem } from '@/lib/buyNowSession';
@@ -53,8 +67,11 @@ export function ProductDetailsPage() {
   const product = liveProduct ?? initialProduct;
   const relatedQuery = useRelatedProducts(product);
   const fbtQuery = useFrequentlyBoughtTogether(product);
+  const bestSellersQuery = useBestSellers();
+  const topRatedQuery = useTopRated();
   const reviewsQuery = useReviews(product?.id);
   const ratingSummaryQuery = useRatingSummary(product?.id);
+  const [reviewSearch, setReviewSearch] = useState('');
   // Realtime — a shopper deciding to buy should see stock change immediately if someone else checks out first.
   const { data: inventory } = useInventoryRealtime(product?.id);
   const { recordView, recentlyViewed, isLoading: isLoadingRecentlyViewed } = useRecentlyViewed();
@@ -62,9 +79,13 @@ export function ProductDetailsPage() {
   const { isWishlisted, toggle } = useWishlist();
   const { isAuthenticated } = useAuth();
   const [pincode, setPincode] = useLocalStorage('dressmart:pincode', '400001');
+  const { data: coupons } = useCoupons();
+  const { defaultAddress } = useDefaultAddress();
+  const { data: platformSettings } = usePlatformSettings();
 
   const [activeColor, setActiveColor] = useState<string | null>(null);
   const [activeSize, setActiveSize] = useState<string | null>(null);
+  const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
     if (product) {
@@ -106,6 +127,23 @@ export function ProductDetailsPage() {
     [product, activeColor, activeSize],
   );
 
+  // Client-side filter over the already-fetched review list — matches "Looking for specific info?"
+  // style review search without needing a separate search index/query for what's already loaded.
+  const filteredReviews = useMemo(() => {
+    const reviews = reviewsQuery.data ?? [];
+    const query = reviewSearch.trim().toLowerCase();
+    if (!query) return reviews;
+    return reviews.filter(
+      (r) => (r.review_title ?? '').toLowerCase().includes(query) || (r.review_text ?? '').toLowerCase().includes(query),
+    );
+  }, [reviewsQuery.data, reviewSearch]);
+
+  // Reset quantity whenever the selected variant changes — a quantity valid for one size/color's
+  // stock could otherwise silently carry over and exceed a different variant's availability.
+  useEffect(() => {
+    setQuantity(1);
+  }, [activeVariant?.id]);
+
   if (isLoading) {
     return (
       <div className="container-app py-8">
@@ -143,6 +181,19 @@ export function ProductDetailsPage() {
   const isActiveVariantLowStock = activeVariantStock > 0 && activeVariantStock <= lowStockThreshold;
   const canTransact = !productUnavailable && (!activeVariant || activeVariantStock > 0);
 
+  const displayPrice = activeVariant?.price_override ?? product.price;
+  /** Real, currently-active coupons (see couponService) that apply to this product — platform-wide
+   *  ones (no applicable_categories) plus any scoped to this product's category. */
+  const applicableCoupons = (coupons ?? []).filter(
+    (c) => !c.applicable_categories?.length || c.applicable_categories.includes(product.category_id),
+  );
+  const freeDeliveryThreshold = platformSettings?.free_shipping_threshold ?? 999;
+  const qualifiesForFreeDelivery = displayPrice >= freeDeliveryThreshold;
+  /** Cosmetic loyalty-points teaser only — DressMart has no wallet/redemption system yet, so this is
+   *  deliberately framed as a point count rather than a "worth ₹X cash" claim (which would be a
+   *  concrete, unbacked promise to a real buyer). */
+  const rewardPoints = Math.round(displayPrice * 0.05);
+
   /** Shared validation for both Add to Cart and Buy Now — login, then color, then size, then stock,
    *  in that order, matching the spec exactly. Returns the variant to transact with, or null (after
    *  showing the relevant toast/redirect) if something failed. */
@@ -173,7 +224,7 @@ export function ProductDetailsPage() {
 
   const handleAddToCart = async () => {
     if (!validateForPurchase() || !activeVariant) return;
-    await addItem({ productId: product.id, variantId: activeVariant.id });
+    await addItem({ productId: product.id, variantId: activeVariant.id, quantity });
   };
 
   /**
@@ -184,14 +235,57 @@ export function ProductDetailsPage() {
    */
   const handleBuyNow = () => {
     if (!validateForPurchase() || !activeVariant) return;
-    setBuyNowItem({ productId: product.id, variantId: activeVariant.id, quantity: 1 });
+    setBuyNowItem({ productId: product.id, variantId: activeVariant.id, quantity });
     navigate('/checkout');
   };
 
+  /** Converts a fetched image Blob to the raw base64 string Filesystem.writeFile expects (no
+   *  `data:...;base64,` prefix — see visualSearchService's compressToBase64 for the same trick). */
+  const blobToBase64 = (blob: Blob): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve((reader.result as string).split(',')[1] ?? '');
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+
   const handleShare = async () => {
     const url = window.location.href;
+    const priceLine =
+      displayPrice < product.mrp ? `${formatCurrency(displayPrice)} (MRP ${formatCurrency(product.mrp)})` : formatCurrency(displayPrice);
+    const text = `${product.name} — ${priceLine}\nCheck it out on DressMart!`;
+
+    if (Capacitor.isNativePlatform()) {
+      // The native share sheet (WhatsApp, Instagram, ...) only accepts a local file:// URI for an
+      // attached image, never a remote URL — so the cover image is downloaded into the app's cache
+      // first. If that fails for any reason, fall back to a plain text+link share rather than
+      // blocking sharing altogether.
+      let fileUri: string | undefined;
+      try {
+        const imageUrl = product.coverImage || product.images[0]?.url;
+        if (imageUrl) {
+          const { Filesystem, Directory } = await import('@capacitor/filesystem');
+          const blob = await (await fetch(imageUrl)).blob();
+          const base64 = await blobToBase64(blob);
+          const path = `share-${product.id}.jpg`;
+          await Filesystem.writeFile({ path, data: base64, directory: Directory.Cache });
+          fileUri = (await Filesystem.getUri({ path, directory: Directory.Cache })).uri;
+        }
+      } catch {
+        // Image download/cache-write failed — share without an attached image below.
+      }
+
+      try {
+        const { Share } = await import('@capacitor/share');
+        await Share.share({ title: product.name, text, url, ...(fileUri ? { files: [fileUri] } : {}) });
+      } catch {
+        // User cancelled the share sheet — nothing to show.
+      }
+      return;
+    }
+
     if (navigator.share) {
-      await navigator.share({ title: product.name, url });
+      await navigator.share({ title: product.name, text, url });
     } else {
       await navigator.clipboard.writeText(url);
       toast.success('Product link copied to clipboard');
@@ -221,14 +315,42 @@ export function ProductDetailsPage() {
           </div>
 
           <div className="mt-4">
-            <PriceTag price={activeVariant?.price_override ?? product.price} mrp={product.mrp} discountPercent={product.discount_percent} size="lg" />
+            <PriceTag price={displayPrice} mrp={product.mrp} discountPercent={product.discount_percent} size="lg" />
             <p className="mt-1 text-xs text-primary-400">Inclusive of all taxes</p>
             {product.seller_name && (
               <p className="mt-1 flex items-center gap-1 text-xs text-primary-400">
                 <Store size={12} /> Sold by <span className="font-medium text-primary-600 dark:text-primary-300">{product.seller_name}</span>
               </p>
             )}
+            {rewardPoints > 0 && (
+              <p className="mt-1.5 flex items-center gap-1 text-xs font-medium text-amber-600 dark:text-amber-400">
+                <Gift size={13} /> Earn {rewardPoints} DressMart Coins on this order
+              </p>
+            )}
           </div>
+
+          {applicableCoupons.length > 0 && (
+            <div className="mt-4 rounded-2xl bg-primary-50 p-3 dark:bg-primary-800">
+              <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold">
+                <Tag size={15} className="text-primary-500" /> Offers for you
+              </p>
+              <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+                {applicableCoupons.slice(0, 5).map((c) => (
+                  <div
+                    key={c.id}
+                    className="w-56 shrink-0 rounded-xl border border-primary-200 bg-white p-3 text-xs dark:border-primary-600 dark:bg-primary-900"
+                  >
+                    <p className="font-bold text-primary-700 dark:text-white">{c.code}</p>
+                    <p className="mt-0.5 text-primary-500 dark:text-primary-300">{c.description}</p>
+                    {c.min_order_value > 0 && <p className="mt-1 text-primary-400">Min. order {formatCurrency(c.min_order_value)}</p>}
+                  </div>
+                ))}
+              </div>
+              <Link to="/coupons" className="mt-2 inline-block text-sm font-medium text-accent-600 hover:underline dark:text-accent-400">
+                See all offers
+              </Link>
+            </div>
+          )}
 
           <div className="mt-6 space-y-5">
             <ColorSwatches colors={colors} activeColor={activeColor ?? ''} onChange={(c) => { setActiveColor(c); setActiveSize(null); }} />
@@ -266,6 +388,13 @@ export function ProductDetailsPage() {
             </div>
           )}
 
+          {!productUnavailable && activeVariant && activeVariantStock > 0 && (
+            <div className="mt-4 flex items-center gap-3">
+              <span className="text-sm font-medium text-primary-500">Quantity</span>
+              <QuantitySelector value={quantity} onChange={setQuantity} max={Math.min(activeVariantStock, 10)} />
+            </div>
+          )}
+
           <div className="mt-6 hidden gap-3 md:flex">
             {productUnavailable ? (
               <div className="flex h-12 flex-1 items-center justify-center rounded-xl bg-primary-100 text-sm font-semibold text-red-500 dark:bg-primary-800">
@@ -295,17 +424,35 @@ export function ProductDetailsPage() {
               <Truck size={18} className="text-primary-500" />
               <div className="flex-1">
                 <p className="font-medium">Delivery by {formatDate(estimatedDeliveryFor(pincode))}</p>
-                <p className="mb-2 text-xs text-primary-400">to {pincode}</p>
+                {defaultAddress && defaultAddress.pincode === pincode ? (
+                  <p className="mb-2 text-xs text-primary-400">
+                    Deliver to <span className="font-medium text-primary-600 dark:text-primary-300">{defaultAddress.full_name}</span> — {defaultAddress.city} {pincode}
+                  </p>
+                ) : (
+                  <p className="mb-2 text-xs text-primary-400">to {pincode}</p>
+                )}
                 <PincodeChecker onVerified={setPincode} />
               </div>
             </div>
-            <div className="mt-3 flex items-center gap-3 text-sm">
-              <RotateCcw size={18} className="text-primary-500" />
-              <p>7-day easy return &amp; exchange</p>
-            </div>
-            <div className="mt-3 flex items-center gap-3 text-sm">
-              <ShieldCheck size={18} className="text-primary-500" />
-              <p>100% authentic products, secure payments</p>
+
+            <p className="mt-4 mb-2 text-xs font-semibold text-primary-500">Shop with confidence</p>
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="flex items-center gap-2">
+                <RotateCcw size={16} className="shrink-0 text-primary-500" />
+                <span>7-day return &amp; exchange</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Truck size={16} className="shrink-0 text-primary-500" />
+                <span>{qualifiesForFreeDelivery ? 'Free delivery' : `Free delivery above ${formatCurrency(freeDeliveryThreshold)}`}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <ShieldCheck size={16} className="shrink-0 text-primary-500" />
+                <span>100% authentic products</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <PackageCheck size={16} className="shrink-0 text-primary-500" />
+                <span>{product.cod_available === false ? 'Secure prepaid payments' : 'Cash on Delivery available'}</span>
+              </div>
             </div>
           </div>
 
@@ -415,7 +562,19 @@ export function ProductDetailsPage() {
         <h2 className="mb-4 text-xl font-bold">Ratings &amp; Reviews</h2>
 
         {ratingSummaryQuery.data && ratingSummaryQuery.data.total_reviews > 0 ? (
-          <ReviewsSummary summary={ratingSummaryQuery.data} />
+          <>
+            <ReviewsSummary summary={ratingSummaryQuery.data} />
+            <div className="relative mt-4 max-w-md">
+              <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-primary-300" />
+              <input
+                value={reviewSearch}
+                onChange={(e) => setReviewSearch(e.target.value)}
+                placeholder="Search reviews (e.g. fit, quality, size)"
+                aria-label="Search reviews"
+                className="w-full rounded-xl border border-primary-200 bg-white py-2.5 pl-9 pr-3 text-sm text-primary-900 placeholder:text-primary-300 focus:border-accent dark:border-primary-600 dark:bg-primary-800 dark:text-white dark:placeholder:text-primary-400"
+              />
+            </div>
+          </>
         ) : (
           <p className="text-sm text-primary-400">No customer reviews yet. Be the first to review this product.</p>
         )}
@@ -425,13 +584,25 @@ export function ProductDetailsPage() {
         </div>
 
         <div className="mt-6">
-          {(reviewsQuery.data ?? []).map((review) => (
-            <ReviewCard key={review.id} review={review} />
-          ))}
+          {filteredReviews.length === 0 && reviewSearch.trim() ? (
+            <p className="text-sm text-primary-400">No reviews match "{reviewSearch}".</p>
+          ) : (
+            filteredReviews.map((review) => <ReviewCard key={review.id} review={review} />)
+          )}
         </div>
       </section>
 
       <ProductCarousel title="Related Products" products={relatedQuery.data ?? []} isLoading={relatedQuery.isLoading} />
+      <ProductCarousel
+        title="Best Sellers You Might Like"
+        products={(bestSellersQuery.data ?? []).filter((p) => p.id !== product.id)}
+        isLoading={bestSellersQuery.isLoading}
+      />
+      <ProductCarousel
+        title="Top Rated Picks"
+        products={(topRatedQuery.data ?? []).filter((p) => p.id !== product.id)}
+        isLoading={topRatedQuery.isLoading}
+      />
       {(() => {
         const otherRecentlyViewed = recentlyViewed.filter((p) => p.id !== product.id);
         return (

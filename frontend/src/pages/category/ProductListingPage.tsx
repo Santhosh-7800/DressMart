@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { SlidersHorizontal, X } from 'lucide-react';
+import { SlidersHorizontal } from 'lucide-react';
 import type { Gender, ProductFilters as Filters } from '@/types';
 import { Seo } from '@/components/common/Seo';
 import { ProductGrid } from '@/components/product/ProductGrid';
 import { ProductFilters } from '@/components/product/ProductFilters';
+import { ActiveFilterChips } from '@/components/product/ActiveFilterChips';
+import { MobileFilterDrawer } from '@/components/product/MobileFilterDrawer';
 import { SortDropdown } from '@/components/product/SortDropdown';
 import { InfiniteScrollSentinel } from '@/components/product/InfiniteScrollSentinel';
 import { useProductFacets } from '@/hooks/useProducts';
 import { useInfiniteProductListing } from '@/hooks/useInfiniteProductListing';
 import { useCategoryHistory } from '@/hooks/useCategoryHistory';
-import { filtersFromSearchParams, applyFiltersToSearchParams } from '@/lib/filterUrlSync';
+import { filtersFromSearchParams, applyFiltersToSearchParams, hasActiveFilters } from '@/lib/filterUrlSync';
 
 interface ProductListingPageProps {
   gender: Gender;
@@ -89,25 +91,16 @@ export function ProductListingPage({ gender }: ProductListingPageProps) {
         </div>
       </div>
 
+      <ActiveFilterChips filters={filters} facets={facetsQuery.data} onChange={updateFilters} />
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[260px_1fr]">
         <div className="hidden lg:block lg:sticky lg:top-24 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
           <ProductFilters facets={facetsQuery.data} filters={filters} onChange={(next) => updateFilters({ ...next, page: 1 })} />
         </div>
 
-        {isMobileFiltersOpen && (
-          <div className="fixed inset-0 z-50 flex lg:hidden">
-            <div className="absolute inset-0 bg-primary-950/50" onClick={() => setIsMobileFiltersOpen(false)} />
-            <div className="relative ml-auto h-full w-[85%] max-w-sm overflow-y-auto bg-surface p-4 dark:bg-surface-dark">
-              <div className="mb-3 flex items-center justify-between">
-                <h3 className="font-semibold">Filters</h3>
-                <button onClick={() => setIsMobileFiltersOpen(false)} aria-label="Close filters">
-                  <X size={20} />
-                </button>
-              </div>
-              <ProductFilters facets={facetsQuery.data} filters={filters} onChange={(next) => updateFilters({ ...next, page: 1 })} />
-            </div>
-          </div>
-        )}
+        <MobileFilterDrawer isOpen={isMobileFiltersOpen} onClose={() => setIsMobileFiltersOpen(false)}>
+          <ProductFilters facets={facetsQuery.data} filters={filters} onChange={(next) => updateFilters({ ...next, page: 1 })} />
+        </MobileFilterDrawer>
 
         <div>
           <ProductGrid
@@ -115,6 +108,8 @@ export function ProductListingPage({ gender }: ProductListingPageProps) {
             isLoading={productsQuery.isLoading}
             isError={productsQuery.isError}
             onRetry={() => productsQuery.refetch()}
+            hasActiveFilters={hasActiveFilters(filters)}
+            onClearFilters={() => updateFilters({ gender, categorySlugs: filters.categorySlugs, pageSize: filters.pageSize })}
           />
           <InfiniteScrollSentinel
             sentinelRef={productsQuery.sentinelRef}

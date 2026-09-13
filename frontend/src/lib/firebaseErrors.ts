@@ -41,6 +41,7 @@ const FRIENDLY_MESSAGES: Record<string, string> = {
   'failed-precondition': 'This action can’t be completed right now.',
   'deadline-exceeded': 'That took too long — please try again.',
   cancelled: 'That was cancelled.',
+  internal: 'Something went wrong on our end. Please try again.',
 };
 
 /** Extracts a bare Firebase error code (e.g. "auth/invalid-credential", "permission-denied") from
@@ -75,7 +76,13 @@ export function getFriendlyErrorMessage(error: unknown, fallback = 'Something we
   // that actual message over the generic per-code mapping below, which would otherwise discard a
   // deliberately human-authored, specific message in favor of a vague one sharing the same code
   // (e.g. many different callables throw 'failed-precondition' for very different reasons).
-  if (extracted?.isCallable && error instanceof Error && error.message) return error.message;
+  // Guarded against the message being the bare error code itself (e.g. just "internal") — the
+  // callable client SDK falls back to that when a response doesn't round-trip cleanly, and it's
+  // not a message any function author actually wrote, so it should fall through to the mapping/
+  // fallback below instead of leaking a raw code to the user.
+  if (extracted?.isCallable && error instanceof Error && error.message && error.message !== extracted.code) {
+    return error.message;
+  }
   if (extracted && FRIENDLY_MESSAGES[extracted.code]) return FRIENDLY_MESSAGES[extracted.code];
   if (error instanceof Error && error.message && !extracted) return error.message; // non-Firebase errors (e.g. our own thrown validation messages) pass through as-is
   return fallback;

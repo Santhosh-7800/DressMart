@@ -46,6 +46,8 @@ export const queryKeys = {
   },
   inventory: {
     detail: (productId: string) => ['inventory', 'detail', productId] as const,
+    movements: (productId: string) => ['inventory', 'movements', productId] as const,
+    summary: (sellerId: string) => ['inventory', 'summary', sellerId] as const,
   },
   categories: {
     all: ['categories'] as const,
@@ -73,9 +75,6 @@ export const queryKeys = {
     all: ['exchanges'] as const,
     bySeller: (sellerId: string) => ['exchanges', 'seller', sellerId] as const,
   },
-  sellerRequests: {
-    all: ['seller-requests'] as const,
-  },
   addresses: {
     all: ['addresses'] as const,
   },
@@ -97,23 +96,23 @@ export const queryKeys = {
     all: ['returns'] as const,
     bySeller: (sellerId: string) => ['returns', 'seller', sellerId] as const,
   },
-  seller: {
-    overview: (sellerId: string) => ['seller', 'overview', sellerId] as const,
-    platformOverview: ['seller', 'platform-overview'] as const,
-    sellers: ['seller', 'roster'] as const,
-    customers: ['seller', 'customers'] as const,
-    recentOrders: (maxDocs: number) => ['seller', 'recent-orders', maxDocs] as const,
-    platformSettings: ['seller', 'platform-settings'] as const,
-    orderStatusBreakdown: (sellerId: string) => ['seller', 'order-status-breakdown', sellerId] as const,
-    lowStockList: (sellerId: string) => ['seller', 'low-stock-list', sellerId] as const,
-    outOfStockList: (sellerId: string) => ['seller', 'out-of-stock-list', sellerId] as const,
-    recentlyAdded: (sellerId: string) => ['seller', 'recently-added', sellerId] as const,
-    dealsEndingSoon: (sellerId: string) => ['seller', 'deals-ending-soon', sellerId] as const,
-    ordersInRange: (sellerId: string, days: number) => ['seller', 'orders-in-range', sellerId, days] as const,
-    categoryBreakdown: (sellerId: string) => ['seller', 'category-breakdown', sellerId] as const,
-    userGrowth: (rolesKey: string, days: number) => ['seller', 'user-growth', rolesKey, days] as const,
-    payouts: (sellerId: string, headSeller: boolean) => ['seller', 'payouts', sellerId, headSeller] as const,
-    topSelling: (sellerId: string) => ['seller', 'top-selling', sellerId] as const,
+  admin: {
+    overview: (sellerId: string) => ['admin', 'overview', sellerId] as const,
+    platformOverview: ['admin', 'platform-overview'] as const,
+    sellers: ['admin', 'roster'] as const,
+    customers: ['admin', 'customers'] as const,
+    recentOrders: (maxDocs: number) => ['admin', 'recent-orders', maxDocs] as const,
+    platformSettings: ['admin', 'platform-settings'] as const,
+    orderStatusBreakdown: (sellerId: string) => ['admin', 'order-status-breakdown', sellerId] as const,
+    lowStockList: (sellerId: string) => ['admin', 'low-stock-list', sellerId] as const,
+    outOfStockList: (sellerId: string) => ['admin', 'out-of-stock-list', sellerId] as const,
+    recentlyAdded: (sellerId: string) => ['admin', 'recently-added', sellerId] as const,
+    dealsEndingSoon: (sellerId: string) => ['admin', 'deals-ending-soon', sellerId] as const,
+    ordersInRange: (sellerId: string, days: number) => ['admin', 'orders-in-range', sellerId, days] as const,
+    categoryBreakdown: (sellerId: string) => ['admin', 'category-breakdown', sellerId] as const,
+    userGrowth: (rolesKey: string, days: number) => ['admin', 'user-growth', rolesKey, days] as const,
+    payouts: (sellerId: string, isAdmin: boolean) => ['admin', 'payouts', sellerId, isAdmin] as const,
+    topSelling: (sellerId: string) => ['admin', 'top-selling', sellerId] as const,
   },
   staff: {
     roster: (sellerId: string) => ['staff', 'roster', sellerId] as const,
@@ -121,5 +120,13 @@ export const queryKeys = {
     permissions: (staffId: string) => ['staff', 'permissions', staffId] as const,
     activity: (sellerId: string) => ['staff', 'activity', sellerId] as const,
     ownActivity: (staffId: string) => ['staff', 'own-activity', staffId] as const,
+  },
+  delivery: {
+    roster: () => ['delivery', 'roster'] as const,
+    profile: (deliveryStaffId: string) => ['delivery', 'profile', deliveryStaffId] as const,
+  },
+  faqs: {
+    active: ['faqs', 'active'] as const,
+    all: ['faqs', 'all'] as const,
   },
 } as const;

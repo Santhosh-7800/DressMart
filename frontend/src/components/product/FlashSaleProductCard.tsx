@@ -10,7 +10,7 @@ import { Rating } from '@/components/ui/Rating';
 import { ProductImage } from '@/components/ui/ProductImage';
 import { useWishlist } from '@/hooks/useWishlist';
 import { useInventory } from '@/hooks/useInventory';
-import { useCart } from '@/hooks/useCart';
+import { useAddToCart } from '@/hooks/useCart';
 import { useAuth } from '@/contexts/AuthContext';
 import { productService } from '@/services/productService';
 import { queryKeys } from '@/lib/queryClient';
@@ -39,7 +39,7 @@ function FlashSaleProductCardImpl({ product, onExpire, className, showAddToCartB
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
-  const { addItem } = useCart();
+  const { addItem } = useAddToCart();
   const primaryImage = product.coverImage || product.thumbnailUrl || product.imageUrl || product.images[0]?.url;
   // Same-colorway second photo — see ProductCard.tsx's identical comment for the rationale.
   const primaryColor = product.images[0]?.color ?? null;

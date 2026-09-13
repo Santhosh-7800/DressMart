@@ -7,7 +7,7 @@ import { isStaffRole } from '@/lib/roles';
 /**
  * The signed-in staff member's own permission grants — drives both firestore.rules-backed writes
  * and, here, hiding actions in the UI the account can't perform anyway. Returns `undefined` for
- * any non-staff role (seller/head_seller/buyer), which every call site treats as "no permission
+ * any non-staff role (staff/buyer), which every call site treats as "no permission
  * gate applies" — see e.g. SellerProductsPage's canEdit/canDelete.
  */
 export function useStaffPermissions() {

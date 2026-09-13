@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Package, PackagePlus, FileEdit, PackageX, Plus, FileUp, ImagePlus, Clock, AlertTriangle, Sparkles } from 'lucide-react';
+import { Package, PackagePlus, FileEdit, FileCheck2, PackageX, Boxes, Plus, FileUp, ImagePlus, Clock, AlertTriangle, Sparkles } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { ProductImage } from '@/components/ui/ProductImage';
 import { ImportProductsModal } from '@/components/staff/ImportProductsModal';
 import { useAuth } from '@/contexts/AuthContext';
-import { useSellerProducts } from '@/hooks/useSellerProducts';
+import { useAdminProducts } from '@/hooks/useAdminProducts';
 import { useStaffPermissions, useOwnStaffActivity } from '@/hooks/useStaff';
 import { inventoryService } from '@/services/inventoryService';
 import { ACTIVITY_ICON, ACTIVITY_LABEL } from '@/lib/staffActivity';
@@ -39,7 +39,7 @@ function StatCard({ icon: Icon, label, value, to, tone = 'default' }: { icon: ty
 export function StaffDashboardPage() {
   const { user } = useAuth();
   const { data: permissions } = useStaffPermissions();
-  const { data: products = [], isLoading: isLoadingProducts } = useSellerProducts();
+  const { data: products = [], isLoading: isLoadingProducts } = useAdminProducts();
   const { data: activity, isLoading: isLoadingActivity } = useOwnStaffActivity(8);
   const [isImportOpen, setIsImportOpen] = useState(false);
 
@@ -52,7 +52,7 @@ export function StaffDashboardPage() {
     return myProducts.filter((p) => new Date(p.created_at).toDateString() === todayKey).length;
   }, [myProducts]);
   const draftCount = useMemo(() => myProducts.filter((p) => p.status === 'draft').length, [myProducts]);
-  const outOfStockCount = useMemo(() => myProducts.filter((p) => p.status === 'out_of_stock').length, [myProducts]);
+  const publishedCount = useMemo(() => myProducts.filter((p) => p.status === 'active').length, [myProducts]);
   const recentlyAdded = myProducts.slice(0, 5);
 
   const canSeeInventory = Boolean(permissions?.manage_inventory);
@@ -61,13 +61,27 @@ export function StaffDashboardPage() {
     queryFn: () => inventoryService.getInventoryBatch(myProducts.map((p) => p.id)),
     enabled: canSeeInventory && myProducts.length > 0,
   });
-  const alertProducts = useMemo(
+  // Real, stock-derived out-of-stock count (not the manually-set `status` flag, which can drift
+  // out of sync with actual stock — see productService.ts's ProductStatus for why) — only
+  // available once inventory data has loaded; falls back to the status flag until then/if the
+  // staff member lacks manage_inventory, so the stat card never just shows 0 while data is missing.
+  const outOfStockCount = useMemo(() => {
+    if (!canSeeInventory) return myProducts.filter((p) => p.status === 'out_of_stock').length;
+    return myProducts.filter((p) => (inventoryMap[p.id]?.total_stock ?? 1) <= 0).length;
+  }, [myProducts, inventoryMap, canSeeInventory]);
+  const lowStockProducts = useMemo(
     () =>
       myProducts
         .map((p) => ({ product: p, inventory: inventoryMap[p.id] }))
-        .filter(({ inventory }) => inventory && inventory.total_stock <= inventory.low_stock_threshold)
-        .slice(0, 5),
+        .filter(({ inventory }) => inventory && inventory.total_stock <= inventory.low_stock_threshold),
     [myProducts, inventoryMap],
+  );
+  const alertProducts = lowStockProducts.slice(0, 5);
+
+  const totalVariants = useMemo(() => myProducts.reduce((sum, p) => sum + p.variants.length, 0), [myProducts]);
+  const totalUnits = useMemo(
+    () => (canSeeInventory ? myProducts.reduce((sum, p) => sum + (inventoryMap[p.id]?.total_stock ?? 0), 0) : 0),
+    [myProducts, inventoryMap, canSeeInventory],
   );
 
   const canAddProducts = Boolean(permissions?.add_products);
@@ -82,13 +96,17 @@ export function StaffDashboardPage() {
         <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-acc-text-secondary">Overview</h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {isLoadingProducts ? (
-            Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-[74px] w-full" />)
+            Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-[74px] w-full" />)
           ) : (
             <>
-              <StatCard icon={PackagePlus} label="Products Added Today" value={todayCount} to="/staff/products" />
               <StatCard icon={Package} label="Total Products Added" value={myProducts.length} to="/staff/products" />
+              <StatCard icon={FileCheck2} label="Published Products" value={publishedCount} to="/staff/products" />
               <StatCard icon={FileEdit} label="Draft Products" value={draftCount} to="/staff/products" />
-              <StatCard icon={PackageX} label="Out of Stock" value={outOfStockCount} to="/staff/products" tone={outOfStockCount > 0 ? 'warning' : 'default'} />
+              <StatCard icon={PackagePlus} label="Products Added Today" value={todayCount} to="/staff/products" />
+              <StatCard icon={Boxes} label="Total Variants" value={totalVariants} to="/staff/inventory" />
+              {canSeeInventory && <StatCard icon={Boxes} label="Total Units in Stock" value={totalUnits} to="/staff/inventory" />}
+              <StatCard icon={Boxes} label="Low Stock" value={lowStockProducts.length} to="/staff/inventory?stock=low" tone={lowStockProducts.length > 0 ? 'warning' : 'default'} />
+              <StatCard icon={PackageX} label="Out of Stock" value={outOfStockCount} to="/staff/inventory?stock=out" tone={outOfStockCount > 0 ? 'warning' : 'default'} />
             </>
           )}
         </div>
@@ -125,6 +143,26 @@ export function StaffDashboardPage() {
               <span className="text-xs font-medium text-acc-text dark:text-white">Upload Images</span>
             </Card>
           </Link>
+          {canSeeInventory && (
+            <>
+              <Link to="/staff/inventory">
+                <Card className="flex flex-col items-center gap-2 py-6 text-center">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-acc-primary/10 text-acc-primary">
+                    <Boxes size={22} />
+                  </div>
+                  <span className="text-xs font-medium text-acc-text dark:text-white">Inventory</span>
+                </Card>
+              </Link>
+              <Link to="/staff/inventory?stock=low">
+                <Card className="flex flex-col items-center gap-2 py-6 text-center">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
+                    <AlertTriangle size={22} />
+                  </div>
+                  <span className="text-xs font-medium text-acc-text dark:text-white">Low Stock</span>
+                </Card>
+              </Link>
+            </>
+          )}
         </div>
       </section>
 
@@ -178,7 +216,10 @@ export function StaffDashboardPage() {
               <ul className="space-y-3">
                 {alertProducts.map(({ product, inventory }) => (
                   <li key={product.id}>
-                    <Link to="/staff/inventory" className="flex items-center gap-3 rounded-xl p-1.5 transition-colors hover:bg-amber-50 dark:hover:bg-amber-900/10">
+                    <Link
+                      to={`/staff/inventory?stock=${inventory && inventory.total_stock <= 0 ? 'out' : 'low'}&highlight=${product.id}`}
+                      className="flex items-center gap-3 rounded-xl p-1.5 transition-colors hover:bg-amber-50 dark:hover:bg-amber-900/10"
+                    >
                       <ProductImage src={product.coverImage} alt={product.name} className="h-11 w-11 shrink-0 rounded-lg" />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-acc-text dark:text-white">{product.name}</p>

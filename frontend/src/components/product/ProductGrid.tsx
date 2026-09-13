@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import type { Product } from '@/types';
 import { ProductCard } from './ProductCard';
@@ -15,6 +16,12 @@ interface ProductGridProps {
   isError?: boolean;
   onRetry?: () => void;
   emptyMessage?: string;
+  /** True when at least one filter (color/size/price/rating/discount/brand/inStock) is active —
+   *  distinguishes "your search found nothing" from "your FILTERS found nothing" (Phase 15 Section
+   *  25), which get different empty-state copy and a "Clear filters" action instead of just
+   *  "try a different term". */
+  hasActiveFilters?: boolean;
+  onClearFilters?: () => void;
   /** Forwarded to every ProductCard — see its own doc comment. Opt-in, unset everywhere except
    *  the homepage's premium card treatment. */
   showAddToCartButtons?: boolean;
@@ -23,7 +30,17 @@ interface ProductGridProps {
   similarityScores?: Map<string, number>;
 }
 
-export function ProductGrid({ products, isLoading, isError, onRetry, emptyMessage, showAddToCartButtons, similarityScores }: ProductGridProps) {
+export function ProductGrid({
+  products,
+  isLoading,
+  isError,
+  onRetry,
+  emptyMessage,
+  hasActiveFilters,
+  onClearFilters,
+  showAddToCartButtons,
+  similarityScores,
+}: ProductGridProps) {
   debugLog('ProductGrid', 'render', { isLoading, isError, count: products.length });
   // One batched inventory read for the whole grid instead of each ProductCard firing its own —
   // see useInventoryBatch's docstring.
@@ -46,11 +63,31 @@ export function ProductGrid({ products, isLoading, isError, onRetry, emptyMessag
 
   if (products.length === 0) {
     return (
-      <EmptyState
-        icon={PackageSearch}
-        title="No products found"
-        description={emptyMessage ?? 'Try adjusting your filters or search terms.'}
-      />
+      <div className="flex flex-col items-center gap-4">
+        <EmptyState
+          icon={PackageSearch}
+          title={hasActiveFilters ? 'No products match your filters' : 'No products found'}
+          description={
+            emptyMessage ?? (hasActiveFilters ? 'Try removing a filter to see more results.' : 'Try a different search term or browse a category instead.')
+          }
+        />
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {hasActiveFilters && onClearFilters && (
+            <button onClick={onClearFilters} className="btn-outline text-sm">
+              Clear Filters
+            </button>
+          )}
+          <Link to="/men" className="btn-outline text-sm">
+            Browse Men
+          </Link>
+          <Link to="/kids" className="btn-outline text-sm">
+            Browse Kids
+          </Link>
+          <Link to="/new-arrivals" className="btn-outline text-sm">
+            New Arrivals
+          </Link>
+        </div>
+      </div>
     );
   }
 

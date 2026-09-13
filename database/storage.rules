@@ -47,7 +47,7 @@ service firebase.storage {
         && request.resource.contentType.matches('image/.*');
     }
 
-    // Head Seller-managed homepage banner images — publicly readable, writable only by that account.
+    // Admin-managed homepage banner images — publicly readable, writable only by that account.
     match /banners/{headSellerId}/{allPaths=**} {
       allow read: if true;
       allow write: if isSignedIn() && request.auth.uid == headSellerId
@@ -55,12 +55,28 @@ service firebase.storage {
         && request.resource.contentType.matches('image/.*');
     }
 
+    // Review photos (Phase 14) — publicly readable (shown on the product page), writable only by
+    // that reviewer. Capped smaller than a product/banner image since these are user-submitted
+    // phone photos, not curated catalog assets.
+    match /reviews/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isSignedIn() && request.auth.uid == userId
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
     // Seller verification documents (GST certificate, etc.) — private, readable by the owner and
-    // the Head Seller only (Head Seller read is enforced via a Cloud Function / Admin SDK signed
+    // the Admin only (Admin read is enforced via a Cloud Function / Admin SDK signed
     // URL rather than this ruleset, since Storage rules can't call out to Firestore for role checks
-    // the same way — keep uploads here scoped to the owner).
+    // the same way — keep uploads here scoped to the owner). No frontend upload flow uses this path
+    // yet, but the rule is live in the deployed ruleset regardless — size/type caps (matching the
+    // pattern used on every other path above) close the gap where a signed-in user could otherwise
+    // upload an arbitrarily large file of any type here via a direct SDK call.
     match /seller_documents/{userId}/{allPaths=**} {
-      allow read, write: if isSignedIn() && request.auth.uid == userId;
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow write: if isSignedIn() && request.auth.uid == userId
+        && request.resource.size < 8 * 1024 * 1024
+        && (request.resource.contentType.matches('image/.*') || request.resource.contentType == 'application/pdf');
     }
   }
 }

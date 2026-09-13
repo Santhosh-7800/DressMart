@@ -10,7 +10,7 @@ import { Rating } from '@/components/ui/Rating';
 import { ProductImage } from '@/components/ui/ProductImage';
 import { useWishlist } from '@/hooks/useWishlist';
 import { useInventory } from '@/hooks/useInventory';
-import { useCart } from '@/hooks/useCart';
+import { useAddToCart } from '@/hooks/useCart';
 import { useAuth } from '@/contexts/AuthContext';
 import { productService } from '@/services/productService';
 import { queryKeys } from '@/lib/queryClient';
@@ -49,7 +49,7 @@ function ProductCardImpl({ product, className, inventory: inventoryProp, skipOwn
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
-  const { addItem } = useCart();
+  const { addItem } = useAddToCart();
 
   // Quick-add from the card skips color/size selection — it grabs the first variant that's
   // actually in stock (falling back to the first variant while inventory is still loading, same

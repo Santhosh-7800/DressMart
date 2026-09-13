@@ -89,11 +89,16 @@ export default {
         'fade-in': { from: { opacity: 0 }, to: { opacity: 1 } },
         'slide-up': { from: { opacity: 0, transform: 'translateY(12px)' }, to: { opacity: 1, transform: 'translateY(0)' } },
         shimmer: { '100%': { transform: 'translateX(100%)' } },
+        'splash-progress': {
+          '0%': { transform: 'translateX(-110%)' },
+          '100%': { transform: 'translateX(310%)' },
+        },
       },
       animation: {
         'fade-in': 'fade-in 0.3s ease-out',
         'slide-up': 'slide-up 0.35s ease-out',
         shimmer: 'shimmer 1.5s infinite',
+        'splash-progress': 'splash-progress 1.3s ease-in-out infinite',
       },
     },
   },

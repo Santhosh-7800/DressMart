@@ -32,6 +32,15 @@ export const env = {
   /** VAPID key for requesting an FCM push token in the browser (Project Settings > Cloud Messaging > Web Push certificates). */
   fcmVapidKey: (import.meta.env.VITE_FIREBASE_VAPID_KEY as string | undefined) ?? '',
   razorpayKeyId: (import.meta.env.VITE_RAZORPAY_KEY_ID as string | undefined) ?? '',
+  /** The Firebase project's auto-generated "Web application" OAuth client (client_type: 3 in
+   *  google-services.json) — required by the native Google Sign-In flow (authService.ts) on
+   *  Android, which needs this to mint a Firebase-compatible ID token even though the app itself
+   *  is native, not web. Not a secret (it's already public inside the committed google-services.json);
+   *  the fallback is that exact value, so this only needs overriding if the Firebase project changes. */
+  googleWebClientId:
+    (import.meta.env.VITE_GOOGLE_WEB_CLIENT_ID as string | undefined) ?? '546968393276-ctmu07249crbestk4op0lgee7c14pd9s.apps.googleusercontent.com',
   siteUrl: (import.meta.env.VITE_SITE_URL as string | undefined) ?? 'http://localhost:5173',
   useEmulators,
+  /** Overrides firebase.ts's native-platform emulator host (10.0.2.2, AVD-only) — set to 'localhost' when testing on a real device over `adb reverse`. */
+  emulatorHost: import.meta.env.VITE_EMULATOR_HOST as string | undefined,
 };

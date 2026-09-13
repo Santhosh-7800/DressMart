@@ -48,7 +48,9 @@ export default defineConfig({
         // with a stale-while-revalidate strategy so repeat visits render instantly while still
         // picking up updated images in the background. Firestore/Storage API calls are intentionally
         // NOT cached here — that's Firestore's own offline-persistence layer's job (see src/lib/firebase.ts).
-        globPatterns: ['**/*.{js,css,html,svg,woff2}'],
+        // webp added for the boot splash hero image (frontend/public/images/splash/) — precached
+        // so it paints instantly (and offline) on every launch, not just the first one.
+        globPatterns: ['**/*.{js,css,html,svg,woff2,webp}'],
         runtimeCaching: [
           {
             urlPattern: /\/images\/products\/.*/i,
@@ -70,6 +72,9 @@ export default defineConfig({
   server: {
     port: 5173,
     open: true,
+    // Bind on all interfaces (not just 127.0.0.1) so a phone on the same Wi-Fi network can reach
+    // this dev server directly for Capacitor live-reload testing (see mobile/capacitor.config.ts).
+    host: true,
   },
   build: {
     // dist/ deliberately stays at the repo root (Capacitor's webDir and the GitHub Pages workflow
@@ -85,6 +90,13 @@ export default defineConfig({
           query: ['@tanstack/react-query'],
           firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage', 'firebase/functions'],
           motion: ['framer-motion'],
+          // Phase 19: without its own entry, Rollup put most of recharts inside whichever seller
+          // dashboard chart component's import graph happened to reach it first
+          // (RankedBarChart.tsx), making that one lazy chunk disproportionately large (~372kB)
+          // versus its sibling chart files. Only ever loaded behind the Head-Seller route guard,
+          // so this doesn't touch the buyer-facing bundle at all — purely cleaner chunking for the
+          // seller/owner analytics pages.
+          recharts: ['recharts'],
         },
       },
     },

@@ -27,10 +27,10 @@ const PERMISSION_KEYS: StaffPermissionKey[] = [
 ];
 
 /**
- * Head-Seller-only: creates a brand-new staff account under the caller's own store. Mirrors
- * addSeller.ts's account-creation pattern exactly (random throwaway password, client follows up
- * with authService.requestPasswordReset) — no one, including the Head Seller, ever sets or knows
- * another user's actual password. Writes three docs atomically-enough for this use case: the
+ * Admin-only: creates a brand-new staff account under the caller's own store — random throwaway
+ * password, client follows up with authService.requestPasswordReset — no one, including the
+ * Admin, ever sets or knows another user's actual password. Writes three docs atomically-enough
+ * for this use case: the
  * auth-linked `users/{uid}` profile (role/staff_status — what login/route-gating needs), the
  * extended `staff/{uid}` profile (designation/department/etc — display-only), and
  * `staff_permissions/{uid}` (what firestore.rules and the Staff Dashboard nav actually gate on).
@@ -43,11 +43,16 @@ export const addStaff = onCall<AddStaffData>(async (request) => {
   if (!fullName?.trim() || !email?.trim() || !designation?.trim()) {
     throw new HttpsError('invalid-argument', 'fullName, email, and designation are required.');
   }
+  // A basic format sanity check — auth.createUser below would reject a malformed email anyway,
+  // but failing fast here gives a clearer error than whatever the Admin SDK's own message is.
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    throw new HttpsError('invalid-argument', 'A valid email address is required.');
+  }
 
   const callerSnap = await db.collection('users').doc(request.auth.uid).get();
   const caller = callerSnap.data() as Profile | undefined;
-  if (!caller || caller.role !== 'head_seller') {
-    throw new HttpsError('permission-denied', 'Only the Head Seller can add staff.');
+  if (!caller || caller.role !== 'admin') {
+    throw new HttpsError('permission-denied', 'Only the Admin can add staff.');
   }
 
   let userRecord;

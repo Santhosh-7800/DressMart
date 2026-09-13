@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { ImagePlus, X } from 'lucide-react';
@@ -9,6 +9,11 @@ import { Avatar } from '@/components/ui/Avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAvatar } from '@/hooks/useAvatar';
 import { useReviewableOrderItems, useSubmitReview } from '@/hooks/useProducts';
+import { uploadReviewImage, isAcceptedImageFile } from '@/services/storageService';
+import { resizeAndCompressImageToWidth } from '@/lib/imageProcessing';
+import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
+
+const MAX_IMAGES = 5;
 
 /**
  * Only renders a usable form for a signed-in customer with at least one delivered,
@@ -26,8 +31,9 @@ export function WriteReviewForm({ productId }: { productId: string }) {
   const [rating, setRating] = useState(0);
   const [title, setTitle] = useState('');
   const [text, setText] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
   const [images, setImages] = useState<string[]>([]);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isAuthenticated) {
     return (
@@ -51,17 +57,32 @@ export function WriteReviewForm({ productId }: { productId: string }) {
     setRating(0);
     setTitle('');
     setText('');
-    setImageUrl('');
     setImages([]);
     setSelectedOrderItemId(null);
     setIsOpen(false);
   };
 
-  const handleAddImage = () => {
-    const url = imageUrl.trim();
-    if (!url) return;
-    setImages((prev) => [...prev, url]);
-    setImageUrl('');
+  const handleImageChange = async (file: File) => {
+    if (!user) return;
+    if (!isAcceptedImageFile(file)) return toast.error('Only JPG, PNG, or WEBP images are supported.');
+    if (file.size > 5 * 1024 * 1024) return toast.error('Image must be smaller than 5MB.');
+    if (images.length >= MAX_IMAGES) return toast.error(`You can attach up to ${MAX_IMAGES} photos.`);
+    setIsUploadingImage(true);
+    try {
+      // Phase 19: a camera-taken review photo can be several MB — every other upload path in the
+      // app (avatar, shop logo/banner, product images) already downsizes client-side before
+      // upload; this one didn't. Mirrors SellerProductFormPage's exact product-image treatment
+      // (1600px max width, same quality) since review photos serve the same purpose (a customer
+      // viewing a garment photo), not the tighter square-crop avatar treatment.
+      const compressed = await resizeAndCompressImageToWidth(file, 1600, 0.85);
+      const compressedFile = new File([compressed], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' });
+      const url = await uploadReviewImage(compressedFile, user.id);
+      setImages((prev) => [...prev, url]);
+    } catch (error) {
+      toast.error(getFriendlyErrorMessage(error, 'Photo upload failed.'));
+    } finally {
+      setIsUploadingImage(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -82,13 +103,11 @@ export function WriteReviewForm({ productId }: { productId: string }) {
           review_text: text.trim() || undefined,
           images,
         },
-        userName: user.full_name,
-        userAvatar: user.avatar_url,
       });
       toast.success('Thanks for your review!');
       resetForm();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Could not submit your review');
+      toast.error(getFriendlyErrorMessage(error, 'Could not submit your review'));
     }
   };
 
@@ -160,12 +179,24 @@ export function WriteReviewForm({ productId }: { productId: string }) {
             </div>
           ))}
         </div>
-        <div className="mt-2 flex gap-2">
-          <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="Paste an image URL" className="text-sm" />
-          <Button type="button" variant="outline" size="sm" onClick={handleAddImage}>
-            <ImagePlus size={14} className="mr-1" /> Add
-          </Button>
-        </div>
+        {images.length < MAX_IMAGES && (
+          <div className="mt-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} isLoading={isUploadingImage}>
+              {!isUploadingImage && <ImagePlus size={14} className="mr-1" />} Add Photo
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void handleImageChange(file);
+                e.target.value = '';
+              }}
+            />
+          </div>
+        )}
       </div>
 
       <div className="flex gap-2">

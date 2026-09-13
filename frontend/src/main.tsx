@@ -29,7 +29,7 @@ async function bootstrap() {
     rootElement.innerHTML = `
       <div style="display:flex;min-height:100vh;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;text-align:center;font-family:system-ui,sans-serif;background:#F8F8F8;color:#131921;">
         <h1 style="font-size:1.125rem;font-weight:600;margin:0;">Something went wrong</h1>
-        <p style="max-width:24rem;margin:0;color:#4a5261;font-size:0.875rem;">We couldn't load DressMart right now. Please try again in a moment.</p>
+        <p style="max-width:24rem;margin:0;color:#4a5261;font-size:0.875rem;">Unable to load DressMart right now. Please try again in a moment.</p>
         <button onclick="location.reload()" style="margin-top:8px;padding:10px 20px;border-radius:9999px;border:none;background:#FF9900;color:#131921;font-weight:600;cursor:pointer;">Retry</button>
       </div>
     `;

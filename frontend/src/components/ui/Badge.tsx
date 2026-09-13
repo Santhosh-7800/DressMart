@@ -16,7 +16,7 @@ interface BadgeProps {
   className?: string;
 }
 
-/** Small status pill — same visual convention already hand-rolled per-page (e.g. SellerSellersPage's
+/** Small status pill — same visual convention already hand-rolled per-page (e.g. AdminCustomersPage's
  *  StatusBadge) productized into one shared component for new dashboard sections. */
 export function Badge({ tone = 'default', children, className }: BadgeProps) {
   return <span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold capitalize', TONE_CLASSES[tone], className)}>{children}</span>;

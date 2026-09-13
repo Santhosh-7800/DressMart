@@ -43,7 +43,7 @@ export function Header() {
   useOnClickOutside(mobileDeliveryRef, () => setIsMobileDeliveryOpen(false));
 
   return (
-    <header className="sticky top-0 z-40 bg-primary text-white shadow-md">
+    <header className="sticky top-0 z-40 bg-primary pt-safe text-white shadow-md">
       {mobileTitle === null ? (
         /* Mobile app-bar: hamburger + logo + delivery chip + notifications on one slim row,
            full-width search below — shown only on Home/Categories/Search, where a shopper is
@@ -60,14 +60,24 @@ export function Header() {
                 Dress<span className="text-accent">Mart</span>
               </span>
             </Link>
-            <Link to="/notifications" className="relative ml-auto shrink-0 tap-target-48" aria-label="Notifications">
-              <Bell size={20} />
-              {unreadCount > 0 && (
-                <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-primary-900">
-                  {unreadCount}
-                </span>
-              )}
-            </Link>
+            <div className="ml-auto flex shrink-0 items-center gap-3.5">
+              <Link to="/notifications" className="relative tap-target-48" aria-label="Notifications">
+                <Bell size={20} />
+                {unreadCount > 0 && (
+                  <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-primary-900">
+                    {unreadCount}
+                  </span>
+                )}
+              </Link>
+              <Link to="/cart" className="relative tap-target-48" aria-label="Cart">
+                <ShoppingCart size={20} />
+                {cartItemCount > 0 && (
+                  <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-primary-900">
+                    {cartItemCount}
+                  </span>
+                )}
+              </Link>
+            </div>
           </div>
           <div ref={mobileDeliveryRef} className="relative flex items-center gap-1.5 border-t border-white/10 pt-1.5 text-xs">
             <button
@@ -94,14 +104,24 @@ export function Header() {
           <button onClick={() => navigate(-1)} aria-label="Go back" className="relative shrink-0 rounded-full p-1 -ml-1 tap-target-48 active:bg-white/10">
             <ArrowLeft size={22} />
           </button>
-          <h1 className="truncate text-base font-semibold">{mobileTitle}</h1>
+          <h1 className="flex-1 truncate text-base font-semibold">{mobileTitle}</h1>
+          {location.pathname !== '/cart' && (
+            <Link to="/cart" className="relative shrink-0 tap-target-48" aria-label="Cart">
+              <ShoppingCart size={20} />
+              {cartItemCount > 0 && (
+                <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-primary-900">
+                  {cartItemCount}
+                </span>
+              )}
+            </Link>
+          )}
         </div>
       )}
 
       {/* Tablet/desktop row — unchanged from before, just now gated to md+ since the block above
           takes over on phone widths. */}
       <div className="container-app hidden items-center gap-4 py-3 md:flex">
-        <button onClick={() => setIsMobileMenuOpen(true)} className="lg:hidden" aria-label="Open menu">
+        <button onClick={() => setIsMobileMenuOpen(true)} className="tap-target-48 lg:hidden" aria-label="Open menu">
           <Menu size={24} />
         </button>
 
@@ -192,9 +212,9 @@ export function Header() {
                     <Link to="/settings" onClick={() => setIsAccountOpen(false)} className="block rounded-lg px-3 py-2 text-sm hover:bg-primary-50 dark:hover:bg-primary-800">
                       Settings
                     </Link>
-                    {(user?.role === 'seller' || user?.role === 'head_seller') && (
-                      <Link to="/seller/dashboard" onClick={() => setIsAccountOpen(false)} className="block rounded-lg px-3 py-2 text-sm font-medium text-accent hover:bg-primary-50 dark:hover:bg-primary-800">
-                        Seller Dashboard
+                    {user?.role === 'admin' && (
+                      <Link to="/admin/dashboard" onClick={() => setIsAccountOpen(false)} className="block rounded-lg px-3 py-2 text-sm font-medium text-accent hover:bg-primary-50 dark:hover:bg-primary-800">
+                        Admin Dashboard
                       </Link>
                     )}
                     <button

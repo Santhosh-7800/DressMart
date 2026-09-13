@@ -26,7 +26,13 @@ export function OfflineBanner() {
   if (isOnline) return null;
 
   return (
-    <div className="sticky top-0 z-50 flex items-center justify-center gap-2 bg-red-600 px-4 py-2 text-center text-xs font-medium text-white sm:text-sm">
+    <div
+      className="sticky top-0 z-50 flex items-center justify-center gap-2 bg-red-600 px-4 pb-2 text-center text-xs font-medium text-white sm:text-sm"
+      // Tailwind's .pt-safe utility would replace py-2's top half outright rather than add to it —
+      // this keeps the same 0.5rem breathing room on web/desktop (where the inset is 0) while still
+      // clearing the status bar on native Android, mirroring BottomNavBar's pb-nav-safe pattern.
+      style={{ paddingTop: 'calc(0.5rem + env(safe-area-inset-top))' }}
+    >
       <WifiOff size={15} className="shrink-0" />
       <span>No Internet Connection — showing cached products</span>
       <button

@@ -12,7 +12,12 @@
           "package_name": "DressMart.com"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "546968393276-ctmu07249crbestk4op0lgee7c14pd9s.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDA0OLtK2V3XtTjbJ1-v-Aq5uhf85tg9ps"
@@ -20,7 +25,41 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "546968393276-ctmu07249crbestk4op0lgee7c14pd9s.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:546968393276:android:d94b900360927bc9169539",
+        "android_client_info": {
+          "package_name": "com.dressmart.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "546968393276-ctmu07249crbestk4op0lgee7c14pd9s.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDA0OLtK2V3XtTjbJ1-v-Aq5uhf85tg9ps"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "546968393276-ctmu07249crbestk4op0lgee7c14pd9s.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

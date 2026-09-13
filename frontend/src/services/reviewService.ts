@@ -1,69 +1,46 @@
-import { addDoc, collection, doc, getDocs, orderBy, query, updateDoc, where } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { collection, doc, getDoc, getDocs, documentId, orderBy, query, updateDoc, where } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '@/lib/firebase';
 import type { Order, RatingSummary, Review, ReviewableOrderItem, SubmitReviewInput } from '@/types';
 
 const REVIEWS_COLLECTION = 'reviews';
+const RATING_SUMMARIES_COLLECTION = 'product_rating_summaries';
 const ORDERS_COLLECTION = 'orders';
 const PRODUCTS_COLLECTION = 'products';
 
-/**
- * Rating aggregation: Firestore has no SQL views/materialized aggregates, and buyers aren't allowed
- * to write to `products/{id}` (see firestore.rules — only the owning seller / head_seller can), so
- * `product.rating`/`product.rating_count` CANNOT be denormalized safely from this client-side
- * service. Everything here is computed live by fetching + aggregating this product's `reviews` docs
- * on every call. If `product.rating`/`rating_count` need to stay in sync for catalog sort/filter,
- * that has to happen server-side — e.g. a Cloud Function `onCreate`/`onDelete` trigger on
- * `reviews/{id}` that updates the parent product with the Admin SDK. Flagging this as a gap for
- * whoever owns functions/.
- */
 function emptySummary(productId: string): RatingSummary {
   return { product_id: productId, average_rating: 0, total_reviews: 0, rating_5: 0, rating_4: 0, rating_3: 0, rating_2: 0, rating_1: 0 };
 }
 
-function summarize(productId: string, reviews: Review[]): RatingSummary {
-  if (reviews.length === 0) return emptySummary(productId);
-  const summary = emptySummary(productId);
-  let total = 0;
-  for (const review of reviews) {
-    total += review.rating;
-    const bucket = Math.min(5, Math.max(1, Math.round(review.rating))) as 1 | 2 | 3 | 4 | 5;
-    summary[`rating_${bucket}` as const] += 1;
-  }
-  summary.total_reviews = reviews.length;
-  summary.average_rating = Math.round((total / reviews.length) * 10) / 10;
-  return summary;
-}
-
 export const reviewService = {
+  /** Public reviews for a product, hidden (moderated) ones excluded — filtered client-side rather
+   *  than via a query constraint since older review docs predate `is_hidden` and have no value for
+   *  it at all, which a `where('is_hidden','==',false)` constraint would incorrectly exclude. */
   async listForProduct(productId: string): Promise<Review[]> {
     const snap = await getDocs(query(collection(db, REVIEWS_COLLECTION), where('product_id', '==', productId), orderBy('created_at', 'desc')));
-    return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Review);
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Review).filter((r) => !r.is_hidden);
   },
 
-  /** Always computed live — see the module-level comment on why this isn't a stored field. */
+  /** Reads the server-maintained summary (see backend/functions/src/triggers/onReviewWritten.ts) —
+   *  no longer aggregates every review live on each call. Falls back to an empty summary for a
+   *  product with zero reviews (the trigger never runs, so no doc exists yet). */
   async getRatingSummary(productId: string): Promise<RatingSummary> {
-    const reviews = await this.listForProduct(productId);
-    return summarize(productId, reviews);
+    const snap = await getDoc(doc(db, RATING_SUMMARIES_COLLECTION, productId));
+    return snap.exists() ? (snap.data() as RatingSummary) : emptySummary(productId);
   },
 
   async getRatingSummaries(productIds: string[]): Promise<RatingSummary[]> {
     if (productIds.length === 0) return [];
-    // Firestore 'in' queries cap at 30 values — chunk defensively for larger product lists.
     const chunks: string[][] = [];
     for (let i = 0; i < productIds.length; i += 30) chunks.push(productIds.slice(i, i + 30));
 
-    const reviewsByProduct = new Map<string, Review[]>();
+    const summaryById = new Map<string, RatingSummary>();
     for (const chunk of chunks) {
-      const snap = await getDocs(query(collection(db, REVIEWS_COLLECTION), where('product_id', 'in', chunk)));
-      snap.docs.forEach((d) => {
-        const review = { id: d.id, ...d.data() } as Review;
-        const list = reviewsByProduct.get(review.product_id) ?? [];
-        list.push(review);
-        reviewsByProduct.set(review.product_id, list);
-      });
+      const snap = await getDocs(query(collection(db, RATING_SUMMARIES_COLLECTION), where(documentId(), 'in', chunk)));
+      snap.docs.forEach((d) => summaryById.set(d.id, d.data() as RatingSummary));
     }
 
-    return productIds.map((id) => summarize(id, reviewsByProduct.get(id) ?? []));
+    return productIds.map((id) => summaryById.get(id) ?? emptySummary(id));
   },
 
   /** Delivered, not-yet-reviewed order items for this user+product — gates the "Write a Review" UI. */
@@ -97,26 +74,17 @@ export const reviewService = {
     return reviewable;
   },
 
-  async submit(input: SubmitReviewInput, userName: string, userAvatar: string | null): Promise<Review> {
-    const now = new Date().toISOString();
-    const payload = {
-      product_id: input.product_id,
-      user_id: input.user_id,
-      order_id: input.order_id,
-      order_item_id: input.order_item_id,
-      user_name: userName,
-      user_avatar: userAvatar,
-      rating: input.rating,
-      review_title: input.review_title ?? null,
-      review_text: input.review_text ?? null,
-      images: input.images ?? [],
-      is_verified_purchase: true,
-      helpful_count: 0,
-      created_at: now,
-      updated_at: now,
-    };
-    const ref = await addDoc(collection(db, REVIEWS_COLLECTION), payload);
-    return { id: ref.id, ...payload };
+  /**
+   * Routes through the submitReview Cloud Function — see its docstring for why: order ownership/
+   * delivery-status/duplicate-review checks all need server-side authority, which is also why
+   * `userName`/`userAvatar` are no longer accepted here (the function reads the caller's own
+   * profile for those, rather than trusting whatever the client passes).
+   */
+  async submit(input: SubmitReviewInput): Promise<{ reviewId: string }> {
+    const call = httpsCallable<Omit<SubmitReviewInput, 'user_id'>, { success: true; reviewId: string }>(functions, 'submitReview');
+    const { user_id: _user_id, ...payload } = input;
+    const { data } = await call(payload);
+    return { reviewId: data.reviewId };
   },
 
   /** Seller/head-seller reply to a review — overwrites any existing reply (edit = re-submit). */
@@ -124,6 +92,13 @@ export const reviewService = {
     await updateDoc(doc(db, REVIEWS_COLLECTION, reviewId), {
       seller_reply: { text: replyText, replied_at: new Date().toISOString() },
     });
+  },
+
+  /** Moderation (Phase 14) — hide/restore a review on the seller's own product. A plain client
+   *  write, allowed by firestore.rules' dedicated is_hidden-only branch (same pattern as
+   *  seller_reply above); no Cloud Function needed for a single boolean field flip. */
+  async setHidden(reviewId: string, isHidden: boolean): Promise<void> {
+    await updateDoc(doc(db, REVIEWS_COLLECTION, reviewId), { is_hidden: isHidden });
   },
 
   /** Lightweight dashboard stat — average rating + unreplied count across this seller's own

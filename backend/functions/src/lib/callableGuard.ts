@@ -17,7 +17,10 @@ import { HttpsError } from 'firebase-functions/v2/https';
 export function runCallable<T>(friendlyMessage: string, handler: () => Promise<T>): Promise<T> {
   return handler().catch((error: unknown) => {
     if (error instanceof HttpsError) throw error;
-    logger.error('[callable] unexpected error', error);
+    // Logs the message/stack only, not the raw error object — some upstream SDKs (Razorpay, Admin
+    // SDK) can embed request payloads in an error's own properties, which shouldn't end up in
+    // Cloud Logging unredacted just because an unexpected exception was thrown.
+    logger.error('[callable] unexpected error', { message: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined });
     throw new HttpsError('internal', friendlyMessage);
   });
 }

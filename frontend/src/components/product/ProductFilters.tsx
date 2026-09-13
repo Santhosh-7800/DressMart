@@ -142,7 +142,7 @@ export function ProductFilters({ facets, filters, onChange }: ProductFiltersProp
       </FilterSection>
 
       <FilterSection title="Color">
-        <div className="grid grid-cols-8 gap-2">
+        <div className="grid grid-cols-6 gap-3">
           {colorGroups.map((group) => {
             const isSelected = group.rawValues.some((v) => (filters.colors ?? []).includes(v));
             const needsBorder = isLightColor(group.hex);
@@ -154,7 +154,7 @@ export function ProductFilters({ facets, filters, onChange }: ProductFiltersProp
                 aria-label={group.displayName}
                 title={group.displayName}
                 className={cn(
-                  'flex h-7 w-7 items-center justify-center rounded-md transition-transform hover:scale-110',
+                  'flex h-9 w-9 items-center justify-center rounded-md transition-transform hover:scale-110',
                   isSelected ? 'ring-2 ring-offset-1 ring-[#FF6B00] dark:ring-offset-primary-800' : needsBorder ? 'border border-[#D1D5DB]' : 'border border-black/5',
                 )}
                 style={{ backgroundColor: group.hex }}

@@ -27,9 +27,10 @@ const FOOTER_LINKS: { title: string; links: { label: string; to: string }[] }[] 
     title: 'Support',
     links: [
       { label: 'Help Center', to: '/help-center' },
+      { label: 'My Support Requests', to: '/support' },
       { label: 'Privacy Policy', to: '/privacy-policy' },
       { label: 'Terms & Conditions', to: '/terms' },
-      { label: 'Contact Us', to: '/help-center' },
+      { label: 'Contact Us', to: '/support/new' },
     ],
   },
 ];

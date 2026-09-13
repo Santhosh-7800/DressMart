@@ -47,7 +47,7 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
             transition={{ type: 'tween', duration: 0.25 }}
-            className="absolute inset-y-0 left-0 w-[85%] max-w-sm overflow-y-auto bg-surface dark:bg-surface-dark"
+            className="absolute inset-y-0 left-0 w-[85%] max-w-sm overflow-y-auto bg-surface text-primary-900 dark:bg-surface-dark dark:text-white"
           >
             <div className="flex items-center justify-between border-b border-primary-100 p-4 dark:border-primary-700">
               <div className="flex items-center gap-3">

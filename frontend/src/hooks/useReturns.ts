@@ -6,7 +6,7 @@ import { staffService } from '@/services/staffService';
 import { queryKeys } from '@/lib/queryClient';
 import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 import { useAuth } from '@/contexts/AuthContext';
-import { effectiveSellerId, isHeadSeller, isStaffRole } from '@/lib/roles';
+import { effectiveSellerId, isAdminRole, isStaffRole } from '@/lib/roles';
 import { RETURN_STATUS_LABELS } from '@/lib/returnStatus';
 import type { Order, ReturnRequest, ReturnStatus } from '@/types';
 
@@ -47,7 +47,7 @@ export function useSellerReturns() {
       return;
     }
     setIsLoading(true);
-    const unsubscribe = returnService.subscribeForSeller(effectiveSellerId(user), isHeadSeller(user.role), (data) => {
+    const unsubscribe = returnService.subscribeForSeller(effectiveSellerId(user), isAdminRole(user.role), (data) => {
       setReturns(data);
       setIsLoading(false);
     });

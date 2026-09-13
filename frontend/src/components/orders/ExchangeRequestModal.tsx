@@ -6,6 +6,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { EXCHANGE_REASONS } from '@/lib/exchangeStatus';
 import { useRequestExchange } from '@/hooks/useExchanges';
+import { useInventory } from '@/hooks/useInventory';
 import { cn } from '@/lib/utils';
 import type { Order, OrderItem, Product } from '@/types';
 
@@ -34,6 +35,10 @@ export function ExchangeRequestModal({ isOpen, onClose, order, item }: ExchangeR
     enabled: isOpen,
   });
   const product = productQuery.data;
+  // A desired variant that exists in the catalog but has zero stock right now would otherwise only
+  // surface as a problem later, when the seller tries to approve/complete the exchange — checking
+  // here lets the customer pick something actually available up front.
+  const { data: inventory } = useInventory(item.product_id, isOpen);
 
   const colors = useMemo(() => {
     if (!product) return [];
@@ -44,16 +49,23 @@ export function ExchangeRequestModal({ isOpen, onClose, order, item }: ExchangeR
 
   const sizesForColor = useMemo(() => {
     if (!product) return [];
-    return product.variants.filter((v) => v.color === desiredColor).map((v) => v.size);
-  }, [product, desiredColor]);
+    return product.variants
+      .filter((v) => v.color === desiredColor)
+      .map((v) => ({ size: v.size, inStock: !inventory || (inventory.variant_stock[v.id] ?? 0) > 0 }));
+  }, [product, desiredColor, inventory]);
 
   const desiredVariant = useMemo(
     () => product?.variants.find((v) => v.color === desiredColor && v.size === desiredSize),
     [product, desiredColor, desiredSize],
   );
+  const desiredVariantStock = desiredVariant ? (inventory?.variant_stock[desiredVariant.id] ?? 0) : 0;
+  // Same "assume in stock while inventory is still loading" tradeoff used on the PDP's size
+  // selector — avoids blocking submission on a slow inventory read for the overwhelmingly common
+  // case where the desired variant IS available.
+  const desiredVariantAvailable = !desiredVariant || !inventory || desiredVariantStock > 0;
 
   const handleSubmit = async () => {
-    if (!desiredVariant) return;
+    if (!desiredVariant || !desiredVariantAvailable) return;
     await requestExchange.mutateAsync({
       order,
       orderItemId: item.id,
@@ -100,12 +112,13 @@ export function ExchangeRequestModal({ isOpen, onClose, order, item }: ExchangeR
             <div>
               <p className="mb-1.5 text-sm font-medium">Desired size</p>
               <div className="flex flex-wrap gap-2">
-                {sizesForColor.map((size) => (
+                {sizesForColor.map(({ size, inStock }) => (
                   <button
                     key={size}
                     onClick={() => setDesiredSize(size)}
+                    disabled={!inStock}
                     className={cn(
-                      'rounded-lg border px-3 py-1.5 text-xs',
+                      'rounded-lg border px-3 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-40 disabled:line-through',
                       desiredSize === size ? 'border-accent bg-accent-50 dark:bg-accent-900/10' : 'border-primary-200 dark:border-primary-600',
                     )}
                   >
@@ -114,6 +127,9 @@ export function ExchangeRequestModal({ isOpen, onClose, order, item }: ExchangeR
                 ))}
               </div>
             </div>
+            {desiredVariant && !desiredVariantAvailable && (
+              <p className="text-xs font-medium text-red-500">This size/color is currently out of stock — pick another to continue.</p>
+            )}
           </>
         )}
 
@@ -131,7 +147,7 @@ export function ExchangeRequestModal({ isOpen, onClose, order, item }: ExchangeR
           <p className="mb-1.5 text-sm font-medium">Additional comments (optional)</p>
           <textarea value={comment} onChange={(e) => setComment(e.target.value)} className="input-field" rows={3} />
         </div>
-        <Button variant="accent" fullWidth onClick={handleSubmit} isLoading={requestExchange.isPending} disabled={!desiredVariant}>
+        <Button variant="accent" fullWidth onClick={handleSubmit} isLoading={requestExchange.isPending} disabled={!desiredVariant || !desiredVariantAvailable}>
           Submit Exchange Request
         </Button>
       </div>

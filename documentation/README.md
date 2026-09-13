@@ -1,8 +1,8 @@
 # DressMart
 
-A lightweight, multi-vendor marketplace for **Men's** and **Kids' Wear** — built with React 19, TypeScript, Tailwind CSS, and **Firebase** end to end (Auth, Firestore, Storage, Cloud Functions, Cloud Messaging, Hosting), with **Razorpay** for payments.
+A single-store storefront for **Men's** and **Kids' Wear** — built with React 19, TypeScript, Tailwind CSS, and **Firebase** end to end (Auth, Firestore, Storage, Cloud Functions, Cloud Messaging, Hosting), with **Razorpay** for payments.
 
-![DressMart](https://img.shields.io/badge/status-Buyer%20%2B%20Seller%20%2B%20Head%20Seller-orange)
+![DressMart](https://img.shields.io/badge/status-Buyer%20%2B%20Admin%20%2B%20Staff-orange)
 
 ---
 
@@ -13,10 +13,10 @@ There are exactly three roles — no separate admin app.
 | Role | What they do |
 |---|---|
 | **Buyer** | Browse/search/filter products, wishlist, cart, checkout (Razorpay or COD), track orders, cancel/return/exchange eligible items, coupons, addresses, profile, notifications. |
-| **Seller** | Manage their own products, inventory, orders, returns, and exchanges. Can never see another seller's data. Multiple sellers are supported. |
-| **Head Seller** | A single, designated Seller account with everything a Seller has, **plus**: approve/suspend seller accounts, platform analytics, revenue reports, coupon management, and platform settings. Uses the exact same Seller Dashboard — extra menu items simply appear when `role === 'head_seller'`. |
+| **Admin** | The single store-owner account. Manages products, inventory, orders, returns, exchanges, staff/delivery accounts, platform analytics, revenue reports, coupon management, and platform settings — one dashboard, no separate admin app. |
+| **Staff** | Employees created by the Admin, scoped to product/inventory management only under granular, individually-assignable permissions. |
 
-A buyer becomes a seller by applying at `/sell` (`SellerApplyPage`); their account sits in `seller_status: 'pending'` until the Head Seller approves it from `/seller/sellers`.
+The one Admin account is created via the one-time `/admin/setup` flow (see below) — there's no seller-application or approval flow; the Admin creates staff/delivery accounts directly from the dashboard.
 
 ---
 
@@ -70,11 +70,11 @@ By default (`VITE_USE_FIREBASE_EMULATOR=true` in `.env`, or simply no real Fireb
    ```
    This writes the full ~962-product catalog (the same one you get for free against the local emulator). Every script upserts by a deterministic ID, so re-running any of them is always safe — it can never create duplicates, and only ever fills in missing products or refreshes existing ones.
 8. Deploy the frontend to Firebase Hosting: `npm run build && firebase --config database/firebase.json deploy --only hosting`. **Deploying to Vercel instead?** See "Deploying the frontend to Vercel" below — skip this step.
-9. Manually promote your own account's `role` to `'head_seller'` in the Firestore console the first time — there's exactly one Head Seller, and it's bootstrapped by hand, not through the UI.
+9. Visit `/admin/setup` once to create the single Admin account (owner name, store name, email, password) — this is a one-time bootstrap endpoint that locks itself after the first account is created; a second visit redirects straight to `/admin/login`.
 
 ### Deploying the frontend to Vercel
 
-Firebase Cloud Functions **cannot run on Vercel** — Vercel hosts static sites and its own serverless functions, not Firebase's. Deploying to Vercel replaces *only* step 8 above (Firebase Hosting) with a different static host; steps 1–7 and 9 (the real Firebase project, Firestore rules, Cloud Functions deploy, seeding, Head Seller) still all happen against Firebase exactly as described, regardless of where the frontend itself is hosted.
+Firebase Cloud Functions **cannot run on Vercel** — Vercel hosts static sites and its own serverless functions, not Firebase's. Deploying to Vercel replaces *only* step 8 above (Firebase Hosting) with a different static host; steps 1–7 and 9 (the real Firebase project, Firestore rules, Cloud Functions deploy, seeding, Admin setup) still all happen against Firebase exactly as described, regardless of where the frontend itself is hosted.
 
 1. Import the GitHub repo into Vercel. `vercel.json` at the repo root already sets `buildCommand: "npm run build"`, `outputDirectory: "dist"`, and a catch-all SPA rewrite to `index.html` (React Router needs that rewrite, or refreshing any non-root route 404s) — leave Vercel's own **Root Directory** project setting at the repo root (not `frontend/`), since the build command runs `npm run build` from there and only descends into `frontend/` via the npm workspace.
 2. In the Vercel project's **Settings → Environment Variables**, set every one of these (Production, and Preview if you want preview deployments to work too) from the real Firebase project you configured above — the exact same values that went into your local `.env`:
@@ -108,15 +108,15 @@ Firebase Cloud Functions **cannot run on Vercel** — Vercel hosts static sites 
 
 | Collection | Notes |
 |---|---|
-| `users` | One profile doc per auth user (`role: buyer\|seller\|head_seller`, plus seller-only fields: `store_name`, `gst_number`, `seller_status`, `fcm_tokens`). |
-| `products` | One doc per listing, owned by exactly one `seller_id`. Stock is **not** stored here. |
+| `users` | One profile doc per auth user (`role: buyer\|admin\|staff\|delivery`, plus admin-only fields: `store_name`, `gst_number`, `fcm_tokens`). |
+| `products` | One doc per listing — `seller_id` always points at the single Admin account. Stock is **not** stored here. |
 | `inventory` | One doc per product (same id as its product), `variant_stock` keyed by variant id — separated from `products` so high-frequency stock writes never touch the larger, rarely-changing product doc. Product pages merge the two on read; stock updates push live via `onSnapshot`. |
-| `orders` | One doc **per seller per checkout** — a cart spanning multiple sellers splits into multiple `Order` docs sharing the same `group_id`/`order_number`, which is what makes "a seller only sees their own orders" a plain `where seller_id == uid` query. |
-| `returns` / `exchanges` | Buyer-created requests, seller/Head-Seller-advanced status. |
-| `cart` / `wishlist` / `addresses` / `notifications` / `coupons` / `reviews` / `seller_requests` | As named. Guest cart/wishlist live in `localStorage` and merge into Firestore on login. |
-| `platform_settings/config` | Singleton doc — Head Seller's Platform Settings page (shipping charge, return/exchange windows, policy text, etc.). |
+| `orders` | One doc per checkout, owned by the single Admin account (`seller_id`). |
+| `returns` / `exchanges` | Buyer-created requests, Admin-advanced status. |
+| `cart` / `wishlist` / `addresses` / `notifications` / `coupons` / `reviews` | As named. Guest cart/wishlist live in `localStorage` and merge into Firestore on login. |
+| `platform_settings/config` | Singleton doc — Admin's Platform Settings page (shipping charge, return/exchange windows, policy text, etc.). |
 
-Security is enforced by `database/firestore.rules` and `database/storage.rules` — read those for the exact ownership model (buyer-owns-their-own-data, seller-owns-their-own-products/orders, Head-Seller-can-see-everything).
+Security is enforced by `database/firestore.rules` and `database/storage.rules` — read those for the exact ownership model (buyer-owns-their-own-data, Admin-owns-everything-else, staff scoped by granular permissions).
 
 ---
 
@@ -124,14 +124,14 @@ Security is enforced by `database/firestore.rules` and `database/storage.rules` 
 
 Under `backend/functions/` (separate TypeScript project, its own `package.json`/lockfile-managed dependencies, deployed independently — see `backend/functions/README.md` for local dev, config/secrets, and the full callable/trigger list). In short:
 
-- **Callables**: `createRazorpayOrder`, `placeCodOrder`, `verifyAndPlaceOrder`, `cancelOrder`, `reviewSellerRequest`, `suspendSellerAccount` — anything that needs server-trusted pricing/stock, an external API call, or an atomic multi-document write.
-- **Firestore triggers**: fire notifications (and push them via FCM) whenever an order/return/exchange status changes, a seller applies, or a notification doc is created — plain seller status-advance writes from the client are enough to drive the whole notification pipeline.
+- **Callables**: `createRazorpayOrder`, `placeCodOrder`, `verifyAndPlaceOrder`, `cancelOrder`, `createAdmin` — anything that needs server-trusted pricing/stock, an external API call, or an atomic multi-document write.
+- **Firestore triggers**: fire notifications (and push them via FCM) whenever an order/return/exchange status changes or a notification doc is created — plain status-advance writes from the client are enough to drive the whole notification pipeline.
 
 ---
 
 ## Reliability
 
-- **Emulator autostart + auto-seed on empty catalog (dev only)** — `npm run dev`'s `predev` hook runs `scripts/ensureEmulatorRunning.ts` (starts the Firestore emulator automatically if it isn't already up — no more running `npm run emulators` in a second terminal) then `scripts/ensureSeeded.ts` (checks whether `products` has any docs and, if not, re-runs the full seed pipeline — no manual `npm run seed` needed). The check-and-seed logic itself lives in the reusable `scripts/lib/ensureSeededCore.ts`, shared with a second caller: `scripts/vite/devSeedPlugin.ts` exposes the same logic as a dev-only Vite endpoint (`/__dev/ensure-seeded`, `apply: 'serve'` so it's absent from `vite build`) that `useCatalogHealth` calls automatically if it ever finds the catalog empty mid-session (e.g. the emulator got restarted while the browser tab was still open) — the app self-heals without a manual reseed step. All of this only ever targets the local emulator and fails soft if it isn't reachable in time. It deliberately does **not** run against a real project or as part of `npm run build`/`preview` — an empty catalog on a live marketplace just means no seller has listed anything yet, which is a legitimate state the UI should show honestly (see `CatalogHealthGate` below), not paper over with fake demo products.
+- **Emulator autostart + auto-seed on empty catalog (dev only)** — `npm run dev`'s `predev` hook runs `scripts/ensureEmulatorRunning.ts` (starts the Firestore emulator automatically if it isn't already up — no more running `npm run emulators` in a second terminal) then `scripts/ensureSeeded.ts` (checks whether `products` has any docs and, if not, re-runs the full seed pipeline — no manual `npm run seed` needed). The check-and-seed logic itself lives in the reusable `scripts/lib/ensureSeededCore.ts`, shared with a second caller: `scripts/vite/devSeedPlugin.ts` exposes the same logic as a dev-only Vite endpoint (`/__dev/ensure-seeded`, `apply: 'serve'` so it's absent from `vite build`) that `useCatalogHealth` calls automatically if it ever finds the catalog empty mid-session (e.g. the emulator got restarted while the browser tab was still open) — the app self-heals without a manual reseed step. All of this only ever targets the local emulator and fails soft if it isn't reachable in time. It deliberately does **not** run against a real project or as part of `npm run build`/`preview` — an empty catalog on a live store just means the Admin hasn't listed anything yet, which is a legitimate state the UI should show honestly (see `CatalogHealthGate` below), not paper over with fake demo products.
 - **`CatalogHealthGate`** (`frontend/src/components/common/CatalogHealthGate.tsx`, wraps the router in `App.tsx`) — a one-time, app-boot check (not a per-page concern) that distinguishes "genuinely offline/unreachable" from "connected but empty", showing a `Preparing product catalog...` state, a distinct empty-catalog message, or an offline message — each with a Retry button — instead of every page silently rendering blank grids.
 - **Offline persistence** — Firestore is initialized with `persistentLocalCache`/`persistentMultipleTabManager` (`frontend/src/lib/firebase.ts`), so previously-loaded products/cart/orders stay browsable offline and queued writes sync automatically once connectivity returns.
 - **Realtime everywhere it matters** — Products, Inventory, Cart, Orders, Returns, and Exchanges all use Firestore `onSnapshot` listeners (see `subscribeTo*`/`subscribeFor*` in the respective `services/*.ts`), not polling or manual refresh. A seller updating stock, price, or an order/return/exchange status is reflected on the buyer's screen live.
@@ -157,13 +157,13 @@ frontend/
       home/ men/ kids/ category/ product/    storefront browsing
       cart/ checkout/ orders/                cart → checkout → Razorpay/COD → tracking
       wishlist/ profile/ auth/ static/ errors/
-      seller/                                Seller Dashboard + Head-Seller-only pages
-    layouts/          MainLayout, AuthLayout, AccountLayout, SellerLayout
-    routes/           AppRoutes, ProtectedRoute, RequireSeller, RequireHeadSeller
+      admin/                                 Admin Dashboard pages
+    layouts/          MainLayout, AuthLayout, AccountLayout, AdminLayout
+    routes/           AppRoutes, ProtectedRoute, RequireAdmin
     services/         one file per domain — all Firestore/Firebase now, no mock layer
     hooks/            TanStack Query hooks wrapping the services
     lib/              firebase.ts (SDK init), env.ts, roles.ts, queryClient.ts, utils
-    types/            database.ts (Firestore doc shapes), seller.ts
+    types/            database.ts (Firestore doc shapes), admin.ts
     contexts/         AuthContext (Firebase Auth + realtime profile), ThemeContext
 ```
 
@@ -175,7 +175,7 @@ backend/functions/
   index.ts, package.json, tsconfig.json, README.md     separate TypeScript project, deployed independently
 ```
 
-Used for: Razorpay order creation/verification, order placement/cancellation, seller approval/suspension, and the notification-trigger pipeline.
+Used for: Razorpay order creation/verification, order placement/cancellation, staff/delivery account management, and the notification-trigger pipeline.
 
 ### `database/` — Firebase project configuration
 
@@ -270,7 +270,7 @@ Run on a connected device/emulator directly with `cd mobile && npx cap run andro
 - [ ] If deploying to Vercel: every `VITE_FIREBASE_*`/`VITE_RAZORPAY_KEY_ID`/`VITE_SITE_URL` var set in the Vercel project's Environment Variables — see "Deploying the frontend to Vercel" above.
 - [ ] If deploying to GitHub Pages: the same variables added as **GitHub Actions secrets** (not just local `.env` — the CI build can't see that) — see "Deploying the frontend to GitHub Pages" above. Repo → Settings → Pages → Source must be "GitHub Actions".
 - [ ] Every deployed domain (Vercel URL, `*.github.io`, custom domain) added to Firebase Console → Authentication → Settings → Authorized domains, or Google/phone sign-in will fail there even with everything else correct.
-- [ ] Exactly one Head Seller account promoted by hand in the Firestore console.
+- [ ] Exactly one Admin account created via `/admin/setup`.
 - [ ] `versionCode`/`versionName` bumped for this release.
 - [ ] `mobile/android/app/dressmart-upload-key.jks` + `mobile/android/keystore.properties` backed up securely outside this repo.
 - [ ] `./gradlew bundleRelease` produces a signed `.aab` (verify with `jarsigner -verify`).
@@ -308,7 +308,7 @@ The Android emulator in a sandboxed/CI environment can hit host-level GPU render
 - **Search** is a client-side substring filter over a bounded fetch of active products — fine at this scale, but a dedicated search service (Algolia/Typesense) would be the next step for a larger catalog.
 - **Order pricing is server-recomputed** for the actual charge (`placeCodOrder`/`verifyAndPlaceOrder` read live product/inventory docs), but the Checkout page's on-screen estimate is still client-computed for responsiveness — they should agree, but the server total is always the source of truth.
 - **`product.rating`/`rating_count`** are plain fields, not yet kept in sync with the `reviews` collection via a Cloud Function trigger — reviews are computed live instead; fine for correctness, a bit more reads than a denormalized counter.
-- **One Head Seller, bootstrapped manually** — there's no UI to create the first Head Seller account; promote it by hand in Firestore after your first sign-up.
+- **One Admin account, created via `/admin/setup`** — a one-time bootstrap endpoint, not a Firestore-console manual promotion.
 - **A handful of `toast.error(...)` call sites may still show raw text** — the sweep covered auth, checkout/payment, the seller dashboard, and image uploads (the highest-traffic flows); any newly-added mutation should route its error through `getFriendlyErrorMessage` (`frontend/src/lib/firebaseErrors.ts`) rather than `error.message` directly.
 - **Performance**: no virtualized lists or list-level code-splitting beyond route-level lazy loading yet — fine at this catalog's scale (hundreds of products), worth revisiting as a dedicated pass if the catalog grows substantially.
 - **No automated dead-code sweep** has been run — "remove unused code" is safest as its own reviewed pass (with a real usage-analysis tool) rather than a speculative delete alongside unrelated changes.

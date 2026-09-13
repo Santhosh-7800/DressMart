@@ -93,3 +93,28 @@ export function useCart() {
     clearCart: clearCart.mutateAsync,
   };
 }
+
+/**
+ * Phase 19: a "just let me add this one item" mutation, with none of useCart()'s two live
+ * `onSnapshot` cart listeners. `ProductCard` (rendered once per grid item) previously called the
+ * full `useCart()` purely to reach `addItem`, meaning a grid of N products opened 2N independent
+ * realtime cart subscriptions simultaneously — each re-running its own product-batch hydration on
+ * every cart mutation — despite never reading `items`/`subtotal`/etc. Anywhere that only needs to
+ * ADD an item (quick-add from a card, "buy again" buttons, etc.) should use this instead; anywhere
+ * that displays live cart contents (CartPage, Header's cart badge, checkout) should keep using the
+ * full `useCart()`.
+ */
+export function useAddToCart() {
+  const { user, isAuthenticated } = useAuth();
+
+  const addItem = useMutation({
+    mutationFn: ({ productId, variantId, quantity }: { productId: string; variantId: string; quantity?: number }) => {
+      if (!isAuthenticated || !user) throw new Error('Please sign in to manage your cart.');
+      return cartService.addItem(user.id, productId, variantId, quantity);
+    },
+    onSuccess: () => toast.success('Added to cart'),
+    onError: (error: Error) => toast.error(getFriendlyErrorMessage(error, error.message)),
+  });
+
+  return { addItem: addItem.mutateAsync, isPending: addItem.isPending };
+}

@@ -1,10 +1,15 @@
-import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, updateDoc, where, type Unsubscribe } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, updateDoc, where, type Unsubscribe } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Order, OrderItem, ReturnRequest, ReturnStatus } from '@/types';
 import { RETURN_STATUS_LABELS } from '@/lib/returnStatus';
 
 const RETURNS_COLLECTION = 'returns';
 const ORDERS_COLLECTION = 'orders';
+/** Phase 19: the Head-Seller "every return platform-wide" branch had no bound at all — capped to
+ *  the same window size the owner support/analytics dashboards already settled on (see
+ *  supportService.ts's OWNER_WINDOW_LIMIT). A single seller's own returns stay unbounded (naturally
+ *  small at this app's scale). */
+const HEAD_SELLER_WINDOW_LIMIT = 500;
 
 function toReturn(snap: { id: string; data: () => Record<string, unknown> }): ReturnRequest {
   return { id: snap.id, ...snap.data() } as ReturnRequest;
@@ -44,10 +49,11 @@ export const returnService = {
     return snap.docs.map(toReturn);
   },
 
-  /** Head Seller sees every return platform-wide (per firestore.rules); a regular seller only their own. */
+  /** Head Seller sees the most recent returns platform-wide (per firestore.rules), bounded — see
+   *  HEAD_SELLER_WINDOW_LIMIT; a regular seller only their own (unbounded, naturally small). */
   async listForSeller(sellerId: string, isHeadSeller: boolean): Promise<ReturnRequest[]> {
     const q = isHeadSeller
-      ? query(collection(db, RETURNS_COLLECTION), orderBy('created_at', 'desc'))
+      ? query(collection(db, RETURNS_COLLECTION), orderBy('created_at', 'desc'), limit(HEAD_SELLER_WINDOW_LIMIT))
       : query(collection(db, RETURNS_COLLECTION), where('seller_id', '==', sellerId), orderBy('created_at', 'desc'));
     const snap = await getDocs(q);
     return snap.docs.map(toReturn);
@@ -59,10 +65,11 @@ export const returnService = {
     return onSnapshot(q, (snap) => callback(snap.docs.map(toReturn)));
   },
 
-  /** Realtime — seller's own return queue (or, for Head Seller, every return) updates live as buyers submit requests. */
+  /** Realtime — seller's own return queue (or, for Head Seller, the most recent returns
+   *  platform-wide, bounded — see HEAD_SELLER_WINDOW_LIMIT) updates live as buyers submit requests. */
   subscribeForSeller(sellerId: string, isHeadSeller: boolean, callback: (returns: ReturnRequest[]) => void): Unsubscribe {
     const q = isHeadSeller
-      ? query(collection(db, RETURNS_COLLECTION), orderBy('created_at', 'desc'))
+      ? query(collection(db, RETURNS_COLLECTION), orderBy('created_at', 'desc'), limit(HEAD_SELLER_WINDOW_LIMIT))
       : query(collection(db, RETURNS_COLLECTION), where('seller_id', '==', sellerId), orderBy('created_at', 'desc'));
     return onSnapshot(q, (snap) => callback(snap.docs.map(toReturn)));
   },
@@ -89,7 +96,7 @@ export const returnService = {
     return { id: ref.id, ...payload };
   },
 
-  /** Seller/head-seller fulfillment action (plain updateDoc — rules already allow the owning seller_id / head_seller to write). */
+  /** Admin fulfillment action (plain updateDoc — rules already allow the Admin to write). */
   async advanceStatus(returnRequest: ReturnRequest, nextStatus: ReturnStatus): Promise<void> {
     const event = { status: nextStatus, label: RETURN_STATUS_LABELS[nextStatus], timestamp: new Date().toISOString() };
     await updateDoc(doc(db, RETURNS_COLLECTION, returnRequest.id), {

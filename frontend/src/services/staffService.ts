@@ -3,7 +3,7 @@ import { db } from '@/lib/firebase';
 import type { StaffActivity, StaffActivityAction, StaffPermissions } from '@/types';
 
 /** Staff-facing reads plus the one shared write (logActivity) called from anywhere a staff-gated
- *  action succeeds — see useSellerProducts.ts's create/update/delete mutations. */
+ *  action succeeds — see useAdminProducts.ts's create/update/delete mutations. */
 export const staffService = {
   async getOwnPermissions(staffId: string): Promise<StaffPermissions | null> {
     const snap = await getDoc(doc(db, 'staff_permissions', staffId));

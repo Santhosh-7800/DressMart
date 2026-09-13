@@ -1,5 +1,5 @@
 import { onDocumentUpdated } from 'firebase-functions/v2/firestore';
-import { createNotification } from '../lib/notifications';
+import { createNotificationOnce } from '../lib/notifications';
 import type { Order, OrderStatus } from '../lib/types';
 
 const STATUS_COPY: Partial<
@@ -52,7 +52,9 @@ export const onOrderStatusChange = onDocumentUpdated('orders/{orderId}', async (
   const copy = STATUS_COPY[after.status];
   if (!copy) return;
 
-  await createNotification({
+  // Guards against Cloud Functions redelivering this exact update event — a redelivery has the
+  // same before/after status, so the check above alone wouldn't catch it.
+  await createNotificationOnce(`order:${event.params.orderId}:${after.status}`, {
     userId: after.buyer_id,
     title: copy.title,
     message: copy.message(after),

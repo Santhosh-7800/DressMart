@@ -10,7 +10,7 @@ import {
 } from 'firebase/firestore';
 import { getStorage, connectStorageEmulator } from 'firebase/storage';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
-import { isSupported, type Messaging } from 'firebase/messaging';
+import type { Messaging } from 'firebase/messaging';
 import { env } from './env';
 
 // Firebase Authentication always talks to the real Firebase project — it never connects to a local
@@ -106,13 +106,14 @@ export const functions = getFunctions(app);
 
 if (env.useEmulators) {
   // 10.0.2.2 is the standard Android Emulator's alias for the host machine's localhost (AVD-only —
-  // a real physical device would need the host's actual LAN IP instead). Only matters for local
-  // dev/testing against the emulator suite from inside the native Android shell; production builds
-  // point at a real Firebase project and never take this branch at all.
+  // a real physical device needs `adb reverse` + VITE_EMULATOR_HOST=localhost instead, since
+  // 10.0.2.2 isn't routable from real hardware). Only matters for local dev/testing against the
+  // emulator suite from inside the native Android shell; production builds point at a real Firebase
+  // project and never take this branch at all.
   //
   // Authentication is deliberately absent here — it always uses the real Firebase project (see the
   // guard + `auth` above), regardless of VITE_USE_FIREBASE_EMULATOR.
-  const emulatorHost = Capacitor.isNativePlatform() ? '10.0.2.2' : 'localhost';
+  const emulatorHost = env.emulatorHost ?? (Capacitor.isNativePlatform() ? '10.0.2.2' : 'localhost');
   connectFirestoreEmulator(db, emulatorHost, 8081);
   connectStorageEmulator(storage, emulatorHost, 9199);
   connectFunctionsEmulator(functions, emulatorHost, 5001);
@@ -126,10 +127,13 @@ if (import.meta.env.DEV) {
   );
 }
 
-/** Lazily resolved — FCM requires browser support (no SSR, needs a service worker) and is unavailable in most emulator/test contexts. */
+/** Lazily resolved — FCM requires browser support (no SSR, needs a service worker) and is unavailable
+ *  in most emulator/test contexts. `isSupported` is imported here too (not at module top-level) so
+ *  the whole firebase/messaging SDK stays out of the always-loaded main bundle, only fetched when a
+ *  caller (e.g. requesting push-notification permission) actually needs it. */
 export async function getMessagingIfSupported(): Promise<Messaging | null> {
+  const { getMessaging, isSupported } = await import('firebase/messaging');
   if (!(await isSupported())) return null;
-  const { getMessaging } = await import('firebase/messaging');
   return getMessaging(app);
 }
 

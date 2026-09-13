@@ -1,7 +1,8 @@
-import { Bell, Package, CreditCard, Truck, RotateCcw, Repeat, XCircle, AlertTriangle, Store, Megaphone, type LucideIcon } from 'lucide-react';
+import { Bell, Package, CreditCard, Truck, RotateCcw, Repeat, XCircle, AlertTriangle, Megaphone, LifeBuoy, type LucideIcon } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { useNotifications } from '@/hooks/useNotifications';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { formatDateTime, cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 import type { NotificationType } from '@/types';
@@ -15,12 +16,14 @@ const ICONS: Record<NotificationType, LucideIcon> = {
   new_order: Package,
   cancelled_order: XCircle,
   low_stock: AlertTriangle,
-  seller_registration: Store,
+  out_of_stock: AlertTriangle,
   platform: Megaphone,
+  promotion: Megaphone,
+  support: LifeBuoy,
 };
 
 export function NotificationsPage() {
-  const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
+  const { notifications, unreadCount, isLoading, markRead, markAllRead } = useNotifications();
 
   return (
     <div>
@@ -34,7 +37,13 @@ export function NotificationsPage() {
         )}
       </div>
 
-      {notifications.length === 0 ? (
+      {isLoading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-20 w-full" />
+          ))}
+        </div>
+      ) : notifications.length === 0 ? (
         <EmptyState icon={Bell} title="No notifications" description="You're all caught up!" />
       ) : (
         <div className="space-y-2">

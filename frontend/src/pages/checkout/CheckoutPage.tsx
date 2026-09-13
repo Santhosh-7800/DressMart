@@ -18,12 +18,10 @@ import { Avatar } from '@/components/ui/Avatar';
 import { AddressFormFields } from '@/components/address/AddressFormFields';
 import { EMPTY_ADDRESS_FORM, isAddressFormValid, type AddressFormValues } from '@/lib/addressValidation';
 import { db } from '@/lib/firebase';
+import { usePlatformSettings } from '@/hooks/useDashboardData';
+import { computeOrderTotals } from '@/lib/orderMath';
 import { cn, formatCurrency } from '@/lib/utils';
 import type { Address, Coupon, PaymentMethod } from '@/types';
-
-const FREE_SHIPPING_THRESHOLD = 999;
-const SHIPPING_FEE = 79;
-const TAX_RATE = 0.05;
 
 /**
  * Address CRUD is read/written directly against Firestore here rather than through
@@ -39,8 +37,9 @@ async function fetchAddresses(userId: string): Promise<Address[]> {
 export function CheckoutPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { items, subtotal, totalDiscount, totalItems, isLoading: isLoadingItems } = useCheckoutItems();
+  const { items, subtotal, totalDiscount, totalItems, hasOutOfStockItems, isLoading: isLoadingItems } = useCheckoutItems();
   const { avatarUrl } = useAvatar();
+  const { data: settings } = usePlatformSettings();
   const queryClient = useQueryClient();
   const userId = user?.id ?? '';
 
@@ -85,14 +84,12 @@ export function CheckoutPage() {
     }
   })();
 
-  const shippingFee = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
-  let couponDiscount = 0;
-  if (coupon) {
-    couponDiscount = coupon.discount_type === 'percent' ? (subtotal * coupon.discount_value) / 100 : coupon.discount_value;
-    if (coupon.max_discount) couponDiscount = Math.min(couponDiscount, coupon.max_discount);
-  }
-  const tax = Math.round(Math.max(subtotal - couponDiscount, 0) * TAX_RATE);
-  const total = Math.round(Math.max(subtotal - couponDiscount, 0) + tax + shippingFee);
+  const { discount: couponDiscount, shippingFee, tax, total } = computeOrderTotals(
+    items,
+    coupon,
+    settings?.shipping_charge ?? 0,
+    settings?.free_shipping_threshold ?? 999,
+  );
 
   const effectiveAddressId = selectedAddressId ?? addresses.find((a) => a.is_default)?.id ?? addresses[0]?.id ?? null;
 
@@ -111,6 +108,15 @@ export function CheckoutPage() {
   const handleContinue = () => {
     if (!effectiveAddressId) {
       toast.error('Please select or add a delivery address');
+      return;
+    }
+    // Must be checked here, before Payment — for Razorpay specifically, Payment is where money is
+    // actually captured, and stock can only be authoritatively re-checked at order-placement time
+    // (after payment). Blocking here prevents the "charged but no order" scenario for the common
+    // case where an item sold out while it sat in the cart.
+    if (hasOutOfStockItems) {
+      toast.error('Some items in your cart are out of stock or exceed available quantity. Please update your cart before continuing.');
+      navigate('/cart');
       return;
     }
     navigate('/checkout/payment', { state: { addressId: effectiveAddressId, paymentMethod } });

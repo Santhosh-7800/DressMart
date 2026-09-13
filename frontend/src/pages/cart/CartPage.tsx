@@ -9,30 +9,29 @@ import { OrderSummary } from '@/components/cart/OrderSummary';
 import { CouponInput } from '@/components/cart/CouponInput';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
+import { Skeleton } from '@/components/ui/Skeleton';
 import type { Coupon } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePlatformSettings } from '@/hooks/useDashboardData';
 import { clearBuyNowItem } from '@/lib/buyNowSession';
+import { computeOrderTotals } from '@/lib/orderMath';
 import { formatCurrency } from '@/lib/utils';
-
-const FREE_SHIPPING_THRESHOLD = 999;
-const SHIPPING_FEE = 79;
-const TAX_RATE = 0.05;
 
 export function CartPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
-  const { items, savedForLater, subtotal, totalDiscount, totalItems, hasOutOfStockItems, updateQuantity, removeItem, saveForLater } = useCart();
+  const { items, savedForLater, subtotal, totalDiscount, totalItems, hasOutOfStockItems, isLoading, updateQuantity, removeItem, saveForLater } = useCart();
   const [coupon, setCoupon] = useState<Coupon | null>(null);
+  // Live shipping/tax config — matches backend/functions/src/lib/orderPlacement.ts's own
+  // platform_settings read, instead of a hardcoded guess that could silently diverge from it.
+  const { data: settings } = usePlatformSettings();
 
-  const shippingFee = subtotal >= FREE_SHIPPING_THRESHOLD || subtotal === 0 ? 0 : SHIPPING_FEE;
-  let couponDiscount = 0;
-  if (coupon) {
-    couponDiscount = coupon.discount_type === 'percent' ? (subtotal * coupon.discount_value) / 100 : coupon.discount_value;
-    if (coupon.max_discount) couponDiscount = Math.min(couponDiscount, coupon.max_discount);
-  }
-  const taxableAmount = Math.max(subtotal - couponDiscount, 0);
-  const tax = Math.round(taxableAmount * TAX_RATE);
-  const total = Math.round(taxableAmount + tax + shippingFee);
+  const { discount: couponDiscount, shippingFee, tax, total } = computeOrderTotals(
+    items,
+    coupon,
+    settings?.shipping_charge ?? 0,
+    settings?.free_shipping_threshold ?? 999,
+  );
 
   const handleCheckout = () => {
     if (hasOutOfStockItems) return;
@@ -41,6 +40,17 @@ export function CartPage() {
     sessionStorage.setItem('dressmart:checkout-coupon', JSON.stringify(coupon));
     navigate(isAuthenticated ? '/checkout' : '/login', { state: { from: '/checkout' } });
   };
+
+  if (isLoading) {
+    return (
+      <div className="container-app space-y-4 py-8">
+        <Seo title="Cart" />
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-24 w-full" />
+      </div>
+    );
+  }
 
   if (items.length === 0 && savedForLater.length === 0) {
     return (
@@ -96,7 +106,15 @@ export function CartPage() {
         {items.length > 0 && (
           <div className="space-y-4">
             <div className="card-surface p-4">
-              <CouponInput appliedCoupon={coupon} onApply={setCoupon} onRemove={() => setCoupon(null)} orderValue={subtotal} />
+              <CouponInput
+                appliedCoupon={coupon}
+                onApply={setCoupon}
+                onRemove={() => setCoupon(null)}
+                cartLines={items.map((item) => ({
+                  categoryId: item.product?.category_id ?? '',
+                  lineSubtotal: (item.variant?.price_override ?? item.product?.price ?? item.price) * item.quantity,
+                }))}
+              />
             </div>
             <OrderSummary itemCount={totalItems} subtotal={subtotal} discount={totalDiscount} couponDiscount={couponDiscount} shippingFee={shippingFee} tax={tax} total={total}>
               {hasOutOfStockItems && (

@@ -111,7 +111,7 @@ export function ProductGalleryLightbox({ items, index, onIndexChange, onClose, p
           <p className="text-sm font-medium text-white/80">
             {index + 1} / {items.length}
           </p>
-          <button onClick={onClose} aria-label="Close gallery" className="rounded-full p-1.5 hover:bg-white/10">
+          <button onClick={onClose} aria-label="Close gallery" className="tap-target-48 rounded-full p-1.5 hover:bg-white/10">
             <X size={22} />
           </button>
         </div>

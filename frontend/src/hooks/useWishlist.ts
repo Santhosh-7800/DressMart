@@ -61,6 +61,8 @@ export function useWishlist() {
   return {
     items,
     isLoading: wishlistQuery.isLoading,
+    isError: wishlistQuery.isError,
+    refetch: wishlistQuery.refetch,
     isWishlisted: (productId: string) => productIds.has(productId),
     toggle: toggleOnce,
     remove: remove.mutateAsync,

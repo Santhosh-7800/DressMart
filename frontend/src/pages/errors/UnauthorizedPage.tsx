@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 /** Reached when a signed-in user's role doesn't permit the route they tried to open (e.g. a buyer
  *  hitting /seller/dashboard, or a seller hitting a Head-Seller-only page) — see
- *  RequireSeller/RequireStaff/RequireHeadSeller. Mirrors NotFoundPage's exact layout/style. */
+ *  RequireAdmin/RequireStaff. Mirrors NotFoundPage's exact layout/style. */
 export function UnauthorizedPage() {
   const { isAuthenticated } = useAuth();
 

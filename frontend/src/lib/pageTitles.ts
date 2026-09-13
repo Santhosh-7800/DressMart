@@ -16,7 +16,6 @@ const EXACT_TITLES: Record<string, string> = {
   '/checkout': 'Checkout',
   '/checkout/payment': 'Payment',
   '/track-order': 'Track Order',
-  '/sell': 'Become a Seller',
   '/wishlist': 'Wishlist',
   '/orders': 'My Orders',
   '/addresses': 'Addresses',

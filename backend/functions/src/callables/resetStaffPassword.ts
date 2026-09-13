@@ -7,10 +7,9 @@ interface ResetStaffPasswordData {
 }
 
 /**
- * Head-Seller-only: authorizes a password reset for a staff account and returns their email so
- * the client can trigger the same standard sendPasswordResetEmail flow used everywhere else.
- * Mirrors resetSellerPassword.ts exactly — this function performs the permission check only, it
- * never sets or sees an actual password.
+ * Admin-only: authorizes a password reset for a staff account and returns their email so
+ * the client can trigger the same standard sendPasswordResetEmail flow used everywhere else —
+ * this function performs the permission check only, it never sets or sees an actual password.
  */
 export const resetStaffPassword = onCall<ResetStaffPasswordData>(async (request) => {
   if (!request.auth) {
@@ -23,8 +22,8 @@ export const resetStaffPassword = onCall<ResetStaffPasswordData>(async (request)
 
   const callerSnap = await db.collection('users').doc(request.auth.uid).get();
   const caller = callerSnap.data() as Profile | undefined;
-  if (!caller || caller.role !== 'head_seller') {
-    throw new HttpsError('permission-denied', "Only the Head Seller can reset a staff member's password.");
+  if (!caller || caller.role !== 'admin') {
+    throw new HttpsError('permission-denied', "Only the Admin can reset a staff member's password.");
   }
 
   const targetSnap = await db.collection('users').doc(staffId).get();

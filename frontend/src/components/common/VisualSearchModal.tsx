@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { Camera, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { validateImageFile, visualSearchService } from '@/services/visualSearchService';
@@ -70,6 +71,32 @@ export function VisualSearchModal({ isOpen, onClose, onAnalyzed }: VisualSearchM
     onClose();
   };
 
+  const handleTakePhoto = async () => {
+    // Inside the Android app, a plain <input capture> is at the mercy of Capacitor's WebView file
+    // chooser, which on many devices ignores `capture="environment"` and opens the gallery picker
+    // instead of the camera. The native Camera plugin drives Android's actual camera intent
+    // directly, so this always opens the real (rear) camera app rather than a file chooser.
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const { Camera: NativeCamera, CameraResultType, CameraSource } = await import('@capacitor/camera');
+        const photo = await NativeCamera.getPhoto({
+          source: CameraSource.Camera,
+          resultType: CameraResultType.Uri,
+          quality: 85,
+        });
+        if (!photo.webPath) return;
+        const blob = await (await fetch(photo.webPath)).blob();
+        const file = new File([blob], `camera-${Date.now()}.jpg`, { type: blob.type || 'image/jpeg' });
+        await handleFileSelected(file);
+      } catch {
+        // User cancelled the native camera or denied permission — same as backing out of the file
+        // picker below, so no error is shown.
+      }
+      return;
+    }
+    cameraInputRef.current?.click();
+  };
+
   const handleFileSelected = async (file: File | undefined) => {
     if (!file) return;
 
@@ -118,11 +145,7 @@ export function VisualSearchModal({ isOpen, onClose, onAnalyzed }: VisualSearchM
               <p className="rounded-xl bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">{errorMessage}</p>
             )}
             <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => cameraInputRef.current?.click()}
-                className="btn-outline flex flex-col items-center gap-2 !py-6"
-              >
+              <button type="button" onClick={() => void handleTakePhoto()} className="btn-outline flex flex-col items-center gap-2 !py-6">
                 <Camera size={22} />
                 Take Photo
               </button>

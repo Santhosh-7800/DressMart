@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Camera, X } from 'lucide-react';
+import { Camera } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ProductGrid } from '@/components/product/ProductGrid';
 import { ProductFilters } from '@/components/product/ProductFilters';
+import { MobileFilterDrawer } from '@/components/product/MobileFilterDrawer';
 import { SortDropdown } from '@/components/product/SortDropdown';
 import { useProductFacets } from '@/hooks/useProducts';
 import { productService, categoryService } from '@/services/productService';
@@ -231,21 +232,10 @@ export function VisualSearchResultsPage() {
           <ProductFilters facets={facetsQuery.data} filters={filters} onChange={(next) => updateFilters({ ...next, page: 1 })} />
         </div>
 
-        {isMobileFiltersOpen && (
-          <div className="fixed inset-0 z-50 flex lg:hidden">
-            <div className="absolute inset-0 bg-primary-950/50" onClick={() => setIsMobileFiltersOpen(false)} />
-            <div className="relative ml-auto h-full w-[85%] max-w-sm space-y-4 overflow-y-auto bg-surface p-4 dark:bg-surface-dark">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold">Filters</h3>
-                <button onClick={() => setIsMobileFiltersOpen(false)} aria-label="Close filters">
-                  <X size={20} />
-                </button>
-              </div>
-              {patternOptions.length > 0 && patternChips}
-              <ProductFilters facets={facetsQuery.data} filters={filters} onChange={(next) => updateFilters({ ...next, page: 1 })} />
-            </div>
-          </div>
-        )}
+        <MobileFilterDrawer isOpen={isMobileFiltersOpen} onClose={() => setIsMobileFiltersOpen(false)}>
+          {patternOptions.length > 0 && patternChips}
+          <ProductFilters facets={facetsQuery.data} filters={filters} onChange={(next) => updateFilters({ ...next, page: 1 })} />
+        </MobileFilterDrawer>
 
         <div className="space-y-8">
           <section>

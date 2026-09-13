@@ -79,8 +79,8 @@ export function OtpVerificationPage() {
       await authService.confirmPhoneOtp(confirmationRef.current, code);
       toast.success('Phone number verified!');
       navigate('/profile');
-    } catch {
-      toast.error('Invalid or expired OTP');
+    } catch (error) {
+      toast.error(getFriendlyErrorMessage(error, 'Invalid or expired OTP'));
     } finally {
       setIsSubmitting(false);
     }

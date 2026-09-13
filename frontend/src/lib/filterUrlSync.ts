@@ -67,3 +67,20 @@ export function applyFiltersToSearchParams(existing: URLSearchParams, filters: U
 
   return next;
 }
+
+/** True if any REMOVABLE filter (the kind ActiveFilterChips renders) is set — excludes gender/
+ *  categorySlugs/search/visualAttributes/sort, which describe WHERE the customer is browsing, not
+ *  a constraint they chose to narrow results with. Used to pick "no results for your search" vs
+ *  "no results for your filters" empty-state copy (Phase 15 Section 25). */
+export function hasActiveFilters(filters: UrlSyncableFilters): boolean {
+  return Boolean(
+    filters.brandIds?.length ||
+      filters.colors?.length ||
+      filters.sizes?.length ||
+      filters.minPrice !== undefined ||
+      filters.maxPrice !== undefined ||
+      filters.minRating !== undefined ||
+      filters.minDiscount !== undefined ||
+      filters.inStockOnly,
+  );
+}

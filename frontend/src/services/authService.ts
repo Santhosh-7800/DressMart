@@ -4,6 +4,7 @@ import {
   signInWithEmailAndPassword,
   signInWithPopup,
   signInWithRedirect,
+  signInWithCredential,
   getRedirectResult,
   signInWithPhoneNumber,
   GoogleAuthProvider,
@@ -23,7 +24,8 @@ import {
   type User as FirebaseUser,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { auth, db, functions } from '@/lib/firebase';
 import { env } from '@/lib/env';
 import type { Profile } from '@/types';
 
@@ -69,12 +71,14 @@ async function touchLastLogin(uid: string): Promise<string> {
   return now;
 }
 
-/** True inside the native Capacitor shell, or a mobile browser — signInWithPopup() is unreliable in
- *  both (native WebViews commonly block it as a "disallowed_useragent"; mobile browsers give it a
- *  worse UX), so signInWithGoogle() uses signInWithRedirect() here instead. */
+/** True on a mobile *browser* (not the native app — that's handled separately in signInWithGoogle,
+ *  via the native Google Sign-In plugin). signInWithPopup() gives a poor UX on a phone browser, so
+ *  signInWithGoogle() uses signInWithRedirect() there instead. */
 function isMobileSignIn(): boolean {
-  return Capacitor.isNativePlatform() || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
+
+let googleSignInInitialized = false;
 
 export const authService = {
   async fetchProfile(uid: string): Promise<Profile | null> {
@@ -97,13 +101,9 @@ export const authService = {
     await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
     const cred = await signInWithEmailAndPassword(auth, email, password);
     const profile = await ensureProfileDoc(cred.user);
-    if (profile.seller_status === 'suspended') {
-      await firebaseSignOut(auth);
-      throw new Error('Your seller account has been suspended. Contact the Head Seller.');
-    }
     if (profile.staff_status === 'disabled') {
       await firebaseSignOut(auth);
-      throw new Error('Your staff account has been disabled. Contact the Head Seller.');
+      throw new Error('Your staff account has been disabled. Contact the Admin.');
     }
     const last_login_at = await touchLastLogin(cred.user.uid);
     return { ...profile, last_login_at };
@@ -115,9 +115,17 @@ export const authService = {
    * silently reuse whichever account was last selected instead of showing the chooser.
    *
    * signInWithPopup() on desktop (resolves synchronously, so the caller gets the resulting Profile
-   * back directly); signInWithRedirect() on mobile (see isMobileSignIn). The redirect path returns
-   * `null` immediately — the browser navigates away to Google and back, so the actual sign-in is
-   * completed by completeGoogleRedirectSignIn() once the app reloads.
+   * back directly); signInWithRedirect() on mobile web (see isMobileSignIn). The redirect path
+   * returns `null` immediately — the browser navigates away to Google and back, so the actual
+   * sign-in is completed by completeGoogleRedirectSignIn() once the app reloads.
+   *
+   * Inside the native Android app, neither of those is used at all — signInWithRedirect/Popup both
+   * go through a browser tab and Firebase's own authDomain handler page, which reads as "leaving the
+   * app" rather than the native "pick a Google account" bottom sheet every other Android app shows.
+   * The native branch below uses @capgo/capacitor-social-login (Android's Credential Manager) to get
+   * a real Google ID token without ever opening a browser, then exchanges it for a Firebase
+   * credential the exact same way ensureProfileDoc()/touchLastLogin() already handle for every other
+   * provider.
    */
   async signInWithGoogle(): Promise<Profile | null> {
     // Google/Phone sign-in have no "remember me" control (that's email/password-only, see signIn()
@@ -126,6 +134,26 @@ export const authService = {
     // *previous* sign-in call last set (e.g. an earlier "remember me" unchecked attempt), signing
     // this user out sooner than expected on next launch even though their Firestore data is untouched.
     await setPersistence(auth, browserLocalPersistence);
+
+    if (Capacitor.isNativePlatform()) {
+      const { SocialLogin } = await import('@capgo/capacitor-social-login');
+      if (!googleSignInInitialized) {
+        await SocialLogin.initialize({ google: { webClientId: env.googleWebClientId } });
+        googleSignInInitialized = true;
+      }
+      const { result } = await SocialLogin.login({ provider: 'google', options: { scopes: ['email', 'profile'] } });
+      // `result` is a GoogleLoginResponseOnline | GoogleLoginResponseOffline union — only the
+      // "online" variant (the default, since no `offline: true` option is passed above) carries
+      // `idToken`; narrow with an `in` check rather than asserting the type.
+      const idToken = result && 'idToken' in result ? result.idToken : null;
+      if (!idToken) return null; // user backed out of the native account picker — not an error
+      const credential = GoogleAuthProvider.credential(idToken);
+      const cred = await signInWithCredential(auth, credential);
+      const profile = await ensureProfileDoc(cred.user);
+      const last_login_at = await touchLastLogin(cred.user.uid);
+      return { ...profile, last_login_at };
+    }
+
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
     if (isMobileSignIn()) {
@@ -168,6 +196,19 @@ export const authService = {
     await firebaseSignOut(auth);
   },
 
+  /**
+   * Self-service account deletion — buyer accounts only (see deleteOwnAccount.ts's docstring for
+   * why admin/staff/delivery aren't handled here). Runs entirely server-side via the
+   * Admin SDK, so no reauthentication is required first the way changeOwnPassword needs one — the
+   * callable only trusts `request.auth.uid`, not anything the client asserts. Signs out locally
+   * afterward since the Auth account no longer exists server-side by the time this resolves.
+   */
+  async deleteAccount(): Promise<void> {
+    const call = httpsCallable<undefined, { success: true }>(functions, 'deleteOwnAccount');
+    await call();
+    await firebaseSignOut(auth);
+  },
+
   /** `handleCodeInApp: true` makes Firebase email a link straight to `url` (with `mode` &
    *  `oobCode` query params attached) instead of routing through Firebase's own hosted
    *  reset-password page — ResetPasswordPage reads `oobCode` off that query string. */
@@ -198,36 +239,5 @@ export const authService = {
 
   async updateProfile(uid: string, updates: Partial<Pick<Profile, 'full_name' | 'phone' | 'avatar_url'>>): Promise<void> {
     await updateDoc(doc(db, 'users', uid), { ...updates, updated_at: serverTimestamp() });
-  },
-
-  /**
-   * Marks the current user as a pending seller and opens a review request for the Head Seller.
-   * The role/status flip to 'approved' happens only via the `reviewSellerRequest` Cloud Function —
-   * never directly from the client — so applicant and reviewer state can't drift out of sync.
-   */
-  async applyToBecomeSeller(uid: string, input: { store_name: string; gst_number: string; full_name: string; email: string; phone: string }): Promise<void> {
-    const now = new Date().toISOString();
-    await updateDoc(doc(db, 'users', uid), {
-      role: 'seller',
-      seller_status: 'pending',
-      store_name: input.store_name,
-      gst_number: input.gst_number,
-      seller_applied_at: now,
-      updated_at: now,
-    });
-    const { addDoc, collection } = await import('firebase/firestore');
-    await addDoc(collection(db, 'seller_requests'), {
-      user_id: uid,
-      full_name: input.full_name,
-      email: input.email,
-      phone: input.phone,
-      store_name: input.store_name,
-      gst_number: input.gst_number,
-      status: 'pending',
-      applied_at: now,
-      reviewed_at: null,
-      reviewed_by: null,
-      rejection_reason: null,
-    });
   },
 };

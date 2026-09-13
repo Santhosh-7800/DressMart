@@ -10,7 +10,7 @@ import type { SearchHistoryEntry, UserActivity } from '@/types';
  * guest branch). Each list is small and bounded, so a full read-modify-write per event is simpler
  * and cheaper than modeling them as subcollections.
  */
-const MAX_RECENTLY_VIEWED = 12;
+const MAX_RECENTLY_VIEWED = 20;
 const MAX_CATEGORY_HISTORY = 20;
 const MAX_RECENT_SEARCHES = 20;
 
@@ -102,5 +102,12 @@ export const userActivityService = {
 
   async clearRecentSearches(uid: string): Promise<void> {
     await setDoc(doc(db, 'user_activity', uid), { recent_searches: [], updated_at: new Date().toISOString() }, { merge: true });
+  },
+
+  /** Removes a single search entry (matched by normalized_query) without touching the rest. */
+  async removeSearchEntry(uid: string, normalizedQuery: string): Promise<void> {
+    const current = await getOrDefault(uid);
+    const recent_searches = current.recent_searches.filter((s) => s.normalized_query !== normalizedQuery);
+    await setDoc(doc(db, 'user_activity', uid), { recent_searches, updated_at: new Date().toISOString() }, { merge: true });
   },
 };

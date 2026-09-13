@@ -107,14 +107,19 @@ export function SearchBar() {
           aria-label="Search products"
         />
         {query && (
-          <button type="button" onClick={() => setQuery('')} className="mr-1 text-primary-300 hover:text-primary-500" aria-label="Clear search">
+          <button
+            type="button"
+            onClick={() => setQuery('')}
+            className="mr-1 text-primary-300 hover:text-primary-500 focus-visible:ring-0 focus-visible:ring-offset-0"
+            aria-label="Clear search"
+          >
             <X size={16} />
           </button>
         )}
         <button
           type="button"
           onClick={handleVoiceSearch}
-          className={`mr-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${isListening ? 'animate-pulse bg-accent text-white' : 'text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-700'}`}
+          className={`mr-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full focus-visible:ring-0 focus-visible:ring-offset-0 ${isListening ? 'animate-pulse bg-accent text-white' : 'text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-700'}`}
           aria-label="Search by voice"
           title="Voice search"
         >
@@ -123,7 +128,7 @@ export function SearchBar() {
         <button
           type="button"
           onClick={() => setIsVisualSearchOpen(true)}
-          className="mr-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-700"
+          className="mr-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-700 focus-visible:ring-0 focus-visible:ring-offset-0"
           aria-label="Search by image"
           title="Search by image"
         >

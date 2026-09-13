@@ -5,12 +5,10 @@
 
 export type Gender = 'men' | 'kids';
 
-/** Head Seller is a single, designated seller account with extra platform-management powers — see
- *  lib/roles.ts. Staff are employees created by the Head Seller to help run its store under
- *  granular, individually-assignable permissions — see StaffPermissions below. */
-export type UserRole = 'buyer' | 'seller' | 'head_seller' | 'staff';
-
-export type SellerStatus = 'pending' | 'approved' | 'rejected' | 'suspended';
+/** Admin is the single store-owner account — see lib/roles.ts. Staff are employees created by the
+ *  Admin to help run the store under granular, individually-assignable permissions — see
+ *  StaffPermissions below. */
+export type UserRole = 'buyer' | 'admin' | 'staff' | 'delivery';
 
 export type StaffStatus = 'active' | 'disabled';
 
@@ -23,24 +21,23 @@ export interface Profile {
   role: UserRole;
   created_at: string;
   updated_at: string;
-  /** Present only when role is 'seller' or 'head_seller'. */
+  /** Present only when role is 'admin'. */
   store_name?: string;
   gst_number?: string;
-  seller_status?: SellerStatus;
-  seller_applied_at?: string;
-  seller_approved_at?: string | null;
-  /** Set when seller_status is 'suspended' or 'rejected' — shown back to the seller. */
-  seller_status_reason?: string | null;
-  /** Present only when role is 'staff' — the Head Seller's uid this staff account was created
-   *  under. Every product/order/inventory/return a staff member touches is scoped to this id
-   *  (see lib/roles.ts's effectiveSellerId), never their own uid. */
+  /** Present only when role is 'staff' — the Admin's uid this staff account was created under.
+   *  Every product/order/inventory/return a staff member touches is scoped to this id (see
+   *  lib/roles.ts's effectiveSellerId), never their own uid. */
   seller_id?: string;
   staff_status?: StaffStatus;
   /** Set when staff_status is 'disabled' — shown back to the staff member. */
   staff_status_reason?: string | null;
+  /** Present only when role is 'delivery' — denormalized from delivery_staff/{uid} for display
+   *  (e.g. roster badges) without a second read, same pattern as staff_status above. */
+  delivery_staff_status?: DeliveryStaffStatus;
+  delivery_staff_status_reason?: string | null;
   /** Web Push (FCM) registration tokens for this user's browsers — appended via arrayUnion by useFcmToken, one entry per opted-in browser/device. */
   fcm_tokens?: string[];
-  /** Shop branding/logistics — present only for seller/head_seller, same as store_name/gst_number. */
+  /** Shop branding/logistics — present only for the Admin, same as store_name/gst_number. */
   shop_logo_url?: string | null;
   shop_banner_url?: string | null;
   pickup_address?: ShopAddress | null;
@@ -51,11 +48,11 @@ export interface Profile {
   bank_ifsc?: string;
   /** Shop-level COD default — distinct from the per-product Product.cod_available. */
   shop_cod_available?: boolean;
-  /** Set on every successful sign-in (see authService.signIn) — powers the Seller Dashboard's "Last Login" display. */
+  /** Set on every successful sign-in (see authService.signIn) — powers the Admin Dashboard's "Last Login" display. */
   last_login_at?: string;
 }
 
-/** Embedded address shape for a seller's pickup/return address — deliberately not the same as the
+/** Embedded address shape for the Admin's pickup/return address — deliberately not the same as the
  *  buyer-facing Address type (which carries id/user_id/type/is_default that make no sense embedded
  *  directly on Profile). */
 export interface ShopAddress {
@@ -67,7 +64,7 @@ export interface ShopAddress {
   landmark: string | null;
 }
 
-/** One togglable capability a Head Seller can grant a staff account — see `staff_permissions/{staffId}`. */
+/** One togglable capability the Admin can grant a staff account — see `staff_permissions/{staffId}`. */
 export type StaffPermissionKey =
   | 'add_products'
   | 'edit_products'
@@ -81,7 +78,7 @@ export type StaffPermissionKey =
   | 'view_reports';
 
 /** `staff_permissions/{staffId}` — one doc per staff account, every key defaulting to false until
- *  the Head Seller grants it. Read by both firestore.rules (gating writes) and the Staff Dashboard
+ *  the Admin grants it. Read by both firestore.rules (gating writes) and the Staff Dashboard
  *  nav (hiding actions the staff member can't perform). */
 export type StaffPermissions = Record<StaffPermissionKey, boolean> & {
   staff_id: string;
@@ -92,14 +89,31 @@ export type StaffPermissions = Record<StaffPermissionKey, boolean> & {
  *  `users/{staffId}` doc (which only carries what login/role-gating needs). */
 export interface StaffProfile {
   id: string;
-  /** The Head Seller's uid this staff account works under — same value as Profile.seller_id. */
+  /** The Admin's uid this staff account works under — same value as Profile.seller_id. */
   seller_id: string;
   employee_id: string | null;
   designation: string;
   department: string | null;
   status: StaffStatus;
   status_reason: string | null;
-  /** uid of the Head Seller who created this account. */
+  /** uid of the Admin who created this account. */
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type DeliveryStaffStatus = 'active' | 'inactive';
+
+/** `delivery_staff/{uid}` — an Admin-managed delivery-personnel account, distinct from
+ *  StaffProfile (product/inventory staff) since delivery has its own, fixed capability set with no
+ *  per-permission toggles. */
+export interface DeliveryStaffProfile {
+  id: string;
+  full_name: string;
+  phone: string;
+  status: DeliveryStaffStatus;
+  status_reason: string | null;
+  /** uid of the Admin who created this account. */
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -116,7 +130,7 @@ export type StaffActivityAction =
   | 'inventory_updated';
 
 /** `staff_activity/{id}` — append-only audit log of staff-performed actions, powering both the
- *  Head Seller's Activity Logs view and each staff member's own "recent activity" list. */
+ *  Admin's Activity Logs view and each staff member's own "recent activity" list. */
 export interface StaffActivity {
   id: string;
   seller_id: string;
@@ -138,13 +152,22 @@ export interface Brand {
   is_featured: boolean;
 }
 
-/** Head-Seller-managed homepage banner carousel — `banners` collection. */
+/** Admin-managed homepage banner carousel — `banners` collection. */
 export interface Banner {
   id: string;
   image_url: string | null;
   title: string;
   subtitle: string | null;
   link: string;
+  /** Button text on the banner (e.g. "Shop Now") — defaults to "Shop Now" when unset, since every
+   *  banner created before this field existed already has a working `link` and just needs a label. */
+  cta_label?: string | null;
+  /** Both null = always shown while is_active (the pre-Phase-13 default, unchanged). When set,
+   *  the banner is only included in the public `list()` read during [start_at, end_at] — evaluated
+   *  against the reading device's clock (Firestore has no way to filter "now" server-side across
+   *  two fields), same caveat the OWNER already accepts for coupon valid_from/valid_until previews. */
+  start_at?: string | null;
+  end_at?: string | null;
   sort_order: number;
   is_active: boolean;
   created_at: string;
@@ -192,10 +215,11 @@ export interface ProductSpecifications {
 }
 
 /**
- * Merchandising status a seller/Head Seller sets explicitly. `is_active` (below) is derived from
- * this — 'active' and 'out_of_stock' are both buyer-visible (an out-of-stock listing still shows,
- * just marked unavailable, same as any real storefront), 'draft' and 'hidden' are not — so every
- * existing `where('is_active', ...)` catalog query keeps working unchanged.
+ * Merchandising status the Admin (or staff with edit_products) sets explicitly. `is_active`
+ * (below) is derived from this — 'active' and 'out_of_stock' are both buyer-visible (an
+ * out-of-stock listing still shows, just marked unavailable, same as any real storefront), 'draft'
+ * and 'hidden' are not — so every existing `where('is_active', ...)` catalog query keeps working
+ * unchanged.
  */
 export type ProductStatus = 'draft' | 'active' | 'out_of_stock' | 'hidden';
 
@@ -205,9 +229,9 @@ export function isActiveStatus(status: ProductStatus): boolean {
 
 export interface Product {
   id: string;
-  /** Owning seller — every product belongs to exactly one seller. Immutable after creation. */
+  /** The Admin's uid — every product is owned by the single Admin account. Immutable after creation. */
   seller_id: string;
-  /** Snapshotted store name, so listings/order history read fine even if the seller renames their store later. */
+  /** Snapshotted store name, so listings/order history read fine even if the store is renamed later. */
   seller_name: string;
   name: string;
   slug: string;
@@ -235,7 +259,7 @@ export interface Product {
   is_bestseller: boolean;
   is_new_arrival: boolean;
   is_trending: boolean;
-  /** Head-Seller-only "Feature this product" toggle — surfaces it in featured placements. */
+  /** Admin-only "Feature this product" toggle — surfaces it in featured placements. */
   is_featured: boolean;
   is_deal_of_day: boolean;
   deal_ends_at: string | null;
@@ -251,11 +275,11 @@ export interface Product {
   thumbnailUrl?: string;
   created_at: string;
   updated_at: string;
-  /** uid of whoever actually created this doc — the signed-in seller/head-seller for a normal
-   *  self-added product, or a staff member's own uid when added on the store's behalf. Distinct
-   *  from `seller_id`, which is always the owning store and never changes to a staff account. */
+  /** uid of whoever actually created this doc — the Admin for a normal self-added product, or a
+   *  staff member's own uid when added on the store's behalf. Distinct from `seller_id`, which is
+   *  always the owning store (the Admin's uid) and never changes to a staff account. */
   created_by?: string | null;
-  /** Present only when a staff account (not the seller themselves) created/last touched this
+  /** Present only when a staff account (not the Admin themselves) created/last touched this
    *  product — denormalized name alongside the id so history reads fine even if the staff account
    *  is later removed. */
   staff_id?: string | null;
@@ -279,6 +303,45 @@ export interface Inventory {
   variant_stock: Record<string, number>;
   low_stock_threshold: number;
   updated_at: string;
+  /** Dedup flags (Phase 12) — whether a low/out-of-stock alert has already been sent for the
+   *  CURRENT dip. Reset to false once total_stock rises back above low_stock_threshold, so a
+   *  future dip alerts again instead of alerting once ever. */
+  low_stock_alert_sent?: boolean;
+  out_of_stock_alert_sent?: boolean;
+}
+
+export type InventoryMovementType =
+  | 'sale'
+  | 'cancellation'
+  | 'return'
+  | 'exchange_out'
+  | 'exchange_in'
+  | 'manual_increase'
+  | 'manual_decrease'
+  | 'initial_stock';
+
+/** `inventory_movements/{movementId}` — an append-only audit trail of every stock change, written
+ *  server-side inside the same transaction as the inventory update it records. Read-only to the
+ *  client (see firestore.rules); never updated or deleted. */
+export interface InventoryMovement {
+  id: string;
+  product_id: string;
+  variant_id: string;
+  sku: string;
+  seller_id: string;
+  previous_quantity: number;
+  quantity_changed: number;
+  new_quantity: number;
+  movement_type: InventoryMovementType;
+  reason: string | null;
+  order_id: string | null;
+  return_id: string | null;
+  exchange_id: string | null;
+  performed_by: string;
+  /** 'system' for movements a Firestore trigger applies as a side effect (return/exchange stock
+   *  restoration) rather than a direct action by the signed-in user named in performed_by. */
+  performed_by_role: UserRole | 'system';
+  created_at: string;
 }
 
 export interface Review {
@@ -300,8 +363,15 @@ export interface Review {
   /** Absent on reviews written before this feature — optional rather than `| null` since existing
    *  Firestore docs were never backfilled with the field. */
   seller_reply?: { text: string; replied_at: string } | null;
+  /** Owner moderation (Phase 14) — hidden reviews stay in Firestore (for accountability/appeal) but
+   *  are filtered out of every public-facing list. Absent/false = visible, same reasoning as
+   *  seller_reply above for why this is optional rather than backfilled. */
+  is_hidden?: boolean;
 }
 
+/** Stored server-side (see backend/functions/src/triggers/onReviewWritten.ts) at
+ *  `product_rating_summaries/{productId}` — computed once per review write, read many times, so a
+ *  product page never has to fetch every review just to show a star average. */
 export interface RatingSummary {
   product_id: string;
   average_rating: number;
@@ -311,6 +381,7 @@ export interface RatingSummary {
   rating_3: number;
   rating_2: number;
   rating_1: number;
+  updated_at?: string;
 }
 
 export interface ReviewableOrderItem {
@@ -403,6 +474,30 @@ export interface OrderTimelineEvent {
   note?: string;
 }
 
+/**
+ * Independent of OrderStatus — tracks the internal fulfillment sub-workflow once an order has a
+ * delivery person assigned. 'unassigned' is the implicit default for every order created before
+ * Phase 11 or never assigned a delivery person; those orders simply have no delivery_status field.
+ */
+export type DeliveryStatus = 'unassigned' | 'assigned' | 'accepted' | 'picked_up' | 'out_for_delivery' | 'delivered' | 'failed';
+
+export interface DeliveryNoteEvent {
+  note: string;
+  added_by: string;
+  added_by_name: string;
+  added_at: string;
+}
+
+/** One entry per assignment/reassignment — lets the owner see who handled an order over time. */
+export interface DeliveryAssignmentEvent {
+  delivery_staff_id: string;
+  delivery_staff_name: string;
+  assigned_by: string;
+  assigned_at: string;
+  unassigned_at?: string | null;
+  outcome?: 'reassigned' | 'failed' | 'delivered' | null;
+}
+
 export interface OrderItem {
   id: string;
   order_id: string;
@@ -413,6 +508,10 @@ export interface OrderItem {
   product_image: string;
   product_slug: string;
   brand_name: string;
+  /** Denormalized from the variant at order-placement time (Phase 17) — enables the owner order
+   *  dashboard's SKU search without a per-item product lookup. Optional because orders placed
+   *  before this field existed don't have it. */
+  sku?: string;
   size: string;
   color: string;
   quantity: number;
@@ -425,11 +524,11 @@ export interface OrderItem {
 }
 
 /**
- * One shipment scoped to a single seller. A buyer's cart spanning multiple sellers splits into
- * multiple Order docs at checkout, all sharing the same `group_id` and `order_number` (and the
- * same `razorpay_order_id`, since payment happens once for the whole cart) — this is what lets
- * "seller cannot view another seller's orders" hold as a plain Firestore query (`where seller_id == me`)
- * instead of filtering inside an array. Buyer-facing pages group by `order_number` for display.
+ * One shipment, always owned by the single Admin account (`seller_id`). Historically a buyer's
+ * cart spanning multiple sellers would split into multiple Order docs sharing the same `group_id`
+ * and `order_number` — that no longer happens under the single-admin model, but the shape is kept
+ * as-is (a checkout still produces one Order per `group_id`/`order_number`, just always exactly
+ * one now) rather than reshaping every order document and query that already keys off it.
  */
 export interface Order {
   id: string;
@@ -456,6 +555,22 @@ export interface Order {
   tracking_number?: string;
   courier_name?: string;
   courier_phone?: string;
+  /** Present only once the Admin has assigned this order to a delivery person (Phase 11). All
+   *  writes to these fields go through the assignDelivery/updateDeliveryStatus Cloud Functions —
+   *  never a direct client write — see firestore.rules' orders match block. */
+  delivery_status?: DeliveryStatus;
+  delivery_staff_id?: string | null;
+  delivery_staff_name?: string | null;
+  delivery_assigned_at?: string | null;
+  delivery_assigned_by?: string | null;
+  delivery_accepted_at?: string | null;
+  delivery_picked_up_at?: string | null;
+  delivery_out_for_delivery_at?: string | null;
+  delivery_delivered_at?: string | null;
+  delivery_failed_at?: string | null;
+  delivery_failure_reason?: string | null;
+  delivery_notes?: DeliveryNoteEvent[];
+  delivery_history?: DeliveryAssignmentEvent[];
 }
 
 export type ReturnStatus = 'requested' | 'approved' | 'rejected' | 'pickup_scheduled' | 'received' | 'refunded';
@@ -478,6 +593,8 @@ export interface ReturnRequest {
   refund_amount: number;
   timeline: ReturnTimelineEvent[];
   created_at: string;
+  /** Set exactly once, server-side only, once stock has been restored for this return. */
+  inventory_restored?: boolean;
 }
 
 export type ExchangeStatus = 'requested' | 'approved' | 'rejected' | 'pickup_scheduled' | 'exchanged';
@@ -502,6 +619,8 @@ export interface ExchangeRequest {
   status: ExchangeStatus;
   timeline: ExchangeTimelineEvent[];
   created_at: string;
+  /** Set exactly once, server-side only, once stock has been swapped for this exchange. */
+  inventory_restored?: boolean;
 }
 
 export interface Coupon {
@@ -517,6 +636,38 @@ export interface Coupon {
   is_active: boolean;
   usage_limit: number | null;
   used_count: number;
+  /** Null/empty = applies platform-wide (the pre-Phase-13 default behavior, unchanged). When set,
+   *  the discount applies only to the subtotal of cart lines whose product.category_id is in this
+   *  list — min_order_value still checks against the FULL cart subtotal (a coupon's minimum-order
+   *  gate is about how much the customer is spending overall, not just on eligible items). */
+  applicable_categories?: string[] | null;
+  /** How many times ONE customer may use this coupon, across separate checkouts. Null = unlimited
+   *  (same customer may reuse it every order) — distinct from `usage_limit`, which caps GLOBAL uses. */
+  per_user_limit?: number | null;
+  /** Restricts this coupon to customers with zero prior orders (any status) at the time they check
+   *  out — the simplest safe/privacy-conscious customer segment (Phase 13 Section 14): no purchase-
+   *  history profiling beyond "have they ordered before," and nothing is exposed back to the client
+   *  about WHY a coupon was rejected beyond a generic ineligibility message. */
+  new_customers_only?: boolean;
+  created_by?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** `coupon_usages/{id}` — one record per successful checkout that used a coupon. Written exclusively by
+ *  the order-placement Cloud Function, inside the same transaction that creates the order(s) and
+ *  increments the coupon's `used_count`, so a failed/aborted checkout never creates a usage record
+ *  (Phase 13 Section 7's "do not count a coupon as used merely because a customer clicked Apply").
+ *  This is what makes `per_user_limit` enforceable and is also the source for promotion analytics
+ *  ("most-used coupon", "revenue from coupon orders") beyond the aggregate `used_count`. */
+export interface CouponUsage {
+  id: string;
+  coupon_id: string;
+  coupon_code: string;
+  user_id: string;
+  order_group_id: string;
+  discount_amount: number;
+  used_at: string;
 }
 
 export type NotificationType =
@@ -528,8 +679,10 @@ export type NotificationType =
   | 'new_order'
   | 'cancelled_order'
   | 'low_stock'
-  | 'seller_registration'
-  | 'platform';
+  | 'out_of_stock'
+  | 'platform'
+  | 'promotion'
+  | 'support';
 
 export interface Notification {
   id: string;
@@ -542,20 +695,85 @@ export interface Notification {
   created_at: string;
 }
 
-/** A prospective seller's application — reviewed by the Head Seller (approve/suspend). */
-export interface SellerRequest {
+export type SupportCategory = 'order' | 'payment' | 'delivery' | 'return' | 'exchange' | 'product' | 'coupon' | 'account' | 'other';
+export type SupportTicketStatus = 'open' | 'in_progress' | 'waiting_for_customer' | 'resolved' | 'closed';
+export type SupportTicketPriority = 'low' | 'normal' | 'high';
+
+/**
+ * `supportTickets/{ticketId}` (Phase 16) — created/replied-to via direct, rules-gated writes (see
+ * services/supportService.ts), the same idiom returns/exchanges already use: every check a create
+ * needs (own order, own ticket, ticket not closed) is a single-doc lookup, which firestore.rules can
+ * express directly, so no Cloud Function round-trip is needed for the core flow to work even while
+ * Cloud Functions themselves are blocked (Spark plan). `user_name` is a deliberate single-field
+ * denormalization (not the full profile) so the owner dashboard can search/display by customer name
+ * without an extra read per ticket.
+ */
+export interface SupportTicket {
   id: string;
   user_id: string;
-  full_name: string;
-  email: string;
-  phone: string;
-  store_name: string;
-  gst_number: string;
-  status: SellerStatus;
-  applied_at: string;
-  reviewed_at: string | null;
-  reviewed_by: string | null;
-  rejection_reason: string | null;
+  user_name: string;
+  subject: string;
+  category: SupportCategory;
+  status: SupportTicketStatus;
+  priority: SupportTicketPriority;
+  order_id: string | null;
+  return_id: string | null;
+  exchange_id: string | null;
+  assigned_to: string | null;
+  created_at: string;
+  updated_at: string;
+  resolved_at: string | null;
+  last_message_at: string;
+  last_message_by: 'customer' | 'admin';
+  last_message_preview: string;
+  admin_unread: boolean;
+  customer_unread: boolean;
+}
+
+export type SupportMessageType = 'customer_message' | 'owner_reply' | 'internal_note';
+
+/** `supportTickets/{ticketId}/messages/{messageId}` — append-only. `internal_note` messages must
+ *  never be fetched for a customer: always query with `where('message_type', 'in',
+ *  ['customer_message', 'owner_reply'])` (see supportService.listMessages) rather than relying on
+ *  the read rule alone — Firestore rejects an entire list query if any matched doc would fail
+ *  `allow read`, so the filter has to be in the query, not just the rule. */
+export interface SupportMessage {
+  id: string;
+  ticket_id: string;
+  sender_id: string;
+  sender_name: string;
+  sender_role: 'customer' | 'admin';
+  message_type: SupportMessageType;
+  message: string;
+  created_at: string;
+}
+
+/** `faqs/{faqId}` — Admin-managed Help Center content, plain public-read/admin-write
+ *  Firestore CRUD (no Cloud Function), mirroring banners/categories exactly. HelpCenterPage falls
+ *  back to lib/defaultFaqs.ts only when this collection is completely empty. */
+export interface Faq {
+  id: string;
+  question: string;
+  answer: string;
+  category: SupportCategory;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** `support_rate_limits/{userId}` — per-user ticket-creation cooldown. `last_ticket_at` is written
+ *  with Firestore's `serverTimestamp()` sentinel (a native Timestamp, not the ISO strings used
+ *  elsewhere in this file) specifically so firestore.rules can do `request.time > last_ticket_at +
+ *  duration.value(2, 'm')` arithmetic and reject a backdated value via `request.resource.data.
+ *  last_ticket_at == request.time` — see supportService.ts. Deliberately just a cooldown, not an
+ *  "open ticket count" cap — a count would need the Admin's status-change actions to keep it
+ *  in sync too, crossing a write-permission boundary (this doc is owner(userId)-write-only) for
+ *  marginal extra abuse protection. The frontend never reads this doc back (a rules rejection is
+ *  caught and shown as a friendly cooldown message), so its Timestamp value never needs to
+ *  round-trip through application code. */
+export interface SupportRateLimit {
+  last_ticket_at: unknown;
 }
 
 /**
@@ -584,7 +802,7 @@ export interface SearchHistoryEntry {
   result_count: number;
 }
 
-/** Singleton doc (`platform_settings/config`) — Head Seller's Platform Settings page. */
+/** Singleton doc (`platform_settings/config`) — Admin's Platform Settings page. */
 export interface PlatformSettings {
   id: string;
   store_name: string;
@@ -597,7 +815,7 @@ export interface PlatformSettings {
   exchange_window_days: number;
   return_policy: string;
   privacy_policy: string;
-  /** Percentage of paid-order revenue the platform keeps — 0 until the Head Seller sets it, so
+  /** Percentage of paid-order revenue the platform keeps — 0 until the Admin sets it, so
    *  existing installs are unaffected. Drives the dashboard's Platform Earnings / Seller Earnings split. */
   commission_rate_percent: number;
   updated_at: string;
@@ -605,9 +823,9 @@ export interface PlatformSettings {
 
 export type PayoutStatus = 'pending' | 'paid';
 
-/** `payouts/{id}` — a manually-recorded payout from the platform to a seller for a given period.
- *  No payment gateway integration exists for payouts; the Head Seller records that a bank transfer
- *  happened and marks it paid, same spirit as the app's existing "informational only" bank fields. */
+/** `payouts/{id}` — a manually-recorded payout for a given period. No payment gateway integration
+ *  exists for payouts; the Admin records that a bank transfer happened and marks it paid, same
+ *  spirit as the app's existing "informational only" bank fields. */
 export interface Payout {
   id: string;
   seller_id: string;

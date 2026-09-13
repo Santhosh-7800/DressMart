@@ -41,6 +41,13 @@ export interface PlaceCodOrderInput {
   clientRequestId: string;
 }
 
+export interface CreateRazorpayOrderInput {
+  addressId: string;
+  couponCode?: string;
+  cart: CartLineForOrder[];
+  receipt: string;
+}
+
 let razorpayScriptPromise: Promise<void> | null = null;
 
 /** Injects the Razorpay Checkout script tag once and resolves once it has loaded (no-op if already present). */
@@ -67,9 +74,11 @@ export function loadRazorpayScript(): Promise<void> {
 }
 
 export const paymentService = {
-  /** Step 1 of the Razorpay flow — mints a Razorpay order server-side for the given rupee total. */
-  async createRazorpayOrder(input: { amount: number; receipt: string }): Promise<CreateRazorpayOrderResult> {
-    const call = httpsCallable<{ amount: number; receipt: string }, CreateRazorpayOrderResult>(functions, 'createRazorpayOrder');
+  /** Step 1 of the Razorpay flow — mints a Razorpay order server-side. The amount is computed by
+   *  the Cloud Function itself from the cart/address/coupon (never sent from here) so what
+   *  Razorpay charges always matches what the order is later recorded for. */
+  async createRazorpayOrder(input: CreateRazorpayOrderInput): Promise<CreateRazorpayOrderResult> {
+    const call = httpsCallable<CreateRazorpayOrderInput, CreateRazorpayOrderResult>(functions, 'createRazorpayOrder');
     const res = await call(input);
     return res.data;
   },

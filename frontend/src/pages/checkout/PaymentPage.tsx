@@ -1,22 +1,21 @@
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { CreditCard, Banknote } from 'lucide-react';
+import { CreditCard, Banknote, MapPin } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { OrderSummary } from '@/components/cart/OrderSummary';
 import { Button } from '@/components/ui/Button';
 import { useCheckoutItems } from '@/hooks/useCheckoutItems';
+import { useAddresses } from '@/hooks/useAddresses';
 import { useAuth } from '@/contexts/AuthContext';
 import { paymentService, loadRazorpayScript, type CartLineForOrder } from '@/services/paymentService';
 import { env } from '@/lib/env';
+import { usePlatformSettings } from '@/hooks/useDashboardData';
 import { clearBuyNowItem } from '@/lib/buyNowSession';
+import { computeOrderTotals } from '@/lib/orderMath';
 import { formatCurrency } from '@/lib/utils';
 import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 import type { Coupon, PaymentMethod } from '@/types';
-
-const FREE_SHIPPING_THRESHOLD = 999;
-const SHIPPING_FEE = 79;
-const TAX_RATE = 0.05;
 
 /** Minimal shape of the global injected by checkout.razorpay.com/v1/checkout.js — no official types package for it. */
 interface RazorpayCheckoutInstance {
@@ -46,7 +45,10 @@ export function PaymentPage() {
   const state = location.state as { addressId?: string; paymentMethod?: PaymentMethod } | null;
   const addressId = state?.addressId;
   const { user } = useAuth();
-  const { items, subtotal, totalItems, isBuyNow } = useCheckoutItems();
+  const { items, totalItems, hasOutOfStockItems, isBuyNow } = useCheckoutItems();
+  const { addresses } = useAddresses();
+  const { data: settings } = usePlatformSettings();
+  const selectedAddress = addresses.find((a) => a.id === addressId);
 
   const [method, setMethod] = useState<PaymentMethod>(state?.paymentMethod ?? 'razorpay');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -64,16 +66,12 @@ export function PaymentPage() {
     }
   })();
 
-  const shippingFee = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
-  let couponDiscount = 0;
-  if (coupon) {
-    couponDiscount = coupon.discount_type === 'percent' ? (subtotal * coupon.discount_value) / 100 : coupon.discount_value;
-    if (coupon.max_discount) couponDiscount = Math.min(couponDiscount, coupon.max_discount);
-  }
-
-  const taxableAmount = Math.max(subtotal - couponDiscount, 0);
-  const tax = Math.round(taxableAmount * TAX_RATE);
-  const total = Math.round(taxableAmount + tax + shippingFee);
+  const { subtotal, discount: couponDiscount, shippingFee, tax, total } = computeOrderTotals(
+    items,
+    coupon,
+    settings?.shipping_charge ?? 0,
+    settings?.free_shipping_threshold ?? 999,
+  );
 
   if (!addressId) {
     return (
@@ -99,6 +97,11 @@ export function PaymentPage() {
   };
 
   const handlePlaceCodOrder = async () => {
+    if (hasOutOfStockItems) {
+      toast.error('Some items in your cart are out of stock or exceed available quantity. Please update your cart before continuing.');
+      navigate('/cart');
+      return;
+    }
     setIsProcessing(true);
     try {
       const result = await paymentService.placeCodOrder({ addressId, couponCode: coupon?.code, cart: cartPayload, clientRequestId });
@@ -111,12 +114,24 @@ export function PaymentPage() {
   };
 
   const handlePayWithRazorpay = async () => {
+    if (hasOutOfStockItems) {
+      toast.error('Some items in your cart are out of stock or exceed available quantity. Please update your cart before continuing.');
+      navigate('/cart');
+      return;
+    }
     setIsProcessing(true);
     try {
       await loadRazorpayScript();
       if (!window.Razorpay) throw new Error('Payment gateway failed to load. Please try again.');
 
-      const razorpayOrder = await paymentService.createRazorpayOrder({ amount: total, receipt: `checkout-${Date.now()}` });
+      // amount is computed server-side (from addressId/couponCode/cart), never sent from here —
+      // see createRazorpayOrder's implementation for why.
+      const razorpayOrder = await paymentService.createRazorpayOrder({
+        addressId,
+        couponCode: coupon?.code,
+        cart: cartPayload,
+        receipt: `checkout-${Date.now()}`,
+      });
 
       const checkout = new window.Razorpay({
         key: razorpayOrder.keyId || env.razorpayKeyId,
@@ -165,6 +180,20 @@ export function PaymentPage() {
       <h1 className="mb-6 hidden text-2xl font-bold md:block">Payment</h1>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
         <div className="card-surface p-5">
+          {selectedAddress && (
+            <div className="mb-5 flex items-start gap-3 rounded-xl border border-primary-100 p-4 dark:border-primary-700">
+              <MapPin size={18} className="mt-0.5 shrink-0 text-primary-400" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">{selectedAddress.full_name}</p>
+                <p className="truncate text-sm text-primary-400">
+                  {selectedAddress.line1}, {selectedAddress.city}, {selectedAddress.state} - {selectedAddress.pincode}
+                </p>
+              </div>
+              <button onClick={() => navigate('/checkout')} className="shrink-0 text-sm font-semibold text-accent">
+                Change
+              </button>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <button
               onClick={() => setMethod('razorpay')}

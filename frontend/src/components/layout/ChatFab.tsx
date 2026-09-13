@@ -39,15 +39,27 @@ export function ChatFab() {
             </div>
           ))}
         </div>
-        <Button
-          className="min-h-12 w-full"
-          onClick={() => {
-            setIsOpen(false);
-            navigate('/help-center');
-          }}
-        >
-          Go to Help Center
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="min-h-12 flex-1"
+            onClick={() => {
+              setIsOpen(false);
+              navigate('/help-center');
+            }}
+          >
+            Help Center
+          </Button>
+          <Button
+            className="min-h-12 flex-1"
+            onClick={() => {
+              setIsOpen(false);
+              navigate('/support/new');
+            }}
+          >
+            Contact Support
+          </Button>
+        </div>
       </Modal>
     </>
   );

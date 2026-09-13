@@ -1,20 +1,14 @@
 import { Capacitor } from '@capacitor/core';
+import { arrayUnion, doc, updateDoc } from 'firebase/firestore';
+import { auth, db } from './firebase';
+import { DEEP_LINK_EVENT } from './deepLinks';
 
 /**
- * Native Android push-notification scaffolding — installed and wired, but deliberately inert until
- * a real Firebase project's `google-services.json` is added to `android/app/`. Without it, the
- * native FCM SDK has no project to register against, so `PushNotifications.register()` will fail;
- * every step below is wrapped so that failure is a silent, expected no-op rather than a crash.
- *
- * TODO(production): once android/app/google-services.json exists (see README's "Push Notification
- * Setup" section):
- *   1. This function will start actually registering devices and receiving tokens — nothing here
- *      needs to change.
- *   2. Wire `onRegistration`'s token into a Firestore write (e.g. `users/{uid}.fcmTokens`) so
- *      Cloud Functions can target this device — there's deliberately no Firestore write here yet,
- *      since without a real project there's nowhere legitimate to send it.
- *   3. Add a server-side Cloud Function (functions/src/triggers or callables) that reads those
- *      tokens and calls `admin.messaging().send(...)` — out of scope for this client-side prep.
+ * Native Android push-notification scaffolding. `android/app/google-services.json` now points at a
+ * real Firebase project, so this actually registers devices and receives tokens (still wrapped so a
+ * misconfiguration is a silent, expected no-op rather than a startup crash). The registered token is
+ * persisted the same way `useFcmToken.ts` (web push) does — `users/{uid}.fcm_tokens` via `arrayUnion`
+ * — so `onNotificationCreated`'s Cloud Function trigger can target this device.
  */
 export async function initPushNotifications(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
@@ -44,9 +38,27 @@ export async function initPushNotifications(): Promise<void> {
   }
 
   PushNotifications.addListener('registration', (token) => {
-    // TODO(production): persist token.value to this user's Firestore profile once there's a real
-    // project to send pushes from — see this file's docstring.
-    console.info('[pushNotifications] device registered, token:', token.value);
+    const uid = auth.currentUser?.uid;
+    if (!uid) {
+      // Registration can fire before sign-in completes (e.g. a cold start on the login screen) —
+      // there's no user to attach the token to yet. Not treated as an error: once the user does sign
+      // in and enables push from Settings, useFcmToken.ts's web-push path writes to the same
+      // fcm_tokens field, so the device still ends up registered.
+      console.info('[pushNotifications] device registered before sign-in — token not yet persisted.');
+      return;
+    }
+    // Phase 19: the native SDK fires 'registration' on every app process/cold start even when the
+    // token itself hasn't changed, which previously meant an unconditional Firestore write on every
+    // launch. `arrayUnion` already de-dupes server-side (this was never a correctness bug), but
+    // skipping the write client-side when the token matches what THIS device last persisted avoids
+    // a redundant write on every single app open.
+    const lastPersistedKey = `dressmart_fcm_token_${uid}`;
+    if (localStorage.getItem(lastPersistedKey) === token.value) return;
+    updateDoc(doc(db, 'users', uid), { fcm_tokens: arrayUnion(token.value) })
+      .then(() => localStorage.setItem(lastPersistedKey, token.value))
+      .catch((error) => {
+        console.warn('[pushNotifications] failed to persist device token:', error);
+      });
   });
 
   PushNotifications.addListener('registrationError', (error) => {
@@ -58,9 +70,12 @@ export async function initPushNotifications(): Promise<void> {
   });
 
   PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
-    // TODO(production): route to the relevant in-app screen based on the notification payload
-    // (e.g. an order-update push should open /orders/{orderId}) — mirror DeepLinkListener's
-    // pattern (src/routes/AppRoutes.tsx) once real push payloads exist to design the mapping from.
-    console.info('[pushNotifications] tapped:', action.notification);
+    // Phase 22: was a no-op TODO — onNotificationCreated.ts already sends the notification's own
+    // `link` field (an in-app route like `/orders/{orderId}`, already exactly what NotificationsPage
+    // itself links to) as part of the FCM data payload, so no new resolution logic is needed here —
+    // just dispatch it through the SAME DEEP_LINK_EVENT bridge `appUrlOpen` already uses (handled by
+    // AppRoutes.tsx's useDeepLinkNavigation, which calls navigate() with whatever path it receives).
+    const link = action.notification.data?.link as string | undefined;
+    if (link) window.dispatchEvent(new CustomEvent(DEEP_LINK_EVENT, { detail: link }));
   });
 }

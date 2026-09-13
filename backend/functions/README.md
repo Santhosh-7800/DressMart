@@ -1,7 +1,7 @@
 # DressMart Cloud Functions
 
 Firebase Cloud Functions (2nd-gen, `firebase-functions/v2`) backing the DressMart Firestore
-marketplace: order placement (COD + Razorpay), order cancellation, seller moderation, and
+store: order placement (COD + Razorpay), order cancellation, and
 notification fan-out (in-app doc + FCM push). Runs on the Admin SDK, so it bypasses
 `firestore.rules` entirely — see the repo-root `firestore.rules` for what plain client writes are
 still allowed to do (status advancement on orders/returns/exchanges), which is what the triggers
@@ -122,10 +122,9 @@ data: {
 returns: { orderNumber: string, groupId: string }
 ```
 Cash-on-delivery checkout. Validates address ownership, re-reads product/inventory
-server-side (never trusts client prices/stock), splits the cart by `seller_id` into one
-`orders/{id}` doc per seller (sharing `group_id`/`order_number`), decrements inventory inside a
-transaction, deletes the purchased `cart/*` docs, applies+increments a coupon if given, and sends
-buyer/seller/low-stock notifications.
+server-side (never trusts client prices/stock), creates one `orders/{id}` doc (owned by the single
+Admin account's `seller_id`), decrements inventory inside a transaction, deletes the purchased
+`cart/*` docs, applies+increments a coupon if given, and sends buyer/Admin/low-stock notifications.
 
 ### `verifyAndPlaceOrder`
 ```ts
@@ -151,25 +150,16 @@ returns: { success: true }
 ```
 Buyer-only, and only while status is `placed`/`confirmed`/`packed`. Restores inventory
 (`variant_stock` + `total_stock`) inside a transaction, appends a `cancelled` timeline event, and
-notifies both the seller (`cancelled_order`) and the buyer (`order`).
+notifies both the Admin (`cancelled_order`) and the buyer (`order`).
 
-### `reviewSellerRequest`
+### `createAdmin`
 ```ts
-data: { requestId: string; approve: boolean; rejectionReason?: string }
-returns: { success: true }
+data: { ownerName: string; storeName: string; email: string; phone?: string; password: string }
+returns: { success: true; uid: string }
 ```
-Head-Seller-only. Updates the `seller_requests` doc and the applicant's `users/{uid}` doc
-(`seller_status`, `seller_approved_at`/`seller_status_reason`) in one batch; role stays `'seller'`
-either way. Notifies the applicant.
-
-### `suspendSellerAccount`
-```ts
-data: { sellerId: string; reason: string; suspend: boolean }
-returns: { success: true }
-```
-Head-Seller-only. Flips `users/{sellerId}.seller_status` between `'suspended'`/`'approved'`; when
-suspending, also sets `is_active: false` on every product owned by that seller (batched in chunks
-of 400 writes). Notifies the seller.
+Unauthenticated — the one-time bootstrap for the single Admin account. Guarded by a transaction on
+`system/setup` (`admin_created`) so it can only ever succeed once; a second call throws
+`already-exists`.
 
 ## Firestore triggers
 
@@ -182,7 +172,6 @@ deliberately ignores the `cancelled` transition — see inline comment).
 | `onOrderStatusChange` | `orders/{orderId}` updated, `status` changed | Notifies the buyer (`order`/`delivery` type). Skips `cancelled` (already handled by `cancelOrder`). |
 | `onReturnStatusChange` | `returns/{returnId}` updated, `status` changed | Notifies the buyer (`return`), mirrors the new status onto the matching `order.items[].return_status`. |
 | `onExchangeStatusChange` | `exchanges/{exchangeId}` updated, `status` changed | Notifies the buyer (`exchange`), mirrors the new status onto the matching `order.items[].exchange_status`. |
-| `onSellerRequestCreated` | `seller_requests/{id}` created | Notifies the (single) `head_seller` user (`seller_registration`). |
 | `onNotificationCreated` | `notifications/{id}` created | Sends an FCM push to `users/{user_id}.fcm_tokens` via `sendEachForMulticast`; prunes tokens that come back `registration-token-not-registered`. Never throws — logs and swallows push failures. |
 
 ## Known gaps / TODOs
@@ -191,15 +180,14 @@ deliberately ignores the `cancelled` transition — see inline comment).
   `failed-precondition` rather than silently placing the order without a discount. This seemed
   safer than surprising the buyer with a different total than what they saw at checkout — flag if
   the client instead expects a soft-fail (order placed, discount just not applied).
-- **Shipping/tax model** is deliberately simple, per the spec: a flat per-shipment shipping fee
+- **Shipping/tax model** is deliberately simple, per the spec: a flat per-order shipping fee
   from `platform_settings/config` (defaulting to the same values as the client's own fallback —
   `shipping_charge: 0`, `free_shipping_threshold: 999`), and tax computed per line as
-  `line_subtotal * product.gst_percent / 100`, summed per seller-group (i.e. tax is **not**
-  netted against the discount). Revisit if finance/product wants tax computed post-discount.
-- **`estimated_delivery`** is a flat "now + 5 days" for every order; no per-seller/per-pincode
-  logic.
-- **Order-number format** is `ORD${Date.now()}` (shared across every seller-group in one
-  checkout). No collision handling beyond millisecond timestamp uniqueness — fine at this scale.
+  `line_subtotal * product.gst_percent / 100` (i.e. tax is **not** netted against the discount).
+  Revisit if finance/product wants tax computed post-discount.
+- **`estimated_delivery`** is a flat "now + 5 days" for every order; no per-pincode logic.
+- **Order-number format** is `ORD${Date.now()}`. No collision handling beyond millisecond
+  timestamp uniqueness — fine at this scale.
 - **`onOrderStatusChange` does not cover every `OrderStatus`** — only the ones that make sense as
   a buyer-facing push after the initial `placed` status (`confirmed`, `packed`, `shipped`,
   `out_for_delivery`, `delivered`, `returned`); `placed` itself is skipped because it's a

@@ -6,13 +6,14 @@ import { useAddresses } from '@/hooks/useAddresses';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { AddressFormFields } from '@/components/address/AddressFormFields';
 import { EMPTY_ADDRESS_FORM, isAddressFormValid, type AddressFormValues } from '@/lib/addressValidation';
 import { cn } from '@/lib/utils';
 import type { Address } from '@/types';
 
 export function AddressesPage() {
-  const { addresses, addAddress, updateAddress, removeAddress } = useAddresses();
+  const { addresses, isLoading, addAddress, updateAddress, removeAddress } = useAddresses();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<AddressFormValues>(EMPTY_ADDRESS_FORM);
@@ -63,7 +64,12 @@ export function AddressesPage() {
         </Button>
       </div>
 
-      {addresses.length === 0 ? (
+      {isLoading ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+      ) : addresses.length === 0 ? (
         <EmptyState icon={MapPin} title="No addresses saved" description="Add a delivery address for faster checkout." />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

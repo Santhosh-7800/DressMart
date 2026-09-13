@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { sellerStatsService } from '@/services/sellerStatsService';
+import { adminStatsService } from '@/services/adminStatsService';
 import { orderService } from '@/services/orderService';
 import { returnService } from '@/services/returnService';
 import { exchangeService } from '@/services/exchangeService';
 import { reviewService } from '@/services/reviewService';
-import { sellerAdminService } from '@/services/sellerAdminService';
 import { staffAdminService } from '@/services/staffAdminService';
 import { payoutService } from '@/services/payoutService';
 import { platformSettingsService } from '@/services/platformSettingsService';
@@ -14,48 +13,48 @@ import type { Order, Review, ReturnRequest, ExchangeRequest } from '@/types';
 
 export function useOrderStatusBreakdown(sellerId: string, isHeadSeller: boolean) {
   return useQuery({
-    queryKey: queryKeys.seller.orderStatusBreakdown(sellerId),
-    queryFn: () => sellerStatsService.getOrderStatusBreakdown(sellerId, isHeadSeller),
+    queryKey: queryKeys.admin.orderStatusBreakdown(sellerId),
+    queryFn: () => adminStatsService.getOrderStatusBreakdown(sellerId, isHeadSeller),
     enabled: Boolean(sellerId),
   });
 }
 
 export function useLowStockList(sellerId: string) {
   return useQuery({
-    queryKey: queryKeys.seller.lowStockList(sellerId),
-    queryFn: () => sellerStatsService.listLowStock(sellerId),
+    queryKey: queryKeys.admin.lowStockList(sellerId),
+    queryFn: () => adminStatsService.listLowStock(sellerId),
     enabled: Boolean(sellerId),
   });
 }
 
 export function useOutOfStockList(sellerId: string) {
   return useQuery({
-    queryKey: queryKeys.seller.outOfStockList(sellerId),
-    queryFn: () => sellerStatsService.listOutOfStock(sellerId),
+    queryKey: queryKeys.admin.outOfStockList(sellerId),
+    queryFn: () => adminStatsService.listOutOfStock(sellerId),
     enabled: Boolean(sellerId),
   });
 }
 
 export function useRecentlyAddedProducts(sellerId: string) {
   return useQuery({
-    queryKey: queryKeys.seller.recentlyAdded(sellerId),
-    queryFn: () => sellerStatsService.listRecentlyAdded(sellerId),
+    queryKey: queryKeys.admin.recentlyAdded(sellerId),
+    queryFn: () => adminStatsService.listRecentlyAdded(sellerId),
     enabled: Boolean(sellerId),
   });
 }
 
 export function useDealsEndingSoon(sellerId: string) {
   return useQuery({
-    queryKey: queryKeys.seller.dealsEndingSoon(sellerId),
-    queryFn: () => sellerStatsService.listDealsEndingSoon(sellerId),
+    queryKey: queryKeys.admin.dealsEndingSoon(sellerId),
+    queryFn: () => adminStatsService.listDealsEndingSoon(sellerId),
     enabled: Boolean(sellerId),
   });
 }
 
 export function useTopSellingProducts(sellerId: string, isHeadSeller: boolean) {
   return useQuery({
-    queryKey: queryKeys.seller.topSelling(sellerId),
-    queryFn: () => sellerStatsService.listTopSelling(sellerId, isHeadSeller),
+    queryKey: queryKeys.admin.topSelling(sellerId),
+    queryFn: () => adminStatsService.listTopSelling(sellerId, isHeadSeller),
     enabled: Boolean(sellerId),
   });
 }
@@ -105,15 +104,6 @@ export function useRecentReviews(sellerId: string) {
   });
 }
 
-export function useLatestSellerRegistrations(enabled: boolean) {
-  return useQuery({
-    queryKey: queryKeys.sellerRequests.all,
-    queryFn: () => sellerAdminService.listSellerRequests(),
-    enabled,
-    select: (rows) => rows.slice(0, 5),
-  });
-}
-
 export function useLatestStaffActivity(sellerId: string, enabled: boolean) {
   return useQuery({
     queryKey: queryKeys.staff.activity(sellerId),
@@ -126,32 +116,32 @@ export function useLatestStaffActivity(sellerId: string, enabled: boolean) {
  *  6-month revenue trend — a single date-bounded fetch per range, bucketed client-side. */
 export function useOrdersInRange(sellerId: string, isHeadSeller: boolean, days: number) {
   return useQuery({
-    queryKey: queryKeys.seller.ordersInRange(sellerId, days),
-    queryFn: () => sellerStatsService.getOrdersInRange(sellerId, isHeadSeller, days),
+    queryKey: queryKeys.admin.ordersInRange(sellerId, days),
+    queryFn: () => adminStatsService.getOrdersInRange(sellerId, isHeadSeller, days),
     enabled: Boolean(sellerId),
   });
 }
 
 export function useCategoryBreakdown(sellerId: string, isHeadSeller: boolean) {
   return useQuery({
-    queryKey: queryKeys.seller.categoryBreakdown(sellerId),
-    queryFn: () => sellerStatsService.getCategoryBreakdown(sellerId, isHeadSeller),
+    queryKey: queryKeys.admin.categoryBreakdown(sellerId),
+    queryFn: () => adminStatsService.getCategoryBreakdown(sellerId, isHeadSeller),
     enabled: Boolean(sellerId),
   });
 }
 
 export function useCustomerGrowth(days: number, enabled: boolean) {
   return useQuery({
-    queryKey: queryKeys.seller.userGrowth('buyer', days),
-    queryFn: () => sellerStatsService.getUserGrowth(days, ['buyer']),
+    queryKey: queryKeys.admin.userGrowth('buyer', days),
+    queryFn: () => adminStatsService.getUserGrowth(days, ['buyer']),
     enabled,
   });
 }
 
 export function useSellerGrowth(days: number, enabled: boolean) {
   return useQuery({
-    queryKey: queryKeys.seller.userGrowth('seller', days),
-    queryFn: () => sellerStatsService.getUserGrowth(days, ['seller', 'head_seller']),
+    queryKey: queryKeys.admin.userGrowth('admin', days),
+    queryFn: () => adminStatsService.getUserGrowth(days, ['admin']),
     enabled,
   });
 }
@@ -172,12 +162,12 @@ export function useWeeklyRevenue(sellerId: string, isHeadSeller: boolean) {
 }
 
 export function usePlatformSettings() {
-  return useQuery({ queryKey: queryKeys.seller.platformSettings, queryFn: () => platformSettingsService.get() });
+  return useQuery({ queryKey: queryKeys.admin.platformSettings, queryFn: () => platformSettingsService.get() });
 }
 
 export function usePayouts(sellerId: string, isHeadSeller: boolean) {
   return useQuery({
-    queryKey: queryKeys.seller.payouts(sellerId, isHeadSeller),
+    queryKey: queryKeys.admin.payouts(sellerId, isHeadSeller),
     queryFn: () => (isHeadSeller ? payoutService.listAll() : payoutService.listForSeller(sellerId)),
     enabled: Boolean(sellerId),
   });

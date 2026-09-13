@@ -1,26 +1,25 @@
 import type { Profile, UserRole } from '@/types';
 
-/** The Head Seller is also a Seller — every seller-facing route/query must admit both. */
-export const SELLER_ROLES: UserRole[] = ['seller', 'head_seller'];
-export const HEAD_SELLER_ROLE: UserRole = 'head_seller';
+export const ADMIN_ROLE: UserRole = 'admin';
 export const STAFF_ROLE: UserRole = 'staff';
+export const DELIVERY_ROLE: UserRole = 'delivery';
 
-export function isSellerRole(role: UserRole | undefined): boolean {
-  return Boolean(role) && SELLER_ROLES.includes(role as UserRole);
-}
-
-export function isHeadSeller(role: UserRole | undefined): boolean {
-  return role === HEAD_SELLER_ROLE;
+export function isAdminRole(role: UserRole | undefined): boolean {
+  return role === ADMIN_ROLE;
 }
 
 export function isStaffRole(role: UserRole | undefined): boolean {
   return role === STAFF_ROLE;
 }
 
+export function isDeliveryRole(role: UserRole | undefined): boolean {
+  return role === DELIVERY_ROLE;
+}
+
 /**
  * The seller_id every product/order/inventory/return query for the signed-in user should scope
- * to. For a seller/head-seller this is just their own uid; for staff it's the Head Seller's uid
- * they were created under (Profile.seller_id) — staff never own anything under their own uid.
+ * to. For the Admin this is just their own uid; for staff it's the Admin's uid they were created
+ * under (Profile.seller_id) — staff never own anything under their own uid.
  */
 export function effectiveSellerId(user: Pick<Profile, 'id' | 'role' | 'seller_id'> | null | undefined): string {
   if (!user) return '';
@@ -30,6 +29,7 @@ export function effectiveSellerId(user: Pick<Profile, 'id' | 'role' | 'seller_id
 /** Where a signed-in user should land right after authenticating, based on role. */
 export function getPostLoginRedirect(role: UserRole | undefined, fallback: string): string {
   if (isStaffRole(role)) return '/staff/dashboard';
-  if (isSellerRole(role)) return '/seller/dashboard';
+  if (isDeliveryRole(role)) return '/delivery/dashboard';
+  if (isAdminRole(role)) return '/admin/dashboard';
   return fallback;
 }

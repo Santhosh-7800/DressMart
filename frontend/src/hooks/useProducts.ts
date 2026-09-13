@@ -120,11 +120,12 @@ export function useReviewableOrderItems(userId: string | null | undefined, produ
 export function useSubmitReview() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ input, userName, userAvatar }: { input: SubmitReviewInput; userName: string; userAvatar?: string | null }) =>
-      reviewService.submit(input, userName, userAvatar ?? null),
-    onSuccess: (_review, { input }) => {
+    mutationFn: ({ input }: { input: SubmitReviewInput }) => reviewService.submit(input),
+    onSuccess: (_result, { input }) => {
       // Invalidate everywhere a rating/review can be displayed — card, PDP, search, category —
-      // so the new review's effect on the average/count/distribution shows up immediately.
+      // so the new review's effect on the average/count/distribution shows up immediately. The
+      // rating summary is server-computed asynchronously (onReviewWritten) — invalidating here just
+      // means the next read picks up whatever's current, same as before.
       queryClient.invalidateQueries({ queryKey: queryKeys.reviews.byProduct(input.product_id) });
       queryClient.invalidateQueries({ queryKey: queryKeys.reviews.summary(input.product_id) });
       queryClient.invalidateQueries({ queryKey: queryKeys.reviews.reviewable(input.user_id, input.product_id) });
@@ -133,15 +134,23 @@ export function useSubmitReview() {
   });
 }
 
+// Phase 19: bumped to match useCategoryCoverImages' existing 10-minute treatment right below —
+// categories/brands change about as rarely as a category's cover photo, and every seller-side
+// create/update/delete already calls invalidateQueries on these exact keys (SellerCategoriesPage/
+// SellerBrandsPage), so a longer staleTime never delays a seller seeing their OWN edit — it only
+// skips a redundant background refetch when nothing has actually changed.
+const CATALOG_METADATA_STALE_TIME = 10 * 60 * 1000;
+
 export function useCategories(gender?: string) {
   return useQuery({
     queryKey: gender ? queryKeys.categories.byGender(gender) : queryKeys.categories.all,
     queryFn: () => categoryService.list(gender),
+    staleTime: CATALOG_METADATA_STALE_TIME,
   });
 }
 
 export function useFeaturedBrands() {
-  return useQuery({ queryKey: queryKeys.brands.featured, queryFn: () => brandService.featured() });
+  return useQuery({ queryKey: queryKeys.brands.featured, queryFn: () => brandService.featured(), staleTime: CATALOG_METADATA_STALE_TIME });
 }
 
 /** One real product photo per category id, for the homepage category tiles — see

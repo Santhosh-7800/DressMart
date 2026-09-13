@@ -59,7 +59,7 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove, onSaveForLater, 
             <p className="font-semibold">{formatCurrency(item.price * item.quantity)}</p>
           </div>
           <div className="flex gap-4 text-xs">
-            <button onClick={onRemove} className="flex items-center gap-1 text-primary-400 hover:text-red-500">
+            <button onClick={onRemove} className="flex items-center gap-1 py-2 text-primary-400 hover:text-red-500">
               <Trash2 size={13} /> Remove
             </button>
           </div>
@@ -121,12 +121,12 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove, onSaveForLater, 
               <Trash2 size={13} /> Remove
             </button>
             {onSaveForLater && (
-              <button onClick={onSaveForLater} className="flex items-center gap-1 text-primary-400 hover:text-accent-600">
+              <button onClick={onSaveForLater} className="flex items-center gap-1 py-2 text-primary-400 hover:text-accent-600">
                 <Heart size={13} /> Save for later
               </button>
             )}
             {onMoveToCart && (
-              <button onClick={onMoveToCart} className="font-medium text-accent-600 hover:underline">
+              <button onClick={onMoveToCart} className="py-2 font-medium text-accent-600 hover:underline">
                 Move to cart
               </button>
             )}

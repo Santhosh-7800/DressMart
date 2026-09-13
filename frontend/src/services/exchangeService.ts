@@ -1,10 +1,13 @@
-import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, updateDoc, where, type Unsubscribe } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, updateDoc, where, type Unsubscribe } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { ExchangeRequest, ExchangeStatus, Order, OrderItem } from '@/types';
 import { EXCHANGE_STATUS_LABELS } from '@/lib/exchangeStatus';
 
 const EXCHANGES_COLLECTION = 'exchanges';
 const ORDERS_COLLECTION = 'orders';
+/** Phase 19: mirrors returnService.ts's identical HEAD_SELLER_WINDOW_LIMIT fix — see that file's
+ *  comment for the reasoning. */
+const HEAD_SELLER_WINDOW_LIMIT = 500;
 
 function toExchange(snap: { id: string; data: () => Record<string, unknown> }): ExchangeRequest {
   return { id: snap.id, ...snap.data() } as ExchangeRequest;
@@ -50,10 +53,11 @@ export const exchangeService = {
     return snap.docs.map(toExchange);
   },
 
-  /** Head Seller sees every exchange platform-wide (per firestore.rules); a regular seller only their own. */
+  /** Head Seller sees the most recent exchanges platform-wide (per firestore.rules), bounded — see
+   *  HEAD_SELLER_WINDOW_LIMIT; a regular seller only their own (unbounded, naturally small). */
   async listForSeller(sellerId: string, isHeadSeller: boolean): Promise<ExchangeRequest[]> {
     const q = isHeadSeller
-      ? query(collection(db, EXCHANGES_COLLECTION), orderBy('created_at', 'desc'))
+      ? query(collection(db, EXCHANGES_COLLECTION), orderBy('created_at', 'desc'), limit(HEAD_SELLER_WINDOW_LIMIT))
       : query(collection(db, EXCHANGES_COLLECTION), where('seller_id', '==', sellerId), orderBy('created_at', 'desc'));
     const snap = await getDocs(q);
     return snap.docs.map(toExchange);
@@ -65,10 +69,11 @@ export const exchangeService = {
     return onSnapshot(q, (snap) => callback(snap.docs.map(toExchange)));
   },
 
-  /** Realtime — seller's own exchange queue (or, for Head Seller, every exchange) updates live as buyers submit requests. */
+  /** Realtime — seller's own exchange queue (or, for Head Seller, the most recent exchanges
+   *  platform-wide, bounded — see HEAD_SELLER_WINDOW_LIMIT) updates live as buyers submit requests. */
   subscribeForSeller(sellerId: string, isHeadSeller: boolean, callback: (exchanges: ExchangeRequest[]) => void): Unsubscribe {
     const q = isHeadSeller
-      ? query(collection(db, EXCHANGES_COLLECTION), orderBy('created_at', 'desc'))
+      ? query(collection(db, EXCHANGES_COLLECTION), orderBy('created_at', 'desc'), limit(HEAD_SELLER_WINDOW_LIMIT))
       : query(collection(db, EXCHANGES_COLLECTION), where('seller_id', '==', sellerId), orderBy('created_at', 'desc'));
     return onSnapshot(q, (snap) => callback(snap.docs.map(toExchange)));
   },
@@ -97,7 +102,7 @@ export const exchangeService = {
     return { id: ref.id, ...payload };
   },
 
-  /** Seller/head-seller fulfillment action (plain updateDoc — rules already allow the owning seller_id / head_seller to write). */
+  /** Admin fulfillment action (plain updateDoc — rules already allow the Admin to write). */
   async advanceStatus(exchangeRequest: ExchangeRequest, nextStatus: ExchangeStatus): Promise<void> {
     const event = { status: nextStatus, label: EXCHANGE_STATUS_LABELS[nextStatus], timestamp: new Date().toISOString() };
     await updateDoc(doc(db, EXCHANGES_COLLECTION, exchangeRequest.id), {

@@ -1,4 +1,4 @@
-import { createHmac } from 'crypto';
+import { createHmac, timingSafeEqual } from 'crypto';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { runCallable } from '../lib/callableGuard';
 import { razorpayKeySecret } from '../lib/config';
@@ -40,7 +40,16 @@ export const verifyAndPlaceOrder = onCall<VerifyAndPlaceOrderData>(
         .update(`${razorpayOrderId}|${razorpayPaymentId}`)
         .digest('hex');
 
-      if (expectedSignature !== razorpaySignature) {
+      // Timing-safe comparison — a plain `!==` on a hex digest leaks how many leading characters
+      // matched via response-time differences, a standard (if hard to exploit remotely) side
+      // channel on any secret comparison. timingSafeEqual requires equal-length buffers, so the
+      // length check must happen first — that length itself isn't secret (a valid signature's
+      // length is always the same, sha256-hex is always 64 chars).
+      const expectedBuffer = Buffer.from(expectedSignature, 'utf8');
+      const providedBuffer = Buffer.from(razorpaySignature, 'utf8');
+      const signatureIsValid = expectedBuffer.length === providedBuffer.length && timingSafeEqual(expectedBuffer, providedBuffer);
+
+      if (!signatureIsValid) {
         throw new HttpsError('invalid-argument', 'Payment verification failed');
       }
 

@@ -33,6 +33,11 @@ export function SearchHistoryPage() {
     toast.success('Search history cleared');
   };
 
+  const handleRemoveOne = async (normalizedQuery: string) => {
+    await userActivityService.removeSearchEntry(identityId, normalizedQuery);
+    queryClient.invalidateQueries({ queryKey });
+  };
+
   return (
     <div>
       <Seo title="Search History" />
@@ -64,19 +69,25 @@ export function SearchHistoryPage() {
       {!isLoading && searches.length > 0 && (
         <div className="card-surface divide-y divide-primary-100 dark:divide-primary-700">
           {searches.map((entry) => (
-            <Link
-              key={entry.normalized_query}
-              to={`/search?q=${encodeURIComponent(entry.query)}`}
-              className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-primary-50 dark:hover:bg-primary-800"
-            >
-              <Search size={16} className="shrink-0 text-primary-400" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-primary-900 dark:text-white">{entry.query}</p>
-                <p className="text-xs text-primary-400">
-                  {formatDate(entry.searched_at)} · {entry.result_count} {entry.result_count === 1 ? 'result' : 'results'}
-                </p>
-              </div>
-            </Link>
+            <div key={entry.normalized_query} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-primary-50 dark:hover:bg-primary-800">
+              <Link to={`/search?q=${encodeURIComponent(entry.query)}`} className="flex min-w-0 flex-1 items-center gap-3">
+                <Search size={16} className="shrink-0 text-primary-400" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-primary-900 dark:text-white">{entry.query}</p>
+                  <p className="text-xs text-primary-400">
+                    {formatDate(entry.searched_at)} · {entry.result_count} {entry.result_count === 1 ? 'result' : 'results'}
+                  </p>
+                </div>
+              </Link>
+              <button
+                type="button"
+                onClick={() => handleRemoveOne(entry.normalized_query)}
+                aria-label={`Remove "${entry.query}" from search history`}
+                className="shrink-0 rounded-full p-1.5 text-primary-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
           ))}
         </div>
       )}

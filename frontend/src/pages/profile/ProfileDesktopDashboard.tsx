@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { User, Mail, Phone, Ticket, MapPin, Sparkles, Package, Heart, Clock, Copy, Plus, Camera, Bell, CreditCard, Settings as SettingsIcon, HelpCircle, LogOut, ChevronRight } from 'lucide-react';
+import { User, Mail, Phone, Ticket, MapPin, Sparkles, Package, Heart, Clock, Copy, Plus, Camera, Bell, CreditCard, Settings as SettingsIcon, HelpCircle, LifeBuoy, LogOut, ChevronRight } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -26,6 +26,7 @@ import type { Profile } from '@/types';
 const MORE_LINKS: { to: string; label: string; icon: typeof Bell }[] = [
   { to: '/payments', label: 'Payment Methods', icon: CreditCard },
   { to: '/notifications', label: 'Notifications', icon: Bell },
+  { to: '/support', label: 'My Support Requests', icon: LifeBuoy },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
   { to: '/help-center', label: 'Help & Support', icon: HelpCircle },
 ];

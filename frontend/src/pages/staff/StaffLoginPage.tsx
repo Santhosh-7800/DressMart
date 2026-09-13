@@ -22,7 +22,7 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-/** Mirrors SellerLoginPage's password flow (staff accounts are created email/password-only via
+/** Mirrors AdminLoginPage's password flow (staff accounts are created email/password-only via
  *  the Head Seller's Add Staff form — no phone/Google sign-in path for staff). */
 export function StaffLoginPage() {
   const { signIn } = useAuth();

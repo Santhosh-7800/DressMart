@@ -21,7 +21,7 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
-        versionName "1.0"
+        versionName "1.0.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -41,7 +41,18 @@ android {
     }
     buildTypes {
         release {
-            minifyEnabled false
+            // Phase 19: was `false` with no shrinkResources at all — the release APK/AAB shipped
+            // fully unminified/unshrunk. Capacitor core + every first-party plugin used here
+            // (@capacitor/app, @capacitor/push-notifications, @capacitor/status-bar) and the
+            // Firebase Android SDK all publish their own consumer-proguard-rules bundled in their
+            // AARs (merged in automatically by AGP), so this is the standard, expected way to ship
+            // a Capacitor release build — proguard-rules.pro below adds one small defensive keep
+            // set on top for the reflection-based/JS-bridge surfaces those consumer rules might not
+            // fully cover, verified by a successful assembleRelease this session (no physical device
+            // to verify zero runtime regressions, consistent with every prior phase's Android
+            // testing caveat).
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
             if (hasSigningConfig) {
                 signingConfig signingConfigs.release

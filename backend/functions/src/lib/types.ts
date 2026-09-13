@@ -8,8 +8,7 @@
  */
 
 export type Gender = 'men' | 'kids';
-export type UserRole = 'buyer' | 'seller' | 'head_seller' | 'staff';
-export type SellerStatus = 'pending' | 'approved' | 'rejected' | 'suspended';
+export type UserRole = 'buyer' | 'admin' | 'staff' | 'delivery';
 export type StaffStatus = 'active' | 'disabled';
 
 export type StaffPermissionKey =
@@ -24,6 +23,11 @@ export type StaffPermissionKey =
   | 'reply_to_customers'
   | 'view_reports';
 
+export type StaffPermissions = Record<StaffPermissionKey, boolean> & {
+  staff_id: string;
+  updated_at: string;
+};
+
 export interface StaffProfile {
   id: string;
   seller_id: string;
@@ -31,6 +35,21 @@ export interface StaffProfile {
   designation: string;
   department: string | null;
   status: StaffStatus;
+  status_reason: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type DeliveryStaffStatus = 'active' | 'inactive';
+
+/** An Admin-managed delivery-personnel account — distinct from StaffProfile (product/inventory
+ *  staff) since delivery has its own, fixed capability set with no per-permission toggles. */
+export interface DeliveryStaffProfile {
+  id: string;
+  full_name: string;
+  phone: string;
+  status: DeliveryStaffStatus;
   status_reason: string | null;
   created_by: string;
   created_at: string;
@@ -57,13 +76,13 @@ export interface Profile {
   updated_at: string;
   store_name?: string;
   gst_number?: string;
-  seller_status?: SellerStatus;
-  seller_applied_at?: string;
-  seller_approved_at?: string | null;
-  seller_status_reason?: string | null;
   seller_id?: string;
   staff_status?: StaffStatus;
   staff_status_reason?: string | null;
+  /** Present only when role is 'delivery' — denormalized from delivery_staff/{uid} for display
+   *  (e.g. roster badges) without a second read, same pattern as staff_status above. */
+  delivery_staff_status?: DeliveryStaffStatus;
+  delivery_staff_status_reason?: string | null;
   fcm_tokens?: string[];
   shop_logo_url?: string | null;
   shop_banner_url?: string | null;
@@ -161,6 +180,44 @@ export interface Inventory {
   variant_stock: Record<string, number>;
   low_stock_threshold: number;
   updated_at: string;
+  /** Dedup flags (Phase 12) — whether a low/out-of-stock alert has already been sent for the
+   *  CURRENT dip. Reset to false once total_stock rises back above low_stock_threshold, so a
+   *  future dip alerts again instead of alerting once ever. See lib/inventoryAlerts.ts. */
+  low_stock_alert_sent?: boolean;
+  out_of_stock_alert_sent?: boolean;
+}
+
+export type InventoryMovementType =
+  | 'sale'
+  | 'cancellation'
+  | 'return'
+  | 'exchange_out'
+  | 'exchange_in'
+  | 'manual_increase'
+  | 'manual_decrease'
+  | 'initial_stock';
+
+/** `inventory_movements/{movementId}` — an append-only audit trail of every stock change, written
+ *  inside the same transaction as the inventory update it records. Never updated or deleted. */
+export interface InventoryMovement {
+  id: string;
+  product_id: string;
+  variant_id: string;
+  sku: string;
+  seller_id: string;
+  previous_quantity: number;
+  quantity_changed: number;
+  new_quantity: number;
+  movement_type: InventoryMovementType;
+  reason: string | null;
+  order_id: string | null;
+  return_id: string | null;
+  exchange_id: string | null;
+  performed_by: string;
+  /** 'system' for movements a Firestore trigger applies as a side effect (return/exchange stock
+   *  restoration) rather than a direct action by the signed-in user named in performed_by. */
+  performed_by_role: UserRole | 'system';
+  created_at: string;
 }
 
 export interface Address {
@@ -198,6 +255,31 @@ export interface OrderTimelineEvent {
   note?: string;
 }
 
+/**
+ * Independent of OrderStatus (see firestore.rules' isValidOrderTransition comment history) —
+ * tracks the internal fulfillment sub-workflow once an order has a delivery person assigned.
+ * 'unassigned' is the implicit default for every order created before Phase 11 or never assigned
+ * a delivery person; those orders simply have no delivery_status field at all.
+ */
+export type DeliveryStatus = 'unassigned' | 'assigned' | 'accepted' | 'picked_up' | 'out_for_delivery' | 'delivered' | 'failed';
+
+export interface DeliveryNoteEvent {
+  note: string;
+  added_by: string;
+  added_by_name: string;
+  added_at: string;
+}
+
+/** One entry per assignment/reassignment — lets the owner see who handled an order over time. */
+export interface DeliveryAssignmentEvent {
+  delivery_staff_id: string;
+  delivery_staff_name: string;
+  assigned_by: string;
+  assigned_at: string;
+  unassigned_at?: string | null;
+  outcome?: 'reassigned' | 'failed' | 'delivered' | null;
+}
+
 export interface OrderItem {
   id: string;
   order_id: string;
@@ -208,6 +290,10 @@ export interface OrderItem {
   product_image: string;
   product_slug: string;
   brand_name: string;
+  /** Denormalized from the variant at order-placement time (Phase 17) — enables the owner order
+   *  dashboard's SKU search without a per-item product lookup. Optional because orders placed
+   *  before this field existed don't have it. */
+  sku?: string;
   size: string;
   color: string;
   quantity: number;
@@ -244,6 +330,22 @@ export interface Order {
   tracking_number?: string;
   courier_name?: string;
   courier_phone?: string;
+  /** Present only once a Admin has assigned this order to a delivery person (Phase 11). All
+   *  writes to these fields go through the assignDelivery/updateDeliveryStatus Cloud Functions —
+   *  never a direct client write — see firestore.rules' orders match block. */
+  delivery_status?: DeliveryStatus;
+  delivery_staff_id?: string | null;
+  delivery_staff_name?: string | null;
+  delivery_assigned_at?: string | null;
+  delivery_assigned_by?: string | null;
+  delivery_accepted_at?: string | null;
+  delivery_picked_up_at?: string | null;
+  delivery_out_for_delivery_at?: string | null;
+  delivery_delivered_at?: string | null;
+  delivery_failed_at?: string | null;
+  delivery_failure_reason?: string | null;
+  delivery_notes?: DeliveryNoteEvent[];
+  delivery_history?: DeliveryAssignmentEvent[];
 }
 
 export type ReturnStatus = 'requested' | 'approved' | 'rejected' | 'pickup_scheduled' | 'received' | 'refunded';
@@ -266,6 +368,10 @@ export interface ReturnRequest {
   refund_amount: number;
   timeline: ReturnTimelineEvent[];
   created_at: string;
+  /** Set exactly once, server-side only (onReturnStatusChange), when stock has been restored for
+   *  this return — guards against restoring twice if the status is re-written or the trigger
+   *  redelivers. Absent/false on every return created before this field existed. */
+  inventory_restored?: boolean;
 }
 
 export type ExchangeStatus = 'requested' | 'approved' | 'rejected' | 'pickup_scheduled' | 'exchanged';
@@ -290,6 +396,42 @@ export interface ExchangeRequest {
   status: ExchangeStatus;
   timeline: ExchangeTimelineEvent[];
   created_at: string;
+  /** Set exactly once, server-side only (onExchangeStatusChange), when stock has been swapped
+   *  (old variant restored, new variant decremented) for this exchange — guards against doing it
+   *  twice if the status is re-written or the trigger redelivers. */
+  inventory_restored?: boolean;
+}
+
+export interface Review {
+  id: string;
+  product_id: string;
+  user_id: string;
+  order_id: string | null;
+  order_item_id: string;
+  user_name: string;
+  user_avatar: string | null;
+  rating: number;
+  review_title: string | null;
+  review_text: string | null;
+  images: string[];
+  is_verified_purchase: boolean;
+  helpful_count: number;
+  created_at: string;
+  updated_at: string;
+  seller_reply?: { text: string; replied_at: string } | null;
+  is_hidden?: boolean;
+}
+
+export interface RatingSummary {
+  product_id: string;
+  average_rating: number;
+  total_reviews: number;
+  rating_5: number;
+  rating_4: number;
+  rating_3: number;
+  rating_2: number;
+  rating_1: number;
+  updated_at?: string;
 }
 
 export interface Coupon {
@@ -305,6 +447,22 @@ export interface Coupon {
   is_active: boolean;
   usage_limit: number | null;
   used_count: number;
+  applicable_categories?: string[] | null;
+  per_user_limit?: number | null;
+  new_customers_only?: boolean;
+  created_by?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CouponUsage {
+  id: string;
+  coupon_id: string;
+  coupon_code: string;
+  user_id: string;
+  order_group_id: string;
+  discount_amount: number;
+  used_at: string;
 }
 
 export type NotificationType =
@@ -316,8 +474,10 @@ export type NotificationType =
   | 'new_order'
   | 'cancelled_order'
   | 'low_stock'
-  | 'seller_registration'
-  | 'platform';
+  | 'out_of_stock'
+  | 'platform'
+  | 'promotion'
+  | 'support';
 
 export interface Notification {
   id: string;
@@ -330,19 +490,87 @@ export interface Notification {
   created_at: string;
 }
 
-export interface SellerRequest {
+export type SupportCategory = 'order' | 'payment' | 'delivery' | 'return' | 'exchange' | 'product' | 'coupon' | 'account' | 'other';
+export type SupportTicketStatus = 'open' | 'in_progress' | 'waiting_for_customer' | 'resolved' | 'closed';
+export type SupportTicketPriority = 'low' | 'normal' | 'high';
+
+/**
+ * `supportTickets/{ticketId}` — Phase 16. Deliberately created/replied-to via direct, rules-gated
+ * client writes (like returns/exchanges), not a Cloud Function, since every ownership/eligibility
+ * check it needs (own order, own ticket, not-closed) is a single-doc get() rules can already
+ * express — unlike reviews (Phase 14), which needed an arbitrary duplicate-review QUERY no rule
+ * can perform. This is what lets ticket creation/replies work today despite the project's Spark
+ * billing plan blocking every Cloud Function; only the notification fan-out (onSupportTicketCreated/
+ * onSupportMessageCreated triggers, same as every other notification in the app) needs Blaze.
+ *
+ * `user_name` is the one deliberate denormalization onto this doc (a display name, not the full
+ * profile) — added specifically so the owner dashboard can search/display by customer name without
+ * an extra read per ticket; every other field stays a reference (order_id/return_id/exchange_id)
+ * rather than a copy, per the "don't duplicate customer profile information" instruction.
+ */
+export interface SupportTicket {
   id: string;
   user_id: string;
-  full_name: string;
-  email: string;
-  phone: string;
-  store_name: string;
-  gst_number: string;
-  status: SellerStatus;
-  applied_at: string;
-  reviewed_at: string | null;
-  reviewed_by: string | null;
-  rejection_reason: string | null;
+  user_name: string;
+  subject: string;
+  category: SupportCategory;
+  status: SupportTicketStatus;
+  priority: SupportTicketPriority;
+  order_id: string | null;
+  return_id: string | null;
+  exchange_id: string | null;
+  assigned_to: string | null;
+  created_at: string;
+  updated_at: string;
+  resolved_at: string | null;
+  last_message_at: string;
+  last_message_by: 'customer' | 'admin';
+  last_message_preview: string;
+  /** Unread flag for the ADMIN's side of the conversation — true whenever the customer has
+   *  sent something the owner hasn't opened the ticket to see yet. */
+  admin_unread: boolean;
+  /** Unread flag for the CUSTOMER's side — true whenever the owner has replied and the customer
+   *  hasn't opened the ticket since. */
+  customer_unread: boolean;
+}
+
+export type SupportMessageType = 'customer_message' | 'owner_reply' | 'internal_note';
+
+/**
+ * `supportTickets/{ticketId}/messages/{messageId}` — append-only (allow update, delete: if false
+ * in firestore.rules), same audit-trail idiom as inventory_movements/coupon_usages. `internal_note`
+ * messages must NEVER reach a customer: the customer-facing list query always applies
+ * `where('message_type', 'in', ['customer_message', 'owner_reply'])` so a query that could ever
+ * match an internal_note is never even sent — Firestore rejects an entire list query if ANY
+ * matched document fails `allow read`, so filtering must happen in the query itself, not just the
+ * rule (the rule's own `message_type != 'internal_note'` check is defense-in-depth for a
+ * single-document get(), not what makes list queries safe).
+ */
+export interface SupportMessage {
+  id: string;
+  ticket_id: string;
+  sender_id: string;
+  sender_name: string;
+  sender_role: 'customer' | 'admin';
+  message_type: SupportMessageType;
+  message: string;
+  created_at: string;
+}
+
+/** `faqs/{faqId}` — Admin-managed Help Center content (Phase 16), mirrors banners/categories'
+ *  plain-Firestore-CRUD pattern exactly (public read, isHeadSeller() write, no Cloud Function
+ *  needed). HelpCenterPage falls back to a hardcoded default set (lib/defaultFaqs.ts) only when
+ *  this collection is completely empty, so a fresh install never shows a blank Help Center before
+ *  the owner has added any content. */
+export interface Faq {
+  id: string;
+  question: string;
+  answer: string;
+  category: SupportCategory;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
 }
 
 /** Singleton doc (`platform_settings/config`). */

@@ -7,10 +7,10 @@ interface RemoveStaffData {
 }
 
 /**
- * Head-Seller-only hard delete of a staff account — unlike removeSeller.ts, staff never own
- * products/orders themselves (everything they touch is attributed to the store's own seller_id),
- * so there's no order-history guard or product/inventory cleanup needed here; just the Auth
- * account and the two staff-only profile docs.
+ * Admin-only hard delete of a staff account — staff never own products/orders themselves
+ * (everything they touch is attributed to the store's own seller_id), so there's no
+ * order-history guard or product/inventory cleanup needed here; just the Auth account and the
+ * two staff-only profile docs.
  */
 export const removeStaff = onCall<RemoveStaffData>(async (request) => {
   if (!request.auth) {
@@ -23,8 +23,8 @@ export const removeStaff = onCall<RemoveStaffData>(async (request) => {
 
   const callerSnap = await db.collection('users').doc(request.auth.uid).get();
   const caller = callerSnap.data() as Profile | undefined;
-  if (!caller || caller.role !== 'head_seller') {
-    throw new HttpsError('permission-denied', 'Only the Head Seller can remove staff.');
+  if (!caller || caller.role !== 'admin') {
+    throw new HttpsError('permission-denied', 'Only the Admin can remove staff.');
   }
 
   const targetSnap = await db.collection('users').doc(staffId).get();

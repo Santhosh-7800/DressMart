@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Moon, Sun, Monitor, Lock, AlertTriangle, Bell, BellOff, BellRing } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
@@ -10,10 +11,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useFcmToken } from '@/hooks/useFcmToken';
 import { authService } from '@/services/authService';
+import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 import { cn } from '@/lib/utils';
 
 export function SettingsPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { themePreference, setThemePreference } = useTheme();
   const { permission, enablePush, isRegistering, isSupported } = useFcmToken();
 
@@ -22,6 +25,21 @@ export function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSavingPassword, setIsSavingPassword] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteAccount = async () => {
+    setIsDeleting(true);
+    try {
+      await authService.deleteAccount();
+      toast.success('Your account has been deleted.');
+      setIsDeleteModalOpen(false);
+      navigate('/', { replace: true });
+    } catch (error) {
+      toast.error(getFriendlyErrorMessage(error, 'Could not delete your account. Please try again.'));
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   if (!user) return null;
 
@@ -46,7 +64,7 @@ export function SettingsPage() {
       setNewPassword('');
       setConfirmPassword('');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Could not update password');
+      toast.error(getFriendlyErrorMessage(error, 'Could not update password'));
     } finally {
       setIsSavingPassword(false);
     }
@@ -145,21 +163,15 @@ export function SettingsPage() {
 
       <Modal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} title="Delete your account?">
         <p className="mb-4 text-sm text-primary-500">
-          Account deletion requests are handled by our support team to make sure any pending orders or refunds are settled first. Submit a request and we'll follow up by email within 24 hours.
+          This permanently deletes your DressMart login, saved addresses, wishlist, search history, and notifications. Your past orders are
+          kept as store records (required for returns, exchanges, and accounting) but are no longer linked to your name — this cannot be undone.
         </p>
         <div className="flex gap-3">
-          <Button variant="outline" fullWidth onClick={() => setIsDeleteModalOpen(false)}>
+          <Button variant="outline" fullWidth onClick={() => setIsDeleteModalOpen(false)} disabled={isDeleting}>
             Cancel
           </Button>
-          <Button
-            variant="danger"
-            fullWidth
-            onClick={() => {
-              toast.success('Deletion request received — our support team will contact you shortly.');
-              setIsDeleteModalOpen(false);
-            }}
-          >
-            Request Deletion
+          <Button variant="danger" fullWidth onClick={handleDeleteAccount} isLoading={isDeleting}>
+            Delete My Account
           </Button>
         </div>
       </Modal>

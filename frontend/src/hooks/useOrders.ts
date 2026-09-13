@@ -6,8 +6,8 @@ import { staffService } from '@/services/staffService';
 import { queryKeys } from '@/lib/queryClient';
 import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 import { useAuth } from '@/contexts/AuthContext';
-import { effectiveSellerId, isHeadSeller, isStaffRole } from '@/lib/roles';
-import type { Order } from '@/types';
+import { effectiveSellerId, isAdminRole, isStaffRole } from '@/lib/roles';
+import type { Order, OrderStatus } from '@/types';
 
 /** Buyer's own orders — one card per seller-scoped shipment; group by order_number/group_id for
  *  display. Realtime: updates live as a seller advances status, no polling/refresh needed. */
@@ -114,7 +114,7 @@ export function useSellerOrders() {
       return;
     }
     setIsLoading(true);
-    const unsubscribe = orderService.subscribeForSeller(effectiveSellerId(user), isHeadSeller(user.role), (data) => {
+    const unsubscribe = orderService.subscribeForSeller(effectiveSellerId(user), isAdminRole(user.role), (data) => {
       setOrders(data);
       setIsLoading(false);
     });
@@ -123,6 +123,49 @@ export function useSellerOrders() {
   }, [user?.id, user?.role]);
 
   return { data: orders, isLoading };
+}
+
+const ORDERS_PAGE_SIZE = 50;
+
+/**
+ * Bounded, status-scoped realtime feed for the owner Orders dashboard (Phase 17) — replaces the
+ * unbounded `useSellerOrders()` there, which had no limit at all for a Head Seller. Changing
+ * `statusFilter` re-queries Firestore directly (server-side reduction, not a client-side filter
+ * over everything already fetched); `loadMore` bumps the shared `limit()` and re-subscribes.
+ * `hasMore` is a heuristic (exactly `maxDocs` docs came back) rather than an exact count, the same
+ * tradeoff `useInfiniteProductListing` accepts for its own "Load more" affordance.
+ */
+export function useSellerOrdersPaged(statusFilter: OrderStatus | 'all') {
+  const { user } = useAuth();
+  const [orders, setOrders] = useState<Order[] | undefined>(undefined);
+  const [isLoading, setIsLoading] = useState(true);
+  const [maxDocs, setMaxDocs] = useState(ORDERS_PAGE_SIZE);
+
+  // Resets the page size back to the default whenever the filter changes — otherwise switching
+  // from a filtered view (small result set) back to "All" would keep whatever larger limit was
+  // reached while paging through a different filter.
+  useEffect(() => setMaxDocs(ORDERS_PAGE_SIZE), [statusFilter]);
+
+  useEffect(() => {
+    if (!user) {
+      setOrders(undefined);
+      return;
+    }
+    setIsLoading(true);
+    const unsubscribe = orderService.subscribeOrdersForSellerPaged(effectiveSellerId(user), isAdminRole(user.role), statusFilter, maxDocs, (data) => {
+      setOrders(data);
+      setIsLoading(false);
+    });
+    return unsubscribe;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, user?.role, statusFilter, maxDocs]);
+
+  return {
+    data: orders,
+    isLoading,
+    hasMore: (orders?.length ?? 0) >= maxDocs,
+    loadMore: () => setMaxDocs((n) => n + ORDERS_PAGE_SIZE),
+  };
 }
 
 export function useAdvanceOrderStatus() {

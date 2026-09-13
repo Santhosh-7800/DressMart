@@ -50,6 +50,17 @@ export async function uploadBannerImage(file: File, headSellerId: string): Promi
   return getDownloadURL(fileRef);
 }
 
+/** Review photo upload — `reviews/{userId}/...`, matching storage.rules. Phase 14 replaced the
+ *  previous "paste an image URL" text box (which rendered ANY external URL on the public product
+ *  page, unvalidated) with a real upload through this same Storage-backed pattern. */
+export async function uploadReviewImage(file: File, userId: string): Promise<string> {
+  const ext = file.name.split('.').pop() ?? 'jpg';
+  const path = `reviews/${userId}/${crypto.randomUUID()}.${ext}`;
+  const fileRef = ref(storage, path);
+  await uploadBytes(fileRef, file, { cacheControl: '3600' });
+  return getDownloadURL(fileRef);
+}
+
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 export function isAcceptedImageFile(file: File): boolean {

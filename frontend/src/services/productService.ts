@@ -33,7 +33,7 @@ import type {
   ProductStatus,
   ProductVariant,
 } from '@/types';
-import type { SellerProductColorInput, SellerProductInput } from '@/types/seller';
+import type { AdminProductColorInput, AdminProductInput } from '@/types/admin';
 
 const PRODUCTS_COLLECTION = 'products';
 const CATALOG_FETCH_LIMIT = 500; // safety valve on the bounded client-side-filtered fetch — see list() below.
@@ -128,11 +128,18 @@ function fetchActiveWindow(gender?: Gender, categorySlugs?: string[]): Promise<P
 }
 
 /** Every filter except free-text search — search needs its own multi-field relevance pass (see
- *  applySearch below), not a plain boolean predicate. */
-function matchesNonSearchFilters(p: Product, filters: ProductFilters): boolean {
+ *  applySearch below), not a plain boolean predicate. `inventory` is optional: when provided
+ *  (see list()'s inventory batch fetch below), the color/size filters require actual stock on a
+ *  matching variant, not just that the color/size combination exists in the catalog — Phase 15's
+ *  audit found a product with e.g. size L at 0 stock would still satisfy an "L" filter, which
+ *  meant a customer could filter to a size that's actually unavailable on every matching product.
+ *  Falls back to existence-only when inventory isn't loaded (kept optional rather than always
+ *  fetched, since most filter combinations don't touch color/size and shouldn't pay for it). */
+function matchesNonSearchFilters(p: Product, filters: ProductFilters, inventory?: Inventory): boolean {
   if (filters.brandIds?.length && !filters.brandIds.includes(p.brand_id)) return false;
-  if (filters.colors?.length && !p.variants.some((v) => filters.colors!.includes(v.color))) return false;
-  if (filters.sizes?.length && !p.variants.some((v) => filters.sizes!.includes(v.size))) return false;
+  const hasStock = (variantId: string) => !inventory || (inventory.variant_stock[variantId] ?? 0) > 0;
+  if (filters.colors?.length && !p.variants.some((v) => filters.colors!.includes(v.color) && hasStock(v.id))) return false;
+  if (filters.sizes?.length && !p.variants.some((v) => filters.sizes!.includes(v.size) && hasStock(v.id))) return false;
   if (filters.minPrice !== undefined && p.price < filters.minPrice) return false;
   if (filters.maxPrice !== undefined && p.price > filters.maxPrice) return false;
   if (filters.minRating !== undefined && p.rating < filters.minRating) return false;
@@ -201,7 +208,7 @@ function sortProducts(items: Product[], sort: ProductFilters['sort']): Product[]
  * OMITTED entirely, never set to `undefined` (Firestore's setDoc rejects any field whose value is
  * `undefined` outright, throwing "invalid data... Unsupported field value: undefined").
  */
-function buildSpecifications(input: SellerProductInput): ProductSpecifications {
+function buildSpecifications(input: AdminProductInput): ProductSpecifications {
   return {
     fabric: input.fabric,
     fit: input.fit,
@@ -220,7 +227,7 @@ function buildSpecifications(input: SellerProductInput): ProductSpecifications {
  * combo keep its original variant id, so its inventory history/SKU stay stable across edits.
  */
 function buildVariantsFromInput(
-  input: SellerProductInput,
+  input: AdminProductInput,
   productId: string,
   existingVariants: ProductVariant[] = [],
 ): { variants: ProductVariant[]; variantStock: Record<string, number> } {
@@ -250,7 +257,7 @@ function buildVariantsFromInput(
 }
 
 /** Flattens each color's images (in color order) into the product's `images: ProductImage[]`, capped at 10 total. */
-function buildImagesFromColors(colors: SellerProductColorInput[], productId: string, productName: string): ProductImage[] {
+function buildImagesFromColors(colors: AdminProductColorInput[], productId: string, productName: string): ProductImage[] {
   const images: ProductImage[] = [];
   colors.forEach((color) => {
     color.images.forEach((url) => {
@@ -265,9 +272,9 @@ function buildImagesFromColors(colors: SellerProductColorInput[], productId: str
  * Reconstructs the seller form's per-color input (name/hex/images/per-size stock) from a saved
  * Product + its Inventory doc — powers prefilling the Edit Product form.
  */
-export function toColorInputs(product: Product, inventory: Inventory | null): SellerProductColorInput[] {
+export function toColorInputs(product: Product, inventory: Inventory | null): AdminProductColorInput[] {
   const stock = inventory?.variant_stock ?? {};
-  const byColor = new Map<string, SellerProductColorInput>();
+  const byColor = new Map<string, AdminProductColorInput>();
   product.variants.forEach((v) => {
     if (!byColor.has(v.color)) {
       byColor.set(v.color, {
@@ -288,7 +295,14 @@ export const productService = {
     const pageSize = filters.pageSize ?? 24;
 
     let items = await fetchActiveWindow(filters.gender, filters.categorySlugs);
-    items = items.filter((p) => matchesNonSearchFilters(p, filters));
+
+    // Only fetched when a filter actually needs per-variant stock (color/size) or product-level
+    // stock (inStockOnly) — most filter combinations touch neither and shouldn't pay for this read.
+    // One batch covers both uses below rather than fetching twice.
+    const needsInventory = Boolean(filters.colors?.length || filters.sizes?.length || filters.inStockOnly);
+    const invMap = needsInventory ? await inventoryService.getInventoryBatch(items.map((p) => p.id)) : {};
+
+    items = items.filter((p) => matchesNonSearchFilters(p, filters, invMap[p.id]));
 
     let relevance: Map<string, number> | null = null;
     if (filters.search) {
@@ -302,7 +316,6 @@ export const productService = {
     }
 
     if (filters.inStockOnly) {
-      const invMap = await inventoryService.getInventoryBatch(items.map((p) => p.id));
       items = items.filter((p) => (invMap[p.id]?.total_stock ?? 0) > 0);
     }
 
@@ -470,16 +483,32 @@ export const productService = {
     return hydrate(items);
   },
 
+  /** Throws if `sku` is already used by a different product. Only called for a user-typed SKU —
+   *  the auto-generated `SKU-<docId>` fallback is unique by construction and skips this check.
+   *  Query-then-write, same non-transactional pattern this file already uses for
+   *  categoryService.remove/brandService.remove's existence checks — good enough at this app's
+   *  scale; a true race (two simultaneous creates with the identical SKU) remains theoretically
+   *  possible, same as those other checks. */
+  async assertSkuAvailable(sku: string, excludeProductId?: string): Promise<void> {
+    const snap = await getDocs(query(collection(db, PRODUCTS_COLLECTION), where('sku', '==', sku), fsLimit(2)));
+    const clash = snap.docs.find((d) => d.id !== excludeProductId);
+    if (clash) {
+      throw new Error(`SKU "${sku}" is already used by another product. Choose a different SKU.`);
+    }
+  },
+
   /** Creates the product doc + its paired inventory doc together. seller_id/seller_name are always
    *  taken from the signed-in seller, never trusted from the form (see firestore.rules). `actor` is
    *  present only when a staff member (not the seller themselves) performed the action — it never
    *  changes who *owns* the product (seller_id/seller_name), only who's recorded as having done it. */
-  async create(sellerId: string, sellerName: string, input: SellerProductInput, actor?: { id: string; name: string }): Promise<Product> {
+  async create(sellerId: string, sellerName: string, input: AdminProductInput, actor?: { id: string; name: string }): Promise<Product> {
     const ref = doc(collection(db, PRODUCTS_COLLECTION));
     const { variants, variantStock } = buildVariantsFromInput(input, ref.id);
     const images = buildImagesFromColors(input.colors, ref.id, input.name);
     const now = new Date().toISOString();
-    const sku = input.sku.trim() || `SKU-${ref.id.slice(0, 8).toUpperCase()}`;
+    const trimmedSku = input.sku.trim();
+    if (trimmedSku) await this.assertSkuAvailable(trimmedSku);
+    const sku = trimmedSku || `SKU-${ref.id.slice(0, 8).toUpperCase()}`;
 
     const product: Product = {
       id: ref.id,
@@ -538,11 +567,13 @@ export const productService = {
    * stock is always taken directly from the submitted per-color sizeStock (the Inventory page is
    * for quick stock-only tweaks — editing the product here is the source of truth for the full grid).
    */
-  async update(productId: string, sellerId: string, sellerName: string, input: SellerProductInput, actor?: { id: string; name: string }): Promise<Product> {
+  async update(productId: string, sellerId: string, sellerName: string, input: AdminProductInput, actor?: { id: string; name: string }): Promise<Product> {
     const existing = await this.getById(productId);
     const { variants, variantStock } = buildVariantsFromInput(input, productId, existing?.variants ?? []);
     const images = buildImagesFromColors(input.colors, productId, input.name);
-    const sku = input.sku.trim() || existing?.sku || `SKU-${productId.slice(0, 8).toUpperCase()}`;
+    const trimmedSku = input.sku.trim();
+    if (trimmedSku && trimmedSku !== existing?.sku) await this.assertSkuAvailable(trimmedSku, productId);
+    const sku = trimmedSku || existing?.sku || `SKU-${productId.slice(0, 8).toUpperCase()}`;
 
     const updates: Partial<Product> = {
       seller_id: sellerId,
@@ -621,7 +652,7 @@ export const productService = {
     const existing = await this.getById(productId);
     if (!existing) throw new Error('Product not found.');
     const inventory = await inventoryService.getInventory(productId);
-    const input: SellerProductInput = {
+    const input: AdminProductInput = {
       name: `${existing.name} (Copy)`,
       sku: '',
       brand_id: existing.brand_id,
@@ -705,25 +736,21 @@ export const categoryService = {
 
   /**
    * One real product photo per category, for the homepage "Shop by Category" tiles — reuses
-   * actual catalog photography instead of a generic icon or placeholder. A single-field `in`
-   * query (no second `where`) needs no composite index. Chunked to Firestore's 30-value `in`
-   * limit, same pattern as inventoryService.getInventoryBatch.
+   * actual catalog photography instead of a generic icon or placeholder. One `limit(1)` query per
+   * category (not a single batched `in` query) so every category is guaranteed its own result —
+   * a shared `in` + limit across many categories lets ones with more/earlier-sorting products
+   * crowd out the rest before Firestore ever reaches their documents, even though those categories
+   * have perfectly good product photos of their own.
    */
   async getCoverImages(categoryIds: string[]): Promise<Record<string, string>> {
     if (categoryIds.length === 0) return {};
     const result: Record<string, string> = {};
-    const chunks: string[][] = [];
-    for (let i = 0; i < categoryIds.length; i += 30) chunks.push(categoryIds.slice(i, i + 30));
     await Promise.all(
-      chunks.map(async (chunk) => {
-        const snap = await getDocs(query(collection(db, PRODUCTS_COLLECTION), where('category_id', 'in', chunk), fsLimit(chunk.length * 3)));
-        snap.docs.forEach((d) => {
-          const p = d.data() as Product;
-          if (!result[p.category_id]) {
-            const image = p.coverImage || p.images[0]?.url;
-            if (image) result[p.category_id] = image;
-          }
-        });
+      categoryIds.map(async (categoryId) => {
+        const snap = await getDocs(query(collection(db, PRODUCTS_COLLECTION), where('category_id', '==', categoryId), fsLimit(1)));
+        const p = snap.docs[0]?.data() as Product | undefined;
+        const image = p?.coverImage || p?.images[0]?.url;
+        if (image) result[categoryId] = image;
       }),
     );
     return result;

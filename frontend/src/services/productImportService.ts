@@ -1,5 +1,5 @@
 import { productService, brandService, categoryService } from './productService';
-import type { Gender, SellerProductInput } from '@/types';
+import type { Gender, AdminProductInput } from '@/types';
 
 export interface ProductImportRow {
   name: string;
@@ -108,7 +108,7 @@ export async function importProducts(
       const mrp = Number(row.mrp) || price;
       const stock = Math.max(0, Math.round(Number(row.stock)) || 0);
 
-      const input: SellerProductInput = {
+      const input: AdminProductInput = {
         name: row.name.trim(),
         sku: row.sku.trim(),
         brand_id: brand.id,

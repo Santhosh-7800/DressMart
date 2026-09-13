@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { Download, XCircle, RotateCcw, Repeat } from 'lucide-react';
+import { Link, useParams } from 'react-router-dom';
+import { Download, XCircle, RotateCcw, Repeat, LifeBuoy } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { useOrder, useCancelOrder } from '@/hooks/useOrders';
 import { Button } from '@/components/ui/Button';
@@ -31,7 +31,9 @@ export function OrderDetailsPage() {
     );
   }
 
-  const canCancel = !['delivered', 'cancelled', 'returned'].includes(order.status);
+  // Must mirror backend/functions/src/callables/cancelOrder.ts's CANCELLABLE_STATUSES exactly —
+  // showing Cancel for a status the server will reject leaves the customer at a dead end.
+  const canCancel = ['placed', 'confirmed', 'packed'].includes(order.status);
   const isDelivered = order.status === 'delivered';
 
   return (
@@ -46,6 +48,11 @@ export function OrderDetailsPage() {
           <Button variant="outline" size="sm" onClick={() => downloadInvoice(order)}>
             <Download size={14} /> Invoice
           </Button>
+          <Link to={`/support/new?category=order&orderId=${order.id}`}>
+            <Button variant="outline" size="sm">
+              <LifeBuoy size={14} /> Need Help?
+            </Button>
+          </Link>
           {canCancel && (
             <Button variant="danger" size="sm" onClick={() => setIsCancelOpen(true)}>
               <XCircle size={14} /> Cancel Order
@@ -93,6 +100,59 @@ export function OrderDetailsPage() {
         </div>
       </div>
 
+      <div className="card-surface mb-6 p-5">
+        <h2 className="mb-3 font-semibold">Payment Summary</h2>
+        <div className="space-y-1.5 text-sm">
+          <div className="flex justify-between text-primary-400">
+            <span>Subtotal</span>
+            <span>{formatCurrency(order.subtotal)}</span>
+          </div>
+          {order.discount > 0 && (
+            <div className="flex justify-between text-green-600 dark:text-green-400">
+              <span>Discount{order.coupon_code ? ` (${order.coupon_code})` : ''}</span>
+              <span>-{formatCurrency(order.discount)}</span>
+            </div>
+          )}
+          <div className="flex justify-between text-primary-400">
+            <span>Shipping</span>
+            <span>{order.shipping_fee > 0 ? formatCurrency(order.shipping_fee) : 'Free'}</span>
+          </div>
+          {order.tax > 0 && (
+            <div className="flex justify-between text-primary-400">
+              <span>Tax</span>
+              <span>{formatCurrency(order.tax)}</span>
+            </div>
+          )}
+          <div className="mt-2 flex justify-between border-t border-primary-100 pt-2 font-semibold dark:border-primary-700">
+            <span>Total</span>
+            <span>{formatCurrency(order.total)}</span>
+          </div>
+          <div className="flex justify-between pt-1 text-primary-400">
+            <span>Payment Method</span>
+            <span className="font-medium text-primary-600 dark:text-primary-300">
+              {order.payment_method === 'cod' ? 'Cash on Delivery' : 'Razorpay'} · {order.payment_status === 'paid' ? 'Paid' : order.payment_status === 'failed' ? 'Failed' : 'Pending'}
+            </span>
+          </div>
+        </div>
+        {order.payment_status === 'failed' && (
+          <Link
+            to={`/support/new?category=payment&orderId=${order.id}`}
+            className="mt-3 flex items-center gap-2 rounded-xl bg-red-50 px-3 py-2.5 text-xs font-medium text-red-600 dark:bg-red-900/20 dark:text-red-400"
+          >
+            <LifeBuoy size={14} /> Payment failed for this order — get help
+          </Link>
+        )}
+      </div>
+
+      {(order.delivery_status === 'out_for_delivery' || order.delivery_status === 'failed') && (
+        <div className="card-surface mb-6 p-5">
+          <Link to={`/support/new?category=delivery&orderId=${order.id}`} className="flex items-center gap-2 text-sm font-medium text-accent-600">
+            <LifeBuoy size={15} />
+            {order.delivery_status === 'failed' ? 'Delivery attempt failed — need help?' : "Having trouble with today's delivery? Get help"}
+          </Link>
+        </div>
+      )}
+
       <div className="card-surface p-5">
         <h2 className="mb-3 font-semibold">Delivery Address</h2>
         <p className="text-sm text-primary-500">
@@ -112,8 +172,13 @@ export function OrderDetailsPage() {
             variant="danger"
             fullWidth
             onClick={async () => {
-              await cancelOrder.mutateAsync(order.id);
-              setIsCancelOpen(false);
+              try {
+                await cancelOrder.mutateAsync(order.id);
+              } finally {
+                // Always close — success/failure toasts are handled by useCancelOrder itself, so
+                // this modal shouldn't stay stuck open on a rejected cancellation.
+                setIsCancelOpen(false);
+              }
             }}
             isLoading={cancelOrder.isPending}
           >

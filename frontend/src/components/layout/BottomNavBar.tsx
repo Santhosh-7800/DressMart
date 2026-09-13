@@ -1,7 +1,6 @@
 import { NavLink } from 'react-router-dom';
-import { Home, LayoutGrid, ShoppingCart, Package, User, type LucideIcon } from 'lucide-react';
+import { Home, LayoutGrid, Search, Package, User, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useCart } from '@/hooks/useCart';
 import { useRipple } from '@/hooks/useRipple';
 import { CountBadge } from '@/components/ui/CountBadge';
 import { RippleLayer } from '@/components/ui/RippleLayer';
@@ -13,10 +12,12 @@ interface TabDef {
   end?: boolean;
 }
 
+// Cart is deliberately NOT a tab here — it stays reachable via the header cart icon (see
+// Header.tsx) on every screen, so this primary nav row has a slot free for Search instead.
 const TABS: TabDef[] = [
   { to: '/', label: 'Home', icon: Home, end: true },
   { to: '/categories', label: 'Categories', icon: LayoutGrid },
-  { to: '/cart', label: 'Cart', icon: ShoppingCart },
+  { to: '/search', label: 'Search', icon: Search },
   { to: '/orders', label: 'Orders', icon: Package },
   { to: '/profile', label: 'Profile', icon: User },
 ];
@@ -55,15 +56,13 @@ function TabLink({ to, label, icon: Icon, end, badge }: TabDef & { badge?: numbe
  * See src/layouts/MainLayout.tsx for where this is conditionally rendered.
  */
 export function BottomNavBar() {
-  const { totalItems } = useCart();
-
   return (
     <nav
       className="pb-safe fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t border-primary-100 bg-white/95 backdrop-blur-md md:hidden dark:border-primary-700 dark:bg-card-dark/95 shadow-[0_-2px_10px_rgba(0,0,0,0.06)]"
       aria-label="Primary"
     >
       {TABS.map((tab) => (
-        <TabLink key={tab.to} {...tab} badge={tab.to === '/cart' ? totalItems : undefined} />
+        <TabLink key={tab.to} {...tab} />
       ))}
     </nav>
   );

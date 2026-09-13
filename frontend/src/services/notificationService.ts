@@ -1,8 +1,13 @@
-import { collection, addDoc, doc, getDocs, onSnapshot, orderBy, query, updateDoc, where, writeBatch, type Unsubscribe } from 'firebase/firestore';
+import { collection, addDoc, doc, getDocs, limit, onSnapshot, orderBy, query, updateDoc, where, writeBatch, type Unsubscribe } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Notification, NotificationType } from '@/types';
 
 const NOTIFICATIONS_COLLECTION = 'notifications';
+/** Phase 19: `list`/`subscribe` previously had no cap at all — a long-lived account's entire
+ *  notification history was read (and, for `subscribe`, kept live) on every profile/nav-bell
+ *  mount. 150 is generous for what a customer/seller actually scrolls through; `markAllRead`
+ *  deliberately stays unbounded below since it must touch every unread doc to actually clear them. */
+const NOTIFICATION_HISTORY_LIMIT = 150;
 
 export const notificationService = {
   /** Available for any client-triggered notification (e.g. a seller action the buyer should hear
@@ -21,16 +26,19 @@ export const notificationService = {
 
   async list(userId: string): Promise<Notification[]> {
     const snap = await getDocs(
-      query(collection(db, NOTIFICATIONS_COLLECTION), where('user_id', '==', userId), orderBy('created_at', 'desc')),
+      query(collection(db, NOTIFICATIONS_COLLECTION), where('user_id', '==', userId), orderBy('created_at', 'desc'), limit(NOTIFICATION_HISTORY_LIMIT)),
     );
     return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Notification);
   },
 
   /** Realtime — a single user's own notifications is naturally small/bounded, unlike a whole-collection
    *  aggregate, so a live listener here (unlike e.g. platform-wide revenue) is cheap and exactly what
-   *  "unread badge updates the instant a notification lands" needs. */
+   *  "unread badge updates the instant a notification lands" needs. Capped at
+   *  NOTIFICATION_HISTORY_LIMIT (Phase 19) so a long-lived account's full history isn't read (and
+   *  kept live) on every mount — this listener runs on nearly every authenticated page via the nav
+   *  bell badge. */
   subscribe(userId: string, callback: (notifications: Notification[]) => void): Unsubscribe {
-    const q = query(collection(db, NOTIFICATIONS_COLLECTION), where('user_id', '==', userId), orderBy('created_at', 'desc'));
+    const q = query(collection(db, NOTIFICATIONS_COLLECTION), where('user_id', '==', userId), orderBy('created_at', 'desc'), limit(NOTIFICATION_HISTORY_LIMIT));
     return onSnapshot(q, (snap) => callback(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Notification)));
   },
 

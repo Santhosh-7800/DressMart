@@ -16,6 +16,19 @@ const config: CapacitorConfig = {
   android: {
     backgroundColor: '#131921',
   },
+  // Only Google Sign-In is actually implemented (see authService.ts) — disabling the other
+  // providers keeps their unconfigured native dependencies (Facebook/Apple/Twitter SDKs) out of
+  // the APK entirely, rather than bundling dead code with no App ID/keys behind it.
+  plugins: {
+    SocialLogin: {
+      providers: {
+        google: true,
+        facebook: false,
+        apple: false,
+        twitter: false,
+      },
+    },
+  },
 };
 
 export default config;

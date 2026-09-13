@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Download, HelpCircle } from 'lucide-react';
+import { Download, LifeBuoy } from 'lucide-react';
 import type { ExchangeRequest, Order, OrderItem } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { formatDate, formatDateTime } from '@/lib/utils';
@@ -67,8 +67,8 @@ export function ExchangeCard({ enriched }: ExchangeCardProps) {
             <Button variant="outline" size="sm" onClick={() => downloadInvoice(order)}>
               <Download size={13} /> Download Invoice
             </Button>
-            <Link to="/help-center" className="btn-outline !px-3 !py-1.5 text-xs">
-              <HelpCircle size={13} /> Contact Support
+            <Link to={`/support/new?category=exchange&exchangeId=${e.id}&orderId=${order.id}`} className="btn-outline !px-3 !py-1.5 text-xs">
+              <LifeBuoy size={13} /> Need Help?
             </Link>
           </div>
         </div>

@@ -6,7 +6,7 @@ import { staffService } from '@/services/staffService';
 import { queryKeys } from '@/lib/queryClient';
 import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 import { useAuth } from '@/contexts/AuthContext';
-import { isHeadSeller, isStaffRole } from '@/lib/roles';
+import { isAdminRole, isStaffRole } from '@/lib/roles';
 import { EXCHANGE_STATUS_LABELS } from '@/lib/exchangeStatus';
 import type { ExchangeRequest, ExchangeStatus } from '@/types';
 
@@ -47,7 +47,7 @@ export function useSellerExchanges() {
       return;
     }
     setIsLoading(true);
-    const unsubscribe = exchangeService.subscribeForSeller(user.id, isHeadSeller(user.role), (data) => {
+    const unsubscribe = exchangeService.subscribeForSeller(user.id, isAdminRole(user.role), (data) => {
       setExchanges(data);
       setIsLoading(false);
     });

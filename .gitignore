@@ -35,3 +35,11 @@ ui-debug.log
 # scratch/export dumps — never meant to be committed
 /temp/
 /logs/
+
+# signing keys & service-account credentials — never commit
+*.jks
+*.keystore
+key.properties
+*serviceAccount*.json
+*service-account*.json
+*-adminsdk-*.json

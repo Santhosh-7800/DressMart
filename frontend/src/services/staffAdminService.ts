@@ -5,11 +5,11 @@ import type { Profile, StaffActivity, StaffPermissionKey, StaffPermissions, Staf
 import { authService } from './authService';
 
 /**
- * Head-Seller-only reads/actions over their own staff roster. Mirrors sellerAdminService.ts's
+ * Head-Seller-only reads/actions over their own staff roster. Mirrors adminService.ts's
  * split: account lifecycle (create/remove/reset-password — anything touching Firebase Auth) goes
  * through Cloud Functions so it can't drift out of sync; simple single-document edits (toggling a
  * permission, disabling an account, updating a designation) are plain Firestore writes, allowed
- * directly by firestore.rules for isHeadSeller().
+ * directly by firestore.rules for isAdmin().
  */
 export const staffAdminService = {
   /** Every staff account belonging to this store (users where role == 'staff' && seller_id == sellerId). */

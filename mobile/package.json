@@ -2,5 +2,16 @@
   "name": "dressmart-mobile",
   "private": true,
   "version": "1.0.0",
-  "description": "DressMart Capacitor Android shell — wraps the built web app (../dist). Not an npm workspace member: it has no dependencies of its own, only capacitor.config.ts and the native android/ project. The Capacitor CLI requires a package.json to exist in its own working directory to run at all, which is the only reason this file exists."
+  "description": "DressMart Capacitor Android shell — wraps the built web app (../dist). Not an npm workspace member — these plugin entries exist only so `cap sync` (run from this directory) can detect which native Android plugins to wire into capacitor.build.gradle; actual installs are hoisted from the root package.json.",
+  "dependencies": {
+    "@capacitor/android": "^8.4.2",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/camera": "^8.2.4",
+    "@capacitor/core": "^8.4.2",
+    "@capacitor/filesystem": "^8.1.3",
+    "@capacitor/push-notifications": "^8.1.2",
+    "@capacitor/share": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.3",
+    "@capgo/capacitor-social-login": "^8.5.7"
+  }
 }

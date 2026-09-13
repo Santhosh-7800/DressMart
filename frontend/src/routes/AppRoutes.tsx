@@ -4,15 +4,17 @@ import { Loader2 } from 'lucide-react';
 import { MainLayout } from '@/layouts/MainLayout';
 import { AuthLayout } from '@/layouts/AuthLayout';
 import { AccountLayout } from '@/layouts/AccountLayout';
-import { SellerLayout } from '@/layouts/SellerLayout';
+import { AdminLayout } from '@/layouts/AdminLayout';
 import { StaffLayout } from '@/layouts/StaffLayout';
+import { DeliveryLayout } from '@/layouts/DeliveryLayout';
 import { ProtectedRoute } from './ProtectedRoute';
-import { RequireSeller } from './RequireSeller';
-import { RequireHeadSeller } from './RequireHeadSeller';
+import { RequireAdmin } from './RequireAdmin';
 import { RequireStaff } from './RequireStaff';
+import { RequireDelivery } from './RequireDelivery';
 import { lazyWithRetry } from '@/lib/lazyWithRetry';
 import { DEEP_LINK_EVENT } from '@/lib/deepLinks';
 import { useAuth } from '@/contexts/AuthContext';
+import { getPostLoginRedirect } from '@/lib/roles';
 
 const HomePage = lazyWithRetry(() => import('@/pages/home/HomePage').then((m) => ({ default: m.HomePage })));
 const SearchResultsPage = lazyWithRetry(() => import('@/pages/home/SearchResultsPage').then((m) => ({ default: m.SearchResultsPage })));
@@ -57,42 +59,56 @@ const SettingsPage = lazyWithRetry(() => import('@/pages/profile/SettingsPage').
 const SearchHistoryPage = lazyWithRetry(() => import('@/pages/profile/SearchHistoryPage').then((m) => ({ default: m.SearchHistoryPage })));
 
 const HelpCenterPage = lazyWithRetry(() => import('@/pages/static/HelpCenterPage').then((m) => ({ default: m.HelpCenterPage })));
+const SupportListPage = lazyWithRetry(() => import('@/pages/support/SupportListPage').then((m) => ({ default: m.SupportListPage })));
+const NewSupportTicketPage = lazyWithRetry(() => import('@/pages/support/NewSupportTicketPage').then((m) => ({ default: m.NewSupportTicketPage })));
+const SupportDetailPage = lazyWithRetry(() => import('@/pages/support/SupportDetailPage').then((m) => ({ default: m.SupportDetailPage })));
 const PrivacyPolicyPage = lazyWithRetry(() => import('@/pages/static/PrivacyPolicyPage').then((m) => ({ default: m.PrivacyPolicyPage })));
 const TermsPage = lazyWithRetry(() => import('@/pages/static/TermsPage').then((m) => ({ default: m.TermsPage })));
 const NotFoundPage = lazyWithRetry(() => import('@/pages/errors/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
 const UnauthorizedPage = lazyWithRetry(() => import('@/pages/errors/UnauthorizedPage').then((m) => ({ default: m.UnauthorizedPage })));
 
-// Seller pages
-const SellerDashboardPage = lazyWithRetry(() => import('@/pages/seller/SellerDashboardPage').then((m) => ({ default: m.SellerDashboardPage })));
-const SellerProductsPage = lazyWithRetry(() => import('@/pages/seller/SellerProductsPage').then((m) => ({ default: m.SellerProductsPage })));
-const SellerProductFormPage = lazyWithRetry(() => import('@/pages/seller/SellerProductFormPage').then((m) => ({ default: m.SellerProductFormPage })));
-const SellerInventoryPage = lazyWithRetry(() => import('@/pages/seller/SellerInventoryPage').then((m) => ({ default: m.SellerInventoryPage })));
-const SellerOrdersPage = lazyWithRetry(() => import('@/pages/seller/SellerOrdersPage').then((m) => ({ default: m.SellerOrdersPage })));
-const SellerReturnsPage = lazyWithRetry(() => import('@/pages/seller/SellerReturnsPage').then((m) => ({ default: m.SellerReturnsPage })));
-const SellerExchangesPage = lazyWithRetry(() => import('@/pages/seller/SellerExchangesPage').then((m) => ({ default: m.SellerExchangesPage })));
-const SellerSettingsPage = lazyWithRetry(() => import('@/pages/seller/SellerSettingsPage').then((m) => ({ default: m.SellerSettingsPage })));
-const SellerSellersPage = lazyWithRetry(() => import('@/pages/seller/SellerSellersPage').then((m) => ({ default: m.SellerSellersPage })));
-const SellerCustomersPage = lazyWithRetry(() => import('@/pages/seller/SellerCustomersPage').then((m) => ({ default: m.SellerCustomersPage })));
-const SellerAllProductsPage = lazyWithRetry(() => import('@/pages/seller/SellerAllProductsPage').then((m) => ({ default: m.SellerAllProductsPage })));
-const SellerAnalyticsPage = lazyWithRetry(() => import('@/pages/seller/SellerAnalyticsPage').then((m) => ({ default: m.SellerAnalyticsPage })));
-const SellerReportsPage = lazyWithRetry(() => import('@/pages/seller/SellerReportsPage').then((m) => ({ default: m.SellerReportsPage })));
-const SellerCouponsPage = lazyWithRetry(() => import('@/pages/seller/SellerCouponsPage').then((m) => ({ default: m.SellerCouponsPage })));
-const SellerPlatformSettingsPage = lazyWithRetry(() => import('@/pages/seller/SellerPlatformSettingsPage').then((m) => ({ default: m.SellerPlatformSettingsPage })));
-const SellerApplyPage = lazyWithRetry(() => import('@/pages/seller/SellerApplyPage').then((m) => ({ default: m.SellerApplyPage })));
-const SellerLoginPage = lazyWithRetry(() => import('@/pages/seller/SellerLoginPage').then((m) => ({ default: m.SellerLoginPage })));
-const HeadSellerSetupPage = lazyWithRetry(() => import('@/pages/seller/HeadSellerSetupPage').then((m) => ({ default: m.HeadSellerSetupPage })));
-const SellerCategoriesPage = lazyWithRetry(() => import('@/pages/seller/SellerCategoriesPage').then((m) => ({ default: m.SellerCategoriesPage })));
-const SellerBrandsPage = lazyWithRetry(() => import('@/pages/seller/SellerBrandsPage').then((m) => ({ default: m.SellerBrandsPage })));
-const SellerBannersPage = lazyWithRetry(() => import('@/pages/seller/SellerBannersPage').then((m) => ({ default: m.SellerBannersPage })));
-const SellerReviewsPage = lazyWithRetry(() => import('@/pages/seller/SellerReviewsPage').then((m) => ({ default: m.SellerReviewsPage })));
-const SellerNotificationsPage = lazyWithRetry(() => import('@/pages/seller/SellerNotificationsPage').then((m) => ({ default: m.SellerNotificationsPage })));
-const SellerStaffPage = lazyWithRetry(() => import('@/pages/seller/SellerStaffPage').then((m) => ({ default: m.SellerStaffPage })));
+// Admin pages
+const AdminDashboardPage = lazyWithRetry(() => import('@/pages/admin/AdminDashboardPage').then((m) => ({ default: m.AdminDashboardPage })));
+const AdminProductsPage = lazyWithRetry(() => import('@/pages/admin/AdminProductsPage').then((m) => ({ default: m.AdminProductsPage })));
+const AdminProductFormPage = lazyWithRetry(() => import('@/pages/admin/AdminProductFormPage').then((m) => ({ default: m.AdminProductFormPage })));
+const AdminInventoryPage = lazyWithRetry(() => import('@/pages/admin/AdminInventoryPage').then((m) => ({ default: m.AdminInventoryPage })));
+const AdminOrdersPage = lazyWithRetry(() => import('@/pages/admin/AdminOrdersPage').then((m) => ({ default: m.AdminOrdersPage })));
+const AdminReturnsPage = lazyWithRetry(() => import('@/pages/admin/AdminReturnsPage').then((m) => ({ default: m.AdminReturnsPage })));
+const AdminExchangesPage = lazyWithRetry(() => import('@/pages/admin/AdminExchangesPage').then((m) => ({ default: m.AdminExchangesPage })));
+const AdminSettingsPage = lazyWithRetry(() => import('@/pages/admin/AdminSettingsPage').then((m) => ({ default: m.AdminSettingsPage })));
+const AdminCustomersPage = lazyWithRetry(() => import('@/pages/admin/AdminCustomersPage').then((m) => ({ default: m.AdminCustomersPage })));
+const AdminAllProductsPage = lazyWithRetry(() => import('@/pages/admin/AdminAllProductsPage').then((m) => ({ default: m.AdminAllProductsPage })));
+const AdminAnalyticsPage = lazyWithRetry(() => import('@/pages/admin/AdminAnalyticsPage').then((m) => ({ default: m.AdminAnalyticsPage })));
+const AdminReportsPage = lazyWithRetry(() => import('@/pages/admin/AdminReportsPage').then((m) => ({ default: m.AdminReportsPage })));
+const AdminBusinessReportsPage = lazyWithRetry(() =>
+  import('@/pages/admin/AdminBusinessReportsPage').then((m) => ({ default: m.AdminBusinessReportsPage })),
+);
+const AdminCouponsPage = lazyWithRetry(() => import('@/pages/admin/AdminCouponsPage').then((m) => ({ default: m.AdminCouponsPage })));
+const AdminPlatformSettingsPage = lazyWithRetry(() => import('@/pages/admin/AdminPlatformSettingsPage').then((m) => ({ default: m.AdminPlatformSettingsPage })));
+const AdminLoginPage = lazyWithRetry(() => import('@/pages/admin/AdminLoginPage').then((m) => ({ default: m.AdminLoginPage })));
+const AdminSetupPage = lazyWithRetry(() => import('@/pages/admin/AdminSetupPage').then((m) => ({ default: m.AdminSetupPage })));
+const AdminCategoriesPage = lazyWithRetry(() => import('@/pages/admin/AdminCategoriesPage').then((m) => ({ default: m.AdminCategoriesPage })));
+const AdminBrandsPage = lazyWithRetry(() => import('@/pages/admin/AdminBrandsPage').then((m) => ({ default: m.AdminBrandsPage })));
+const AdminBannersPage = lazyWithRetry(() => import('@/pages/admin/AdminBannersPage').then((m) => ({ default: m.AdminBannersPage })));
+const AdminReviewsPage = lazyWithRetry(() => import('@/pages/admin/AdminReviewsPage').then((m) => ({ default: m.AdminReviewsPage })));
+const AdminNotificationsPage = lazyWithRetry(() => import('@/pages/admin/AdminNotificationsPage').then((m) => ({ default: m.AdminNotificationsPage })));
+const AdminStaffPage = lazyWithRetry(() => import('@/pages/admin/AdminStaffPage').then((m) => ({ default: m.AdminStaffPage })));
+const AdminDeliveryManagementPage = lazyWithRetry(() =>
+  import('@/pages/admin/AdminDeliveryManagementPage').then((m) => ({ default: m.AdminDeliveryManagementPage })),
+);
+const AdminFaqPage = lazyWithRetry(() => import('@/pages/admin/AdminFaqPage').then((m) => ({ default: m.AdminFaqPage })));
+const AdminSupportPage = lazyWithRetry(() => import('@/pages/admin/AdminSupportPage').then((m) => ({ default: m.AdminSupportPage })));
+const AdminSupportDetailPage = lazyWithRetry(() => import('@/pages/admin/AdminSupportDetailPage').then((m) => ({ default: m.AdminSupportDetailPage })));
 
 // Staff pages
 const StaffLoginPage = lazyWithRetry(() => import('@/pages/staff/StaffLoginPage').then((m) => ({ default: m.StaffLoginPage })));
 const StaffDashboardPage = lazyWithRetry(() => import('@/pages/staff/StaffDashboardPage').then((m) => ({ default: m.StaffDashboardPage })));
 const StaffActivityPage = lazyWithRetry(() => import('@/pages/staff/StaffActivityPage').then((m) => ({ default: m.StaffActivityPage })));
 const StaffProfilePage = lazyWithRetry(() => import('@/pages/staff/StaffProfilePage').then((m) => ({ default: m.StaffProfilePage })));
+
+const DeliveryLoginPage = lazyWithRetry(() => import('@/pages/delivery/DeliveryLoginPage').then((m) => ({ default: m.DeliveryLoginPage })));
+const DeliveryDashboardPage = lazyWithRetry(() => import('@/pages/delivery/DeliveryDashboardPage').then((m) => ({ default: m.DeliveryDashboardPage })));
+const DeliveryProfilePage = lazyWithRetry(() => import('@/pages/delivery/DeliveryProfilePage').then((m) => ({ default: m.DeliveryProfilePage })));
 
 function RouteFallback() {
   return (
@@ -102,13 +118,22 @@ function RouteFallback() {
   );
 }
 
-/** Gates "/" itself: signed-out visitors are sent to /login instead of browsing Home; once
- *  authenticated, "/" shows Home as normal. Waits out AuthContext's initial isLoading so a
+/** Gates "/" itself: signed-out visitors are sent to /login instead of browsing Home. An
+ *  authenticated admin/staff/delivery user is sent straight to their own dashboard instead of the
+ *  buyer Home — this matters most on mobile, where the app relaunching (backgrounded and killed
+ *  by the OS, or just reopened) lands back on "/" far more often than a desktop browser tab ever
+ *  does; without this, that non-buyer account would see the buyer storefront every time, even
+ *  though LoginPage's own post-submit redirect (see lib/roles.ts's getPostLoginRedirect, the same
+ *  function this mirrors) already got it right immediately after actually signing in. A plain
+ *  buyer still just sees Home as normal. Waits out AuthContext's initial isLoading so a
  *  refreshing, already-logged-in user doesn't flash the login page before their session resolves. */
 function RootGate() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   if (isLoading) return <RouteFallback />;
-  return isAuthenticated ? <HomePage /> : <Navigate to="/login" replace />;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  const roleRedirect = getPostLoginRedirect(user?.role, '/');
+  if (roleRedirect !== '/') return <Navigate to={roleRedirect} replace />;
+  return <HomePage />;
 }
 
 /** Bridges native deep-link events (dispatched by initCapacitorNative, outside the React tree)
@@ -160,13 +185,18 @@ export function AppRoutes() {
             <Route path="/checkout/payment" element={<PaymentPage />} />
             <Route path="/order-success/:orderId" element={<OrderSuccessPage />} />
             <Route path="/track-order" element={<TrackOrderPage />} />
-            <Route path="/sell" element={<SellerApplyPage />} />
 
             {/* Standalone — not nested under AccountLayout. Orders is its own top-level
                 BottomNavBar destination (see BottomNavBar.tsx), so it renders as a plain full-width
                 page like Wishlist/Cart rather than opening inside the "My Account" sidebar shell. */}
             <Route path="/orders" element={<OrdersPage />} />
             <Route path="/orders/:orderId" element={<OrderDetailsPage />} />
+
+            {/* Support (Phase 16) — same "standalone, not under AccountLayout" reasoning as Orders
+                above: a request's conversation view is its own full-width page, not a sidebar tab. */}
+            <Route path="/support" element={<SupportListPage />} />
+            <Route path="/support/new" element={<NewSupportTicketPage />} />
+            <Route path="/support/:ticketId" element={<SupportDetailPage />} />
 
             <Route element={<AccountLayout />}>
               <Route path="/profile" element={<ProfilePage />} />
@@ -186,69 +216,79 @@ export function AppRoutes() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/verify-otp" element={<OtpVerificationPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
-          <Route path="/seller/login" element={<SellerLoginPage />} />
-          <Route path="/seller/setup" element={<HeadSellerSetupPage />} />
+          <Route path="/admin/login" element={<AdminLoginPage />} />
+          <Route path="/admin/setup" element={<AdminSetupPage />} />
           <Route path="/staff/login" element={<StaffLoginPage />} />
+          <Route path="/delivery/login" element={<DeliveryLoginPage />} />
         </Route>
 
-        {/* Seller Dashboard Routes */}
-        <Route element={<RequireSeller />}>
-          <Route element={<SellerLayout />}>
-            <Route path="/seller/dashboard" element={<SellerDashboardPage />} />
-            <Route path="/seller/products" element={<SellerProductsPage />} />
-            <Route path="/seller/products/new" element={<SellerProductFormPage />} />
-            <Route path="/seller/products/:id/edit" element={<SellerProductFormPage />} />
-            <Route path="/seller/inventory" element={<SellerInventoryPage />} />
-            <Route path="/seller/orders" element={<SellerOrdersPage />} />
-            <Route path="/seller/returns" element={<SellerReturnsPage />} />
-            <Route path="/seller/exchanges" element={<SellerExchangesPage />} />
-            <Route path="/seller/settings" element={<SellerSettingsPage />} />
-            <Route path="/seller/reviews" element={<SellerReviewsPage />} />
-            <Route path="/seller/notifications" element={<SellerNotificationsPage />} />
-
-            {/* Head Seller (Admin) only routes */}
-            <Route element={<RequireHeadSeller />}>
-              <Route path="/seller/sellers" element={<SellerSellersPage />} />
-              <Route path="/seller/customers" element={<SellerCustomersPage />} />
-              <Route path="/seller/staff" element={<SellerStaffPage />} />
-              <Route path="/seller/all-products" element={<SellerAllProductsPage />} />
-              <Route path="/seller/analytics" element={<SellerAnalyticsPage />} />
-              <Route path="/seller/reports" element={<SellerReportsPage />} />
-              <Route path="/seller/coupons" element={<SellerCouponsPage />} />
-              <Route path="/seller/categories" element={<SellerCategoriesPage />} />
-              <Route path="/seller/brands" element={<SellerBrandsPage />} />
-              <Route path="/seller/banners" element={<SellerBannersPage />} />
-              <Route path="/seller/platform-settings" element={<SellerPlatformSettingsPage />} />
-            </Route>
+        {/* Admin Dashboard Routes */}
+        <Route element={<RequireAdmin />}>
+          <Route element={<AdminLayout />}>
+            <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+            <Route path="/admin/products" element={<AdminProductsPage />} />
+            <Route path="/admin/products/new" element={<AdminProductFormPage />} />
+            <Route path="/admin/products/:id/edit" element={<AdminProductFormPage />} />
+            <Route path="/admin/inventory" element={<AdminInventoryPage />} />
+            <Route path="/admin/orders" element={<AdminOrdersPage />} />
+            <Route path="/admin/returns" element={<AdminReturnsPage />} />
+            <Route path="/admin/exchanges" element={<AdminExchangesPage />} />
+            <Route path="/admin/settings" element={<AdminSettingsPage />} />
+            <Route path="/admin/reviews" element={<AdminReviewsPage />} />
+            <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
+            <Route path="/admin/customers" element={<AdminCustomersPage />} />
+            <Route path="/admin/staff" element={<AdminStaffPage />} />
+            <Route path="/admin/delivery" element={<AdminDeliveryManagementPage />} />
+            <Route path="/admin/support" element={<AdminSupportPage />} />
+            <Route path="/admin/support/:ticketId" element={<AdminSupportDetailPage />} />
+            <Route path="/admin/faq" element={<AdminFaqPage />} />
+            <Route path="/admin/all-products" element={<AdminAllProductsPage />} />
+            <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
+            <Route path="/admin/reports" element={<AdminReportsPage />} />
+            <Route path="/admin/business-reports" element={<AdminBusinessReportsPage />} />
+            <Route path="/admin/coupons" element={<AdminCouponsPage />} />
+            <Route path="/admin/categories" element={<AdminCategoriesPage />} />
+            <Route path="/admin/brands" element={<AdminBrandsPage />} />
+            <Route path="/admin/banners" element={<AdminBannersPage />} />
+            <Route path="/admin/platform-settings" element={<AdminPlatformSettingsPage />} />
           </Route>
         </Route>
 
         {/* Staff Dashboard Routes — the Staff role is product-management-only (see StaffLayout's
-            fixed nav): Products/Inventory reuse the same seller page components (see
-            SellerProductFormPage/productService for how seller_id resolution and
+            fixed nav): Products/Inventory reuse the same admin page components (see
+            AdminProductFormPage/productService for how seller_id resolution and
             created_by/staff_id attribution differ for a staff actor), while Activity and Profile
-            are dedicated staff-only pages. No Orders/Returns/Revenue/Seller-Management access. */}
+            are dedicated staff-only pages. No Orders/Returns/Revenue/Admin-Management access. */}
         <Route element={<RequireStaff />}>
           <Route element={<StaffLayout />}>
             <Route path="/staff/dashboard" element={<StaffDashboardPage />} />
-            <Route path="/staff/products" element={<SellerProductsPage />} />
-            <Route path="/staff/products/new" element={<SellerProductFormPage />} />
-            <Route path="/staff/products/:id/edit" element={<SellerProductFormPage />} />
-            <Route path="/staff/inventory" element={<SellerInventoryPage />} />
+            <Route path="/staff/products" element={<AdminProductsPage />} />
+            <Route path="/staff/products/new" element={<AdminProductFormPage />} />
+            <Route path="/staff/products/:id/edit" element={<AdminProductFormPage />} />
+            <Route path="/staff/inventory" element={<AdminInventoryPage />} />
             <Route path="/staff/activity" element={<StaffActivityPage />} />
             <Route path="/staff/settings" element={<StaffProfilePage />} />
           </Route>
         </Route>
 
-        {/* Bare-path convenience aliases — /admin has no dedicated app (Head Seller IS a seller
-            account with extra nav items, see SellerLayout), so it just points at the same
-            dashboard entry point as a plain /seller shortcut would. Each target route's own guard
-            (RequireSeller/RequireStaff) handles the actual auth/role redirect from there — these
-            are pure path aliases, not a parallel auth check. */}
-        <Route path="/admin" element={<Navigate to="/seller/dashboard" replace />} />
-        <Route path="/seller" element={<Navigate to="/seller/dashboard" replace />} />
+        {/* Delivery Dashboard Routes — the Delivery role is fulfillment-only (see DeliveryLayout's
+            fixed nav): access to an order is scoped server-side to delivery_staff_id == their own
+            uid (see firestore.rules), never "every order" the way the Admin sees. */}
+        <Route element={<RequireDelivery />}>
+          <Route element={<DeliveryLayout />}>
+            <Route path="/delivery/dashboard" element={<DeliveryDashboardPage />} />
+            <Route path="/delivery/profile" element={<DeliveryProfilePage />} />
+          </Route>
+        </Route>
+
+        {/* Bare-path convenience aliases. Each target route's own guard (RequireAdmin/RequireStaff)
+            handles the actual auth/role redirect from there — these are pure path aliases, not a
+            parallel auth check. /seller and /head-seller are kept as legacy aliases in case any
+            old bookmarks/links still use them. */}
+        <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+        <Route path="/seller" element={<Navigate to="/admin/dashboard" replace />} />
         <Route path="/staff" element={<Navigate to="/staff/dashboard" replace />} />
-        <Route path="/head-seller" element={<Navigate to="/seller/dashboard" replace />} />
+        <Route path="/head-seller" element={<Navigate to="/admin/dashboard" replace />} />
 
         <Route path="/unauthorized" element={<UnauthorizedPage />} />
         <Route path="*" element={<NotFoundPage />} />

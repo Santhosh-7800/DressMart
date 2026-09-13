@@ -39,6 +39,8 @@ export const onNotificationCreated = onDocumentCreated('notifications/{notificat
       await db.collection('users').doc(notification.user_id).update({ fcm_tokens: remaining });
     }
   } catch (err) {
-    console.error('onNotificationCreated: failed to send FCM push', err);
+    // Message/stack only — never the raw error object (which, depending on the SDK, could embed
+    // the request payload including device tokens) and never the tokens themselves.
+    console.error('onNotificationCreated: failed to send FCM push', err instanceof Error ? err.message : String(err));
   }
 });

@@ -42,8 +42,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoading(false);
         return;
       }
-      // Realtime profile subscription — role/seller_status changes (e.g. Head Seller approving or
-      // suspending a seller) take effect immediately, without the affected user needing to re-login.
+      // Realtime profile subscription — role/status changes (e.g. an Admin disabling a staff
+      // account) take effect immediately, without the affected user needing to re-login.
       unsubscribeProfile = onSnapshot(doc(db, 'users', fbUser.uid), (snap) => {
         setUser(snap.exists() ? ({ id: fbUser.uid, ...snap.data() } as Profile) : null);
         setIsLoading(false);

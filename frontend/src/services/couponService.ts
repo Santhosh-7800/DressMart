@@ -1,4 +1,4 @@
-import { collection, deleteDoc, doc, getDoc, getDocs, increment, orderBy, query, setDoc, updateDoc, where } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, increment, limit, orderBy, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Coupon } from '@/types';
 
@@ -37,13 +37,26 @@ export async function listAllCoupons(): Promise<Coupon[]> {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Coupon);
 }
 
+export interface CartLineForCoupon {
+  categoryId: string;
+  lineSubtotal: number;
+}
+
 /**
- * Validates a coupon code against an order subtotal and returns the discount to apply.
- * Used by this app's CouponsPage AND the Checkout flow — keep this signature stable, other call
- * sites depend on it exactly as-is. (Note: cart/checkout's own CouponInput.tsx currently re-implements
- * this same validation inline rather than calling here — see this workstream's final report.)
+ * Validates a coupon code against the actual cart contents and returns the discount to apply.
+ * This is a PREVIEW only — the authoritative check (identical rules, plus the two usage counts
+ * re-read fresh) always happens again server-side inside placeOrderInternal's transaction before
+ * an order is created or a payment is charged; a stale/tampered client read here can never affect
+ * the real charge. The single implementation here replaces what used to be two near-duplicate
+ * copies of this same logic (this function, previously unused, and CouponInput.tsx's own inline
+ * version) — kept in sync by hand with backend/functions/src/lib/orderPlacement.ts's
+ * checkCouponEligibility/computeDiscount, which this mirrors.
  */
-export async function validateCoupon(code: string, subtotal: number): Promise<{ coupon: Coupon; discountAmount: number } | { error: string }> {
+export async function validateCoupon(
+  code: string,
+  cartLines: CartLineForCoupon[],
+  userId: string | null,
+): Promise<{ coupon: Coupon; discountAmount: number } | { error: string }> {
   const normalizedCode = code.trim().toUpperCase();
   if (!normalizedCode) return { error: 'Enter a coupon code.' };
 
@@ -51,21 +64,44 @@ export async function validateCoupon(code: string, subtotal: number): Promise<{ 
   if (!snap.exists()) return { error: 'Invalid coupon code.' };
 
   const coupon = { id: snap.id, ...snap.data() } as Coupon;
+  const grandSubtotal = cartLines.reduce((sum, l) => sum + l.lineSubtotal, 0);
+  const hasCategoryRestriction = Boolean(coupon.applicable_categories && coupon.applicable_categories.length > 0);
+  const eligibleSubtotal = hasCategoryRestriction
+    ? cartLines.filter((l) => coupon.applicable_categories!.includes(l.categoryId)).reduce((sum, l) => sum + l.lineSubtotal, 0)
+    : grandSubtotal;
 
   if (!coupon.is_active) return { error: 'This coupon is no longer active.' };
   const now = new Date();
   if (now < new Date(coupon.valid_from)) return { error: 'This coupon is not active yet.' };
   if (now > new Date(coupon.valid_until)) return { error: 'This coupon has expired.' };
-  if (subtotal < coupon.min_order_value) {
-    return { error: `Add items worth ₹${(coupon.min_order_value - subtotal).toFixed(0)} more to use this coupon.` };
+  if (grandSubtotal < coupon.min_order_value) {
+    return { error: `Add items worth ₹${(coupon.min_order_value - grandSubtotal).toFixed(0)} more to use this coupon.` };
+  }
+  if (eligibleSubtotal <= 0) {
+    return { error: 'This coupon is not applicable to the products in your cart.' };
   }
   if (coupon.usage_limit != null && coupon.used_count >= coupon.usage_limit) {
     return { error: 'This coupon has reached its usage limit.' };
   }
 
-  let discountAmount = coupon.discount_type === 'percent' ? (subtotal * coupon.discount_value) / 100 : coupon.discount_value;
+  if (userId) {
+    if (coupon.new_customers_only) {
+      const priorOrder = await getDocs(query(collection(db, 'orders'), where('buyer_id', '==', userId), limit(1)));
+      if (!priorOrder.empty) return { error: 'This coupon is only valid for new customers.' };
+    }
+    if (coupon.per_user_limit != null) {
+      const priorUsage = await getDocs(
+        query(collection(db, 'coupon_usages'), where('coupon_id', '==', coupon.id), where('user_id', '==', userId)),
+      );
+      if (priorUsage.size >= coupon.per_user_limit) {
+        return { error: "You've already used this coupon the maximum number of times." };
+      }
+    }
+  }
+
+  let discountAmount = coupon.discount_type === 'percent' ? (eligibleSubtotal * coupon.discount_value) / 100 : coupon.discount_value;
   if (coupon.max_discount != null) discountAmount = Math.min(discountAmount, coupon.max_discount);
-  discountAmount = Math.min(discountAmount, subtotal);
+  discountAmount = Math.min(discountAmount, eligibleSubtotal);
 
   return { coupon, discountAmount: Math.round(discountAmount) };
 }
@@ -76,7 +112,7 @@ export async function incrementCouponUsage(codeOrId: string): Promise<void> {
   await updateDoc(couponRef(codeOrId), { used_count: increment(1) });
 }
 
-// --- Head-seller-only writes (coupons rule: `allow write: if isHeadSeller()`) ---
+// --- Admin-only writes (coupons rule: `allow write: if isAdmin()`) ---
 
 export async function createCoupon(input: Omit<Coupon, 'id' | 'used_count'>): Promise<Coupon> {
   const normalizedCode = input.code.trim().toUpperCase();

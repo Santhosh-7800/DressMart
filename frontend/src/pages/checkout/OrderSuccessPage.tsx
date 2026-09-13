@@ -50,6 +50,10 @@ export function OrderSuccessPage() {
   const total = shipments.reduce((sum, o) => sum + o.total, 0);
   const estimatedDelivery = shipments.reduce((latest, o) => (o.estimated_delivery > latest ? o.estimated_delivery : latest), shipments[0].estimated_delivery);
   const paymentMethod = shipments[0].payment_method;
+  // Every shipment in one checkout shares the same delivery address (one address is selected per
+  // checkout, before it splits into per-seller orders) — safe to read off the first.
+  const address = shipments[0].address;
+  const firstOrderId = shipments[0].id;
 
   return (
     <div className="container-app flex justify-center py-16">
@@ -84,14 +88,24 @@ export function OrderSuccessPage() {
               <span className="font-semibold">{shipments.length} sellers</span>
             </div>
           )}
+          {address && (
+            <div className="border-t border-primary-200 pt-2 dark:border-primary-700">
+              <span className="text-primary-400">Delivery Address</span>
+              <p className="mt-1 font-medium">
+                {address.full_name} · {address.phone}
+                <br />
+                {address.line1}, {address.city}, {address.state} - {address.pincode}
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="mt-6 flex gap-3">
           <Link to="/" className="btn-outline w-full">
             Continue Shopping
           </Link>
-          <Link to="/orders" className="btn-accent w-full">
-            Track Order
+          <Link to={firstOrderId ? `/orders/${firstOrderId}` : '/orders'} className="btn-accent w-full">
+            View Order
           </Link>
         </div>
       </div>

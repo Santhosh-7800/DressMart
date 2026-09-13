@@ -3,7 +3,7 @@ import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { isStaffRole } from '@/lib/roles';
 
-/** Gate for the Staff Dashboard (/staff/*) — role must be 'staff'. Mirrors RequireSeller.tsx. */
+/** Gate for the Staff Dashboard (/staff/*) — role must be 'staff'. Mirrors RequireAdmin.tsx. */
 export function RequireStaff() {
   const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();

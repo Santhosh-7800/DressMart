@@ -1,7 +1,7 @@
 import type { Product } from '@/types';
 import { productService } from './productService';
 
-const MAX_RECENT = 12;
+const MAX_RECENT = 20;
 const STORAGE_PREFIX = 'dressmart:recently-viewed:';
 
 /**

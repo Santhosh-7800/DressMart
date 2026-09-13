@@ -39,12 +39,10 @@ export function ForgotPasswordPage() {
   } = useForm<FormValues>({ resolver: zodResolver(schema) });
 
   const onSubmit = async (values: FormValues) => {
-    console.log('Sending reset email:', values.email);
     try {
       // Awaited — the success screen below is only ever reached once Firebase has actually
       // confirmed the request; it never renders on a thrown error (see catch below).
       await authService.requestPasswordReset(values.email);
-      console.log('Reset email sent');
       setSubmittedEmail(values.email);
       setIsSent(true);
     } catch (error) {

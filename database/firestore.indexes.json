@@ -31,6 +31,31 @@
       { "fieldPath": "payment_status", "order": "ASCENDING" },
       { "fieldPath": "placed_at", "order": "ASCENDING" }
     ] },
+    { "collectionGroup": "orders", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "delivery_staff_id", "order": "ASCENDING" },
+      { "fieldPath": "placed_at", "order": "DESCENDING" }
+    ] },
+    { "collectionGroup": "orders", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "delivery_staff_id", "order": "ASCENDING" },
+      { "fieldPath": "delivery_status", "order": "ASCENDING" }
+    ] },
+    { "collectionGroup": "orders", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "status", "order": "ASCENDING" },
+      { "fieldPath": "placed_at", "order": "DESCENDING" }
+    ] },
+    { "collectionGroup": "orders", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "seller_id", "order": "ASCENDING" },
+      { "fieldPath": "buyer_id", "order": "ASCENDING" },
+      { "fieldPath": "placed_at", "order": "ASCENDING" }
+    ] },
+    { "collectionGroup": "inventory_movements", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "product_id", "order": "ASCENDING" },
+      { "fieldPath": "created_at", "order": "DESCENDING" }
+    ] },
+    { "collectionGroup": "coupon_usages", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "coupon_id", "order": "ASCENDING" },
+      { "fieldPath": "user_id", "order": "ASCENDING" }
+    ] },
     { "collectionGroup": "users", "queryScope": "COLLECTION", "fields": [
       { "fieldPath": "role", "order": "ASCENDING" },
       { "fieldPath": "created_at", "order": "ASCENDING" }
@@ -63,9 +88,33 @@
       { "fieldPath": "user_id", "order": "ASCENDING" },
       { "fieldPath": "product_id", "order": "ASCENDING" }
     ] },
+    { "collectionGroup": "reviews", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "order_item_id", "order": "ASCENDING" },
+      { "fieldPath": "user_id", "order": "ASCENDING" }
+    ] },
     { "collectionGroup": "wishlist", "queryScope": "COLLECTION", "fields": [
       { "fieldPath": "user_id", "order": "ASCENDING" },
       { "fieldPath": "product_id", "order": "ASCENDING" }
+    ] },
+    { "collectionGroup": "supportTickets", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "user_id", "order": "ASCENDING" },
+      { "fieldPath": "created_at", "order": "DESCENDING" }
+    ] },
+    { "collectionGroup": "supportTickets", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "status", "order": "ASCENDING" },
+      { "fieldPath": "created_at", "order": "DESCENDING" }
+    ] },
+    { "collectionGroup": "supportTickets", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "category", "order": "ASCENDING" },
+      { "fieldPath": "created_at", "order": "DESCENDING" }
+    ] },
+    { "collectionGroup": "supportTickets", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "priority", "order": "ASCENDING" },
+      { "fieldPath": "created_at", "order": "DESCENDING" }
+    ] },
+    { "collectionGroup": "messages", "queryScope": "COLLECTION_GROUP", "fields": [
+      { "fieldPath": "message_type", "order": "ASCENDING" },
+      { "fieldPath": "created_at", "order": "ASCENDING" }
     ] }
   ],
   "fieldOverrides": []

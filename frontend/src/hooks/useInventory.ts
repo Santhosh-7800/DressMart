@@ -73,13 +73,15 @@ export function useUpdateStock() {
       productId,
       variantStock,
       lowStockThreshold,
+      expectedUpdatedAt,
     }: {
       productId: string;
       variantStock: Record<string, number>;
       lowStockThreshold: number;
+      expectedUpdatedAt?: string;
       sellerId?: string;
       productName?: string;
-    }) => inventoryService.updateStock(productId, variantStock, lowStockThreshold),
+    }) => inventoryService.updateStock(productId, variantStock, lowStockThreshold, expectedUpdatedAt),
     onSuccess: (_data, { productId, sellerId, productName }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.detail(productId) });
       // Seller pages (SellerProductsPage/SellerInventoryPage) batch-fetch inventory under this
@@ -99,6 +101,51 @@ export function useUpdateStock() {
         });
       }
     },
+    onError: (error: Error, { productId }) => {
+      toast.error(getFriendlyErrorMessage(error));
+      // On a stale-write conflict specifically, the editor's snapshot is now known-wrong — refetch
+      // so the seller sees the real current stock rather than re-submitting the same stale values.
+      queryClient.invalidateQueries({ queryKey: queryKeys.inventory.detail(productId) });
+      queryClient.invalidateQueries({ queryKey: ['seller', 'inventory', 'batch'] });
+    },
+  });
+}
+
+/** Single-SKU +/- adjustment with a required reason — the Cloud Function rejects a negative
+ *  result and records the movement server-side, so success here always reflects a real, audited
+ *  change (never a false positive shown while offline — useOnlineStatus gates the call site). */
+export function useAdjustStock() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ productId, variantId, delta, reason }: { productId: string; variantId: string; delta: number; reason: string; sellerId?: string; productName?: string }) =>
+      inventoryService.adjustStock(productId, variantId, delta, reason),
+    onSuccess: (_data, { productId, sellerId, productName }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.inventory.detail(productId) });
+      queryClient.invalidateQueries({ queryKey: ['seller', 'inventory', 'batch'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.inventory.movements(productId) });
+      toast.success('Stock updated');
+      if (user && isStaffRole(user.role) && sellerId) {
+        void staffService.logActivity({
+          sellerId,
+          staffId: user.id,
+          staffName: user.full_name,
+          action: 'inventory_updated',
+          targetType: 'inventory',
+          targetId: productId,
+          targetLabel: productName ?? null,
+        });
+      }
+    },
     onError: (error: Error) => toast.error(getFriendlyErrorMessage(error)),
+  });
+}
+
+/** Recent movement history for one product's "Recent Movements" panel. */
+export function useInventoryMovements(productId: string | null | undefined, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.inventory.movements(productId ?? ''),
+    queryFn: () => inventoryService.listMovements(productId as string),
+    enabled: Boolean(productId) && enabled,
   });
 }

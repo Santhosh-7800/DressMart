@@ -2,19 +2,19 @@ rules_version = '2';
 
 // Security model summary:
 // - buyer: owns their own cart/wishlist/addresses/orders/returns/exchanges/notifications/reviews.
-// - seller / head_seller: owns products/inventory where seller_id == their uid; can read/update
-//   only orders/returns/exchanges scoped to their own seller_id.
-// - head_seller: everything a seller can do, plus full read on all sellers/products/orders, and
-//   is the only role allowed to flip seller_status to 'approved'/'suspended' or write coupons /
-//   platform_settings. Cross-document transitions (approving a seller_request AND flipping the
-//   applicant's profile in the same operation) are done by Cloud Functions running with admin
-//   privileges, not by these rules — see functions/src for reviewSellerRequest/suspendSeller.
-// - staff: an employee created by (and scoped to) one Head Seller's store. Can touch
-//   products/inventory/orders/returns/reviews owned by that store ONLY to the extent
-//   staff_permissions/{uid} grants (add/edit/delete products, manage inventory, process orders,
-//   approve returns, reply to customers) — see staffCan() below. Account lifecycle (create/
-//   delete/reset password) goes through Cloud Functions exactly like sellers; permission/status
-//   edits are simple enough to allow as direct Head-Seller-only Firestore writes.
+// - admin: the single store-owner account. Owns every product/inventory record (seller_id ==
+//   their uid, stamped at creation — kept as a data field even though there's only ever one admin,
+//   since products/orders/returns/exchanges/inventory_movements/payouts already key off it and
+//   renaming it everywhere would touch live Firestore documents for no functional benefit), plus
+//   full read/write on coupons/banners/platform_settings/staff/delivery accounts.
+// - staff: an employee created by (and scoped to) the Admin's store. Product-management only by
+//   design — can touch products/inventory/reviews owned by that store ONLY to the extent
+//   staff_permissions/{uid} grants (add/edit/delete products, manage inventory, reply to
+//   customers) — see staffCan() below. Staff has no access to orders/returns/exchanges at all
+//   (no rule branch, regardless of what staff_permissions/{uid} holds) since there is no
+//   Staff-facing Orders/Returns page — see AppRoutes.tsx's staff route block. Account lifecycle
+//   (create/delete/reset password) goes through Cloud Functions; permission/status edits are
+//   simple enough to allow as direct Admin-only Firestore writes.
 //
 // NOTE: this is a solid starting point, not a substitute for a security review before going to
 // production — in particular, order/coupon totals here are trusted from the client on write;
@@ -34,14 +34,8 @@ service cloud.firestore {
     function role() {
       return isSignedIn() ? userData().role : null;
     }
-    function isSeller() {
-      return isSignedIn() && (role() == 'seller' || role() == 'head_seller');
-    }
-    function isApprovedSeller() {
-      return isSeller() && userData().seller_status == 'approved';
-    }
-    function isHeadSeller() {
-      return isSignedIn() && role() == 'head_seller';
+    function isAdmin() {
+      return isSignedIn() && role() == 'admin';
     }
     function isOwner(userId) {
       return isSignedIn() && uid() == userId;
@@ -52,7 +46,14 @@ service cloud.firestore {
     function isActiveStaff() {
       return isStaff() && userData().staff_status == 'active';
     }
-    // The Head Seller's uid a staff account was created under (Profile.seller_id) — every
+    // Delivery personnel — a Admin-managed role distinct from product/inventory staff (see
+    // delivery_staff/{staffId} below). Every delivery status mutation goes through the
+    // assignDelivery/updateDeliveryStatus Cloud Functions (Admin SDK, bypasses these rules) — the
+    // isDelivery() checks here exist only to scope what a delivery account may READ.
+    function isDelivery() {
+      return isSignedIn() && role() == 'delivery';
+    }
+    // The Admin's uid a staff account was created under (Profile.seller_id) — every
     // product/order/inventory/return a staff member may touch is scoped to this id, never their
     // own uid. Denormalized onto users/{uid} at creation (see functions/src/callables/addStaff)
     // specifically so this never needs a second document read.
@@ -65,26 +66,85 @@ service cloud.firestore {
     function staffCan(permission) {
       return isActiveStaff() && staffPermissions()[permission] == true;
     }
+    // Used by returns/exchanges create rules to confirm the order a request references actually
+    // belongs to the requester and has reached 'delivered' — without this, a client could create a
+    // return/exchange doc for any order_id, including someone else's or one still in transit.
+    function orderData(orderId) {
+      return get(/databases/$(database)/documents/orders/$(orderId)).data;
+    }
+    // Mirrors orderService.ts's HAPPY_PATH — that array is what the seller UI's "Mark as X" button
+    // computes from, but it has no enforcement power over Firestore itself (a direct client write
+    // could previously set `status` to anything). This is the server-side backstop: same-status
+    // writes (e.g. only updating tracking_number) always pass; otherwise the transition must be one
+    // step forward along the real happy path, or into 'cancelled' from a still-cancellable status.
+    // 'returned' is reachable only via the onReturnStatusChange Cloud Function (Admin SDK, bypasses
+    // rules entirely), never a direct client write, so it's deliberately not a `to` here.
+    function isValidOrderTransition(from, to) {
+      return to == from ||
+        (from == 'placed' && (to == 'confirmed' || to == 'cancelled')) ||
+        (from == 'confirmed' && (to == 'packed' || to == 'cancelled')) ||
+        (from == 'packed' && (to == 'shipped' || to == 'cancelled')) ||
+        (from == 'shipped' && to == 'out_for_delivery') ||
+        (from == 'out_for_delivery' && to == 'delivered');
+    }
 
-    // Singleton flag for the one-time Head Seller setup flow (see functions/src/callables/
-    // createHeadSeller.ts) — public read so the setup page can tell whether it's already been used,
-    // write-only via the Admin SDK inside that Cloud Function's transaction so the "exactly one Head
-    // Seller, created once" guarantee can't be bypassed by a direct client write.
+    // Singleton flag for the one-time Admin setup flow (see functions/src/callables/
+    // createAdmin.ts) — public read so the setup page can tell whether it's already been used,
+    // write-only via the Admin SDK inside that Cloud Function's transaction so the "exactly one
+    // Admin, created once" guarantee can't be bypassed by a direct client write.
     match /system/{docId} {
       allow read: if true;
       allow write: if false;
     }
 
+    // Idempotency markers for createNotificationOnce (see functions/src/lib/notifications.ts) —
+    // guards against Cloud Functions redelivering the same status-change event and sending a
+    // duplicate push/in-app notification. Admin-SDK-only, exactly like system/{docId} above; no
+    // client ever needs to read or write these.
+    match /notification_locks/{lockId} {
+      allow read, write: if false;
+    }
+
+    // Razorpay payment-id replay guard (Phase 17) — see orderPlacement.ts's paymentReceiptRef.
+    // Admin-SDK-only, exactly like notification_locks/system above; no client ever needs this.
+    match /payment_receipts/{paymentId} {
+      allow read, write: if false;
+    }
+
     match /users/{userId} {
-      allow read: if isOwner(userId) || isHeadSeller();
-      allow create: if isOwner(userId);
-      // Self-service profile edits (name/phone/avatar/fcm tokens) plus the one-time buyer -> pending
-      // seller application transition. Any other role/status change is Head-Seller or Function only.
-      allow update: if isOwner(userId) && (
-        request.resource.data.role == resource.data.role ||
-        (resource.data.role == 'buyer' && request.resource.data.role == 'seller' && request.resource.data.seller_status == 'pending')
-      );
-      allow update: if isHeadSeller();
+      allow read: if isOwner(userId) || isAdmin();
+      // Phase 20 P0 fix: this previously had NO field restrictions at all — any authenticated user
+      // (a real Firebase Auth account, reached via ordinary email/password/Google/phone sign-up)
+      // could bypass the app's own authService.ts entirely and call setDoc() directly with
+      // role: 'admin' (or 'staff'/'delivery', with a privileged status field, etc.) for their OWN
+      // uid, since isOwner(userId) was the only check. Every legitimate non-buyer account
+      // (admin/staff/delivery) is created exclusively by a Cloud Function via the Admin SDK
+      // (createAdmin/addStaff/addDeliveryStaff), which bypasses this rule entirely and never
+      // depends on it — so restricting direct client creation to a plain 'buyer' with no
+      // privileged status fields closes this without affecting any real flow.
+      allow create: if isOwner(userId) &&
+        request.resource.data.role == 'buyer' &&
+        !('staff_status' in request.resource.data) &&
+        !('delivery_staff_status' in request.resource.data);
+      // Self-service profile edits (name/phone/avatar/fcm tokens/store settings). Role is never in
+      // this allowlist — every role/status change is Admin- or Cloud-Function-only.
+      allow update: if isOwner(userId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'full_name', 'phone', 'avatar_url', 'fcm_tokens', 'last_login_at',
+          'store_name', 'gst_number',
+          'notification_prefs', 'pickup_address', 'return_address',
+          'bank_account_holder', 'bank_account_number', 'bank_ifsc',
+          'shop_cod_available', 'shop_logo_url', 'shop_banner_url', 'updated_at'
+        ]);
+      // Admin may disable/re-enable a staff or delivery account directly from the client (see
+      // staffAdminService.setStaffStatus / deliveryAdminService.setDeliveryStaffStatus) — restricted
+      // to exactly these fields. Every other cross-user change (role, ownership, etc.) must go
+      // through a Cloud Function (addStaff/removeStaff/addDeliveryStaff/removeDeliveryStaff/...),
+      // which runs with Admin privileges and bypasses these rules entirely — a plain client write
+      // must not be able to grant itself or anyone else an elevated role/status.
+      allow update: if isAdmin() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+          ['staff_status', 'staff_status_reason', 'delivery_staff_status', 'delivery_staff_status_reason', 'updated_at']);
 
       // Cart is signed-in-only and lives under the owning user — see types/database.ts's CartItem.
       match /cart/{itemId} {
@@ -94,61 +154,156 @@ service cloud.firestore {
 
     match /brands/{brandId} {
       allow read: if true;
-      allow write: if isHeadSeller();
+      allow write: if isAdmin();
     }
 
     match /categories/{categoryId} {
       allow read: if true;
-      allow write: if isHeadSeller();
+      allow write: if isAdmin();
     }
 
     match /products/{productId} {
       allow read: if true;
-      allow create: if (isApprovedSeller() && request.resource.data.seller_id == uid()) ||
-        (staffCan('add_products') && request.resource.data.seller_id == staffSellerId());
-      allow update: if isHeadSeller() ||
-        (isApprovedSeller() && resource.data.seller_id == uid()) ||
-        (staffCan('edit_products') && resource.data.seller_id == staffSellerId());
-      allow delete: if isHeadSeller() ||
-        (isApprovedSeller() && resource.data.seller_id == uid()) ||
+      // Pricing is an owner-only decision (see the frontend form's staff-disabled price/MRP
+      // fields) — a staff-created product must start at price/mrp 0 for the owner to set later;
+      // enforced here too so a staff account can't set a real price by calling Firestore directly.
+      allow create: if isAdmin() ||
+        (staffCan('add_products') && request.resource.data.seller_id == staffSellerId() &&
+          request.resource.data.price == 0 && request.resource.data.mrp == 0);
+      // Same reasoning for edits: staff with edit_products may change anything on their store's
+      // products EXCEPT price/mrp/gst_percent — those fields must be untouched (same value as
+      // before) for a staff-authored update to be accepted.
+      allow update: if isAdmin() ||
+        (staffCan('edit_products') && resource.data.seller_id == staffSellerId() &&
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['price', 'mrp', 'gst_percent']));
+      allow delete: if isAdmin() ||
         (staffCan('delete_products') && resource.data.seller_id == staffSellerId());
+    }
+
+    // Append-only stock-movement audit trail (Phase 12) — written exclusively by Cloud Functions
+    // (adjustStock, order placement, cancellation, return/exchange restoration triggers) via the
+    // Admin SDK, which bypasses these rules entirely. No client, including the Admin, may
+    // create/edit/delete a movement record directly — an audit trail that could be rewritten by
+    // the same people it's meant to hold accountable isn't an audit trail.
+    match /inventory_movements/{movementId} {
+      allow read: if isAdmin() || (isActiveStaff() && resource.data.seller_id == staffSellerId());
+      allow write: if false;
     }
 
     match /inventory/{productId} {
       allow read: if true;
-      allow write: if isHeadSeller() ||
-        (isApprovedSeller() && resource.data.seller_id == uid()) ||
-        (staffCan('manage_inventory') && resource.data.seller_id == staffSellerId());
-      allow create: if (isApprovedSeller() && request.resource.data.seller_id == uid()) ||
-        (staffCan('add_products') && request.resource.data.seller_id == staffSellerId());
+      // total_stock >= 0 is enforced here as a server-side backstop — the client (inventoryService)
+      // already clamps every value to >= 0, but this closes the gap for a direct Firestore write
+      // that skips the app's own code. variant_stock's individual per-color/size values aren't
+      // checked here since Firestore rules can't iterate an arbitrary-keyed map generically; total
+      // stock is the one aggregate value that matters most (it's what every stock-status read uses).
+      allow write: if (isAdmin() ||
+        (staffCan('manage_inventory') && resource.data.seller_id == staffSellerId())) &&
+        request.resource.data.total_stock is int && request.resource.data.total_stock >= 0;
+      allow create: if (isAdmin() ||
+        (staffCan('add_products') && request.resource.data.seller_id == staffSellerId())) &&
+        request.resource.data.total_stock is int && request.resource.data.total_stock >= 0;
     }
 
     match /orders/{orderId} {
-      allow read: if isSignedIn() && (resource.data.buyer_id == uid() || resource.data.seller_id == uid() || isHeadSeller() ||
-        (isStaff() && resource.data.seller_id == staffSellerId()));
+      // Delivery staff may only read an order once it's actually assigned to them (Phase 11) — see
+      // the isDelivery() branch below. They never get a write branch here at all: every delivery
+      // status mutation (accept/pickup/out-for-delivery/delivered/failed/notes) goes exclusively
+      // through the assignDelivery/updateDeliveryStatus Cloud Functions, which run with Admin SDK
+      // privileges and validate assignment ownership + status-transition legality server-side. This
+      // is deliberately more restrictive than the admin update branch below — a client-writable
+      // delivery status would let a delivery account fabricate assignment/ownership (e.g.
+      // "delivery_staff_id = their own uid") just by being signed in.
+      allow read: if isSignedIn() && (resource.data.buyer_id == uid() || isAdmin() ||
+        (isStaff() && resource.data.seller_id == staffSellerId()) ||
+        (isDelivery() && resource.data.delivery_staff_id == uid()));
       allow create: if isSignedIn() && request.resource.data.buyer_id == uid();
-      // Buyers may only move their own order to 'cancelled'; sellers/head-seller can advance any
-      // other status field on orders they own / all orders respectively; a staff member needs the
-      // update_order_status permission and is scoped to their own store's orders.
-      allow update: if isHeadSeller() ||
-        (isSeller() && resource.data.seller_id == uid()) ||
-        (resource.data.buyer_id == uid() && request.resource.data.status == 'cancelled') ||
-        (staffCan('update_order_status') && resource.data.seller_id == staffSellerId());
+      // Buyers may only move their own order to 'cancelled', and only from a status the app itself
+      // treats as cancellable (mirrors cancelOrder.ts's CANCELLABLE_STATUSES — the real cancel path
+      // goes through that Cloud Function anyway, which re-checks this independently; this is the
+      // rules-level backstop for a direct client write). Admin can advance status on any order, but
+      // only along the real forward happy-path — see isValidOrderTransition() above; this closes
+      // the prior gap where any string was accepted.
+      // Staff is product + inventory management only for this store (see StaffLayout/AppRoutes'
+      // staff route block — there is no Staff Orders page), so there is deliberately no
+      // staffCan(...) branch here; this also closes the gap where a staff account granted
+      // 'update_order_status' before this rule existed could otherwise call Firestore directly,
+      // bypassing the (dead) UI entirely.
+      // Phase 17 hardening: isValidOrderTransition only ever validated the STATUS transition
+      // itself — nothing previously stopped a direct client write (bypassing the app's own
+      // orderService.ts/cancelOrder.ts, which only ever touch these exact fields) from changing
+      // `total`/`buyer_id`/`items`/etc. in the SAME write as a legal status change. `affectedKeys()
+      // .hasOnly([...])` closes that gap the same way reviews/returns' update rules already do
+      // above — restricted to precisely what orderService.ts's advanceStatus (admin path) and
+      // cancelOrder.ts (buyer path; this Cloud Function itself runs via the Admin SDK and bypasses
+      // these rules regardless — this branch only governs a hypothetical direct client write) ever
+      // legitimately set.
+      // 'items' is included for the admin branch because returnService.ts/exchangeService.ts's
+      // mirrorItem{Return,Exchange}Status mirrors the request's status onto this order's embedded
+      // item array as a same-status write (isValidOrderTransition's `to == from` clause) whenever
+      // the admin side advances a return/exchange — a real, currently-relied-upon write path this
+      // restriction must not break.
+      allow update: if
+        (isAdmin() &&
+          isValidOrderTransition(resource.data.status, request.resource.data.status) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'timeline', 'tracking_number', 'courier_name', 'courier_phone', 'items'])) ||
+        (resource.data.buyer_id == uid() &&
+          resource.data.status in ['placed', 'confirmed', 'packed'] &&
+          request.resource.data.status == 'cancelled' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'timeline']));
     }
 
     match /returns/{returnId} {
-      allow read: if isSignedIn() && (resource.data.buyer_id == uid() || resource.data.seller_id == uid() || isHeadSeller() ||
+      allow read: if isSignedIn() && (resource.data.buyer_id == uid() || isAdmin() ||
         (isStaff() && resource.data.seller_id == staffSellerId()));
-      allow create: if isSignedIn() && request.resource.data.buyer_id == uid();
-      allow update: if isHeadSeller() ||
-        (isSeller() && resource.data.seller_id == uid()) ||
-        (staffCan('approve_returns') && resource.data.seller_id == staffSellerId());
+      // A return may only be opened against the requester's own order, and only once it has
+      // actually been delivered — otherwise a client could create a return doc referencing any
+      // order_id (someone else's, or one still in transit) directly against Firestore, bypassing
+      // the app's own eligibility UI entirely. Per-item is_return_eligible / duplicate-request
+      // checks remain UI-only for now (see Phase 3 report) — this closes the ownership/status gap.
+      // Phase 20 hardening: pins the initial status to 'requested' (mirrors supportTickets' own
+      // create rule forcing status=='open') — previously a buyer's create write could set `status`
+      // to any value at all, e.g. straight to 'refunded', since only order ownership/delivered-
+      // status were checked. The onReturnStatusChange trigger is onDocumentUpdated (never fires on
+      // a create alone), so this specific gap couldn't trigger a real stock-restoration exploit,
+      // but an unvalidated first-write status is still an unnecessary integrity gap to leave open.
+      // seller_id is also cross-checked against the referenced order's own seller_id (already
+      // fetched by the checks above, so this is a free additional condition) — without this, a
+      // buyer could set seller_id to an arbitrary uid and have that reflected on the return doc.
+      allow create: if isSignedIn() && request.resource.data.buyer_id == uid() &&
+        request.resource.data.status == 'requested' &&
+        orderData(request.resource.data.order_id).buyer_id == uid() &&
+        orderData(request.resource.data.order_id).status == 'delivered' &&
+        orderData(request.resource.data.order_id).seller_id == request.resource.data.seller_id;
+      // Staff is product + inventory only here too (see the orders rule above for why there's no
+      // staffCan(...) branch). `inventory_restored` is a server-only marker (set exclusively by
+      // the onReturnStatusChange Cloud Function via the Admin SDK, which bypasses these rules) —
+      // no client write, including the Admin's own, may ever set it, so a return can't be made to
+      // silently skip or repeat its one-time stock restoration. Phase 20 hardening: also excludes
+      // buyer_id/order_id/order_item_id/refund_amount/created_at — returnService.ts's own
+      // advanceStatus only ever writes {status, timeline}, so restricting the admin update to
+      // exactly what that real write path needs (plus leaving the door open for a future legitimate
+      // field) closes the Admin being able to inflate their own refund_amount or rewrite which
+      // order/buyer a return is tied to.
+      allow update: if isAdmin() &&
+        !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['inventory_restored', 'buyer_id', 'order_id', 'order_item_id', 'refund_amount', 'created_at']);
     }
 
     match /exchanges/{exchangeId} {
-      allow read: if isSignedIn() && (resource.data.buyer_id == uid() || resource.data.seller_id == uid() || isHeadSeller());
-      allow create: if isSignedIn() && request.resource.data.buyer_id == uid();
-      allow update: if isHeadSeller() || (isSeller() && resource.data.seller_id == uid());
+      allow read: if isSignedIn() && (resource.data.buyer_id == uid() || isAdmin());
+      // Same ownership/delivered-order requirement as returns above, plus the same initial-status
+      // pin and seller_id cross-check.
+      allow create: if isSignedIn() && request.resource.data.buyer_id == uid() &&
+        request.resource.data.status == 'requested' &&
+        orderData(request.resource.data.order_id).buyer_id == uid() &&
+        orderData(request.resource.data.order_id).status == 'delivered' &&
+        orderData(request.resource.data.order_id).seller_id == request.resource.data.seller_id;
+      // Same `inventory_restored` protection as returns above, plus the same identity-field lock —
+      // exchangeService.ts's advanceStatus only ever writes {status, timeline} too.
+      allow update: if isAdmin() &&
+        !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['inventory_restored', 'buyer_id', 'order_id', 'order_item_id', 'created_at']);
     }
 
     match /wishlist/{itemId} {
@@ -170,66 +325,99 @@ service cloud.firestore {
       allow create: if isSignedIn() && request.resource.data.user_id == uid();
     }
 
-    match /seller_requests/{requestId} {
-      allow read: if isSignedIn() && (resource.data.user_id == uid() || isHeadSeller());
-      allow create: if isSignedIn() && request.resource.data.user_id == uid();
-      allow update: if isHeadSeller();
-    }
-
     match /coupons/{couponId} {
       allow read: if true;
-      allow write: if isHeadSeller();
+      allow write: if isAdmin();
+    }
+
+    // Coupon redemption audit trail (Phase 13) — written exclusively by the order-placement Cloud
+    // Function (Admin SDK), atomically with the order it belongs to and the coupon's used_count
+    // increment. No client may create/edit/delete a usage record directly — this is what makes
+    // per_user_limit trustworthy; a client-writable usage log could simply not record a use.
+    match /coupon_usages/{usageId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.user_id == uid());
+      allow write: if false;
     }
 
     match /banners/{bannerId} {
       allow read: if true;
-      allow write: if isHeadSeller();
+      allow write: if isAdmin();
     }
 
     match /reviews/{reviewId} {
       allow read: if true;
-      allow create: if isSignedIn() && request.resource.data.user_id == uid();
-      allow update: if isSignedIn() && resource.data.user_id == uid();
-      // Seller reply: the owning seller of the reviewed product (or head-seller) may update ONLY
-      // the seller_reply field — the buyer-authored fields stay immutable to them.
+      // Creation is Cloud-Function-only (see functions/src/callables/submitReview.ts) — a plain
+      // client write could previously set is_verified_purchase/order_id to anything and skip the
+      // duplicate-review check entirely (Phase 14's audit finding); verifying order ownership,
+      // delivery status, and duplicate-review status requires reads a rule can't cheaply express
+      // (an arbitrary "does a matching review already exist" query), so the callable owns this.
+      allow create: if false;
+      // The author may edit their own review's CONTENT only — rating still validated here as a
+      // backstop even though the client UI already constrains it, and is_verified_purchase/
+      // order_id/order_item_id/user_id/created_at can never be touched after creation.
+      allow update: if isSignedIn() && resource.data.user_id == uid() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating', 'review_title', 'review_text', 'images', 'updated_at']) &&
+        request.resource.data.rating is int && request.resource.data.rating >= 1 && request.resource.data.rating <= 5;
+      // Admin reply: the Admin (or staff granted reply_to_customers) may update ONLY the
+      // seller_reply field — the buyer-authored fields stay immutable to them.
       allow update: if isSignedIn() &&
-        (isHeadSeller() ||
-          get(/databases/$(database)/documents/products/$(resource.data.product_id)).data.seller_id == uid() ||
+        (isAdmin() ||
           (staffCan('reply_to_customers') && get(/databases/$(database)/documents/products/$(resource.data.product_id)).data.seller_id == staffSellerId())) &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seller_reply']);
+      // Moderation (Phase 14): the Admin may hide/restore any review — a separate branch from the
+      // seller_reply one above since a moderation action and a reply are different operations that
+      // shouldn't have to happen in the same write.
+      allow update: if isSignedIn() && isAdmin() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['is_hidden']);
       allow delete: if isSignedIn() && resource.data.user_id == uid();
+    }
+
+    // Server-computed rating aggregates (Phase 14) — see functions/src/triggers/onReviewWritten.ts.
+    // Public read (product pages need this on every load); write is trigger-only, since a
+    // client-writable rating summary would let anyone fake a product's star rating directly.
+    match /product_rating_summaries/{productId} {
+      allow read: if true;
+      allow write: if false;
     }
 
     match /platform_settings/{docId} {
       allow read: if true;
-      allow write: if isHeadSeller();
+      allow write: if isAdmin();
     }
 
-    // Manually-recorded Head-Seller-to-seller payouts (no payment gateway integration — see
-    // types/database.ts's Payout). A seller may read their own payout history; only the Head
-    // Seller can create a payout or mark one paid.
+    // Manually-recorded payouts (no payment gateway integration — see types/database.ts's Payout).
+    // Admin-only, both read and write.
     match /payouts/{payoutId} {
-      allow read: if isHeadSeller() || (isSignedIn() && resource.data.seller_id == uid());
-      allow write: if isHeadSeller();
+      allow read: if isAdmin();
+      allow write: if isAdmin();
     }
 
     // Staff Management — see functions/src/callables/addStaff|removeStaff|resetStaffPassword for
     // the account-creation/deletion path (Admin SDK, bypasses these rules entirely). Direct client
-    // writes here are limited to the Head Seller editing a single doc's simple fields (permissions,
+    // writes here are limited to the Admin editing a single doc's simple fields (permissions,
     // designation, status) — never anything cross-document.
     match /staff/{staffId} {
-      allow read: if isOwner(staffId) || isHeadSeller();
-      allow write: if isHeadSeller();
+      allow read: if isOwner(staffId) || isAdmin();
+      allow write: if isAdmin();
     }
 
     match /staff_permissions/{staffId} {
-      allow read: if isOwner(staffId) || isHeadSeller();
-      allow write: if isHeadSeller();
+      allow read: if isOwner(staffId) || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Delivery Personnel Management (Phase 11) — account lifecycle (create/delete) goes through
+    // addDeliveryStaff/removeDeliveryStaff Cloud Functions (Admin SDK, bypasses these rules),
+    // exactly like staff/{staffId} above. Direct client writes here are limited to the Admin
+    // toggling active/inactive — never anything cross-document.
+    match /delivery_staff/{staffId} {
+      allow read: if isOwner(staffId) || isAdmin();
+      allow write: if isAdmin();
     }
 
     match /staff_activity/{activityId} {
-      allow read: if isHeadSeller() || (isSignedIn() && resource.data.staff_id == uid());
-      allow create: if isHeadSeller() || (isActiveStaff() && request.resource.data.staff_id == uid());
+      allow read: if isAdmin() || (isSignedIn() && resource.data.staff_id == uid());
+      allow create: if isAdmin() || (isActiveStaff() && request.resource.data.staff_id == uid());
     }
 
     // Signed-in-only personalization signals (recently viewed, category history, recent
@@ -238,6 +426,105 @@ service cloud.firestore {
     // owner reading/overwriting their own single doc.
     match /user_activity/{userId} {
       allow read, write: if isOwner(userId);
+    }
+
+    // Admin-managed Help Center content (Phase 16) — plain public-read/admin-write
+    // CRUD, no Cloud Function, exactly like banners/categories/brands above.
+    match /faqs/{faqId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Per-user ticket-creation cooldown/cap (Phase 16) — never touched by a Cloud Function; it
+    // exists purely so supportTickets' `allow create` below can cheaply get() a single prior-state
+    // doc (a security rule can't run a `where()` count query). `last_ticket_at` must be set via
+    // serverTimestamp() — the `== request.time` check rejects a client-supplied/backdated value,
+    // which is what makes the 2-minute cooldown in supportTickets' create rule trustworthy.
+    match /support_rate_limits/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) && request.resource.data.last_ticket_at == request.time;
+    }
+
+    // Customer Support (Phase 16) — created/replied-to via direct, rules-gated writes rather than a
+    // Cloud Function: every check a create needs (own order/return/exchange, own ticket, ticket not
+    // closed) is a single-doc get(), the same idiom returns/exchanges already use above, so the
+    // core flow works today even while every Cloud Function in this project is blocked by the
+    // Spark billing plan. Only the notification fan-out (onSupportTicketCreated/
+    // onSupportMessageCreated triggers) needs Blaze, same as every other notification already does.
+    match /supportTickets/{ticketId} {
+      allow read: if isSignedIn() && (resource.data.user_id == uid() || isAdmin());
+
+      // Priority is always forced to 'normal' here — customers cannot self-escalate; only the
+      // Admin (via the update rule below) may raise it. Status is always forced to 'open'.
+      // The rate-limit check mirrors coupons' per_user_limit idiom (see orderPlacement.ts) but
+      // expressed in rules instead of a transaction, since this write never goes through a callable.
+      allow create: if isSignedIn() &&
+        request.resource.data.user_id == uid() &&
+        request.resource.data.status == 'open' &&
+        request.resource.data.priority == 'normal' &&
+        request.resource.data.last_message_by == 'customer' &&
+        request.resource.data.admin_unread == true &&
+        request.resource.data.customer_unread == false &&
+        request.resource.data.subject is string && request.resource.data.subject.size() >= 5 && request.resource.data.subject.size() <= 100 &&
+        request.resource.data.category in ['order', 'payment', 'delivery', 'return', 'exchange', 'product', 'coupon', 'account', 'other'] &&
+        request.resource.data.last_message_preview is string && request.resource.data.last_message_preview.size() >= 1 && request.resource.data.last_message_preview.size() <= 300 &&
+        (request.resource.data.order_id == null || orderData(request.resource.data.order_id).buyer_id == uid()) &&
+        (request.resource.data.return_id == null || get(/databases/$(database)/documents/returns/$(request.resource.data.return_id)).data.buyer_id == uid()) &&
+        (request.resource.data.exchange_id == null || get(/databases/$(database)/documents/exchanges/$(request.resource.data.exchange_id)).data.buyer_id == uid()) &&
+        (!exists(/databases/$(database)/documents/support_rate_limits/$(uid())) ||
+          request.time > get(/databases/$(database)/documents/support_rate_limits/$(uid())).data.last_ticket_at + duration.value(2, 'm'));
+
+      // Admin: status/priority/assignment management, and posting a reply (which also needs
+      // to bump last_message_*/unread here) — one broad branch since the Admin is already
+      // trusted this way for coupons/banners/platform_settings.
+      allow update: if isAdmin() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+          ['status', 'priority', 'assigned_to', 'updated_at', 'resolved_at', 'last_message_at', 'last_message_by', 'last_message_preview', 'admin_unread', 'customer_unread']) &&
+        request.resource.data.status in ['open', 'in_progress', 'waiting_for_customer', 'resolved', 'closed'] &&
+        request.resource.data.priority in ['low', 'normal', 'high'];
+
+      // Customer posting a follow-up message — may only bump the "there's a new customer message"
+      // fields, and only while the ticket isn't closed. A reply to a 'waiting_for_customer' or
+      // 'resolved' ticket is allowed to move status to 'in_progress' (reopening it for the owner to
+      // look at again); the customer can never set resolved/closed/high-priority themselves.
+      allow update: if isSignedIn() && resource.data.user_id == uid() && resource.data.status != 'closed' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+          ['last_message_at', 'last_message_by', 'last_message_preview', 'admin_unread', 'customer_unread', 'updated_at', 'status']) &&
+        request.resource.data.last_message_by == 'customer' &&
+        request.resource.data.admin_unread == true &&
+        request.resource.data.customer_unread == false &&
+        request.resource.data.last_message_preview is string && request.resource.data.last_message_preview.size() >= 1 && request.resource.data.last_message_preview.size() <= 300 &&
+        (request.resource.data.status == resource.data.status ||
+          (resource.data.status in ['waiting_for_customer', 'resolved'] && request.resource.data.status == 'in_progress'));
+
+      // Customer opening the ticket to read the owner's reply — may only clear their own unread flag.
+      allow update: if isSignedIn() && resource.data.user_id == uid() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['customer_unread']) &&
+        request.resource.data.customer_unread == false;
+
+      // supportTickets/{ticketId}/messages/{messageId} — append-only (see lib/types.ts's
+      // SupportMessage doc comment for why internal_note is never queried by a customer, not just
+      // rules-gated: an entire list query is rejected if ANY matched doc would fail allow read).
+      match /messages/{messageId} {
+        allow read: if isSignedIn() && (
+          (get(/databases/$(database)/documents/supportTickets/$(ticketId)).data.user_id == uid() && resource.data.message_type != 'internal_note') ||
+          isAdmin()
+        );
+        allow create: if isSignedIn() &&
+          request.resource.data.sender_id == uid() &&
+          request.resource.data.ticket_id == ticketId &&
+          request.resource.data.message is string && request.resource.data.message.size() >= 2 && request.resource.data.message.size() <= 2000 &&
+          (
+            (get(/databases/$(database)/documents/supportTickets/$(ticketId)).data.user_id == uid() &&
+              get(/databases/$(database)/documents/supportTickets/$(ticketId)).data.status != 'closed' &&
+              request.resource.data.sender_role == 'customer' &&
+              request.resource.data.message_type == 'customer_message') ||
+            (isAdmin() &&
+              request.resource.data.sender_role == 'admin' &&
+              request.resource.data.message_type in ['owner_reply', 'internal_note'])
+          );
+        allow update, delete: if false;
+      }
     }
   }
 }

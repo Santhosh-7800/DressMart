@@ -8,7 +8,11 @@ import { initPushNotifications } from './pushNotifications';
  * WebView doesn't give an app for free the way a real native screen does:
  *
  * 1. Status bar color/style — left to its default, the status bar is the OS's generic
- *    light/white, clashing with DressMart's navy (#131921) header.
+ *    light/white, clashing with DressMart's navy (#131921) header. Overlay is pinned to `true`
+ *    explicitly (rather than left to the plugin's/OS's own default, which varies by Android
+ *    version — Android 15+ forces edge-to-edge regardless of any app setting) so behavior is
+ *    consistent across devices; Header.tsx's `.pt-safe` is what actually keeps its content clear
+ *    of the status bar once the WebView draws underneath it.
  * 2. The hardware Back button — Capacitor's WebView only replays browser history; with no history
  *    left (e.g. sitting on Home) the default behavior varies by version and can feel like Back
  *    "does nothing" instead of exiting, which is what every native Android app does at its root.
@@ -26,6 +30,7 @@ export async function initCapacitorNative(): Promise<void> {
     import('@capacitor/app'),
   ]);
 
+  await StatusBar.setOverlaysWebView({ overlay: true }).catch(() => undefined);
   await StatusBar.setBackgroundColor({ color: '#131921' }).catch(() => undefined);
   await StatusBar.setStyle({ style: Style.Dark }).catch(() => undefined);
 

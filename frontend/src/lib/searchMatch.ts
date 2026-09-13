@@ -53,6 +53,10 @@ export interface ProductSearchIndex {
   tokens: Set<string>;
   nameLower: string;
   skuLower: string;
+  /** Every variant's own SKU (e.g. "FS031-SKY-M"), lowercased — searched separately from skuLower
+   *  (the product-level SKU, e.g. "FS031") so an exact variant SKU still gets the same top-priority
+   *  boost a product-level SKU match gets, rather than only surfacing via the weaker token fallback. */
+  variantSkusLower: string[];
   brandLower: string;
   categoryLower: string;
   subcategoryLower: string;
@@ -71,6 +75,7 @@ export function buildProductSearchIndex(p: Product): ProductSearchIndex {
     p.gender,
     ...p.variants.map((v) => v.color),
     ...p.variants.map((v) => v.size),
+    ...p.variants.map((v) => v.sku),
     ...p.tags,
     p.description,
     ...specValues,
@@ -80,6 +85,7 @@ export function buildProductSearchIndex(p: Product): ProductSearchIndex {
     tokens: new Set(parts.flatMap(tokenize)),
     nameLower: p.name.toLowerCase(),
     skuLower: p.sku.toLowerCase(),
+    variantSkusLower: p.variants.map((v) => v.sku.toLowerCase()),
     brandLower: (p.brand?.name ?? '').toLowerCase(),
     categoryLower: (p.category?.name ?? '').toLowerCase(),
     subcategoryLower: (p.subcategory ?? '').toLowerCase(),
@@ -106,8 +112,10 @@ export function scoreProductMatch(index: ProductSearchIndex, queryPhrase: string
   let score = 0;
 
   // Priority 1: exact/partial SKU match — the strongest possible signal, since a SKU is unique.
-  if (index.skuLower === queryPhrase) score += 10_000;
-  else if (index.skuLower.includes(queryPhrase)) score += 3_000;
+  // Checked against both the product-level SKU (e.g. "FS031") and every variant's own SKU (e.g.
+  // "FS031-SKY-M") — a customer searching either should get the same top-tier confidence match.
+  if (index.skuLower === queryPhrase || index.variantSkusLower.includes(queryPhrase)) score += 10_000;
+  else if (index.skuLower.includes(queryPhrase) || index.variantSkusLower.some((s) => s.includes(queryPhrase))) score += 3_000;
 
   // Priority 2: exact/partial product name match.
   if (index.nameLower === queryPhrase) score += 5_000;

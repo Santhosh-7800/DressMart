@@ -5,6 +5,7 @@ import { LayoutDashboard, Package, Boxes, History, UserCog, LogOut, Menu, X, Bri
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAvatar } from '@/hooks/useAvatar';
+import { useBackButtonDismiss } from '@/hooks/useBackButtonDismiss';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { AnimatedOutlet } from '@/components/common/PageTransition';
@@ -18,9 +19,10 @@ interface NavItem {
 
 /** The Staff role is product-management-only — this fixed list IS the full scope of what a staff
  *  account can reach (no Orders/Returns/Revenue/Seller-Management/Analytics/Payments). Individual
- *  add/edit/delete/manage_inventory actions inside Products/Inventory still respect the account's
- *  granted StaffPermissionKeys (see SellerProductsPage/SellerProductFormPage's canX gates) — this
- *  list only controls which destinations exist at all. */
+ *  add/edit/delete/manage_inventory/upload_images actions inside Products/Inventory still respect
+ *  the account's granted StaffPermissionKeys (see SellerProductsPage's canAdd/canEdit/canDelete and
+ *  SellerProductFormPage's isBlockedByStaffPermission/canUploadImages/canManageInventory gates) —
+ *  this list only controls which destinations exist at all. */
 const STAFF_NAV_ITEMS: NavItem[] = [
   { to: '/staff/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/staff/products', label: 'Products', icon: Package },
@@ -129,6 +131,7 @@ function DisabledBlock({ reason }: { reason: string | null | undefined }) {
  *  can do". */
 export function StaffLayout() {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  useBackButtonDismiss(isMobileNavOpen, () => setIsMobileNavOpen(false));
   const { user } = useAuth();
   const { avatarUrl } = useAvatar();
   const items = STAFF_NAV_ITEMS;

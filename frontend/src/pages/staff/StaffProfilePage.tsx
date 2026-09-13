@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Moon, Sun, Monitor, Lock, User } from 'lucide-react';
+import { Moon, Sun, Monitor, Lock, User, LogOut } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { Card } from '@/components/ui/Card';
 import { Avatar } from '@/components/ui/Avatar';
@@ -16,7 +17,8 @@ import { cn } from '@/lib/utils';
  *  No Danger Zone (account deletion is Head-Seller-only, via removeStaff) and no push-notification
  *  opt-in (out of scope for the product-management-only Staff role). */
 export function StaffProfilePage() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const { avatarUrl, uploadAvatar, isUploading } = useAvatar();
   const { themePreference, setThemePreference } = useTheme();
 
@@ -87,9 +89,16 @@ export function StaffProfilePage() {
           <div>
             <p className="text-base font-semibold text-acc-text dark:text-white">{user.full_name}</p>
             <p className="text-sm text-acc-text-secondary">{user.email}</p>
-            <p className="text-xs text-acc-text-secondary">{user.store_name ? `Staff · ${user.store_name}` : 'Staff'}</p>
+            {user.phone && <p className="text-sm text-acc-text-secondary">{user.phone}</p>}
           </div>
         </div>
+        <div className="mt-4 flex items-center justify-between border-t border-acc-border pt-3 text-sm dark:border-primary-700">
+          <span className="text-acc-text-secondary">Role</span>
+          <span className="font-medium text-acc-text dark:text-white">{user.store_name ? `Staff · ${user.store_name}` : 'Staff'}</span>
+        </div>
+        <Button variant="outline" fullWidth className="mt-4" onClick={() => { void signOut(); navigate('/'); }}>
+          <LogOut size={15} /> Logout
+        </Button>
       </Card>
 
       <Card hover={false}>

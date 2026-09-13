@@ -4,11 +4,22 @@ import type { Banner } from '@/types';
 
 const BANNERS_COLLECTION = 'banners';
 
+function isCurrentlyScheduled(banner: Banner, now = new Date()): boolean {
+  if (banner.start_at && now < new Date(banner.start_at)) return false;
+  if (banner.end_at && now > new Date(banner.end_at)) return false;
+  return true;
+}
+
 export const bannerService = {
-  /** Buyer-facing, public-read — active banners for the homepage carousel, sorted for display. */
+  /** Buyer-facing, public-read — active AND currently-scheduled banners for the homepage carousel,
+   *  sorted for display. is_active alone predates scheduling (Phase 13); a banner outside its
+   *  [start_at, end_at] window is filtered out here since Firestore can't express "now between two
+   *  fields" as a query constraint (same reasoning as couponService's isCurrentlyValid). */
   async list(): Promise<Banner[]> {
     const snap = await getDocs(query(collection(db, BANNERS_COLLECTION), where('is_active', '==', true)));
-    return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Banner).sort((a, b) => a.sort_order - b.sort_order);
+    const banners = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Banner);
+    const now = new Date();
+    return banners.filter((b) => isCurrentlyScheduled(b, now)).sort((a, b) => a.sort_order - b.sort_order);
   },
 
   /** Every banner regardless of active state — Head Seller's Banner Management page. */

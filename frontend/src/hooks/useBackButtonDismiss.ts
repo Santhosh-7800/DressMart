@@ -19,7 +19,10 @@ export function useBackButtonDismiss(isOpen: boolean, onClose: () => void): void
   useEffect(() => {
     if (!isOpen) return;
 
-    window.history.pushState({ dismissable: true }, '');
+    // A unique, serializable marker (Symbols aren't structured-cloneable, so pushState would throw)
+    // identifying *this* dismissable entry — see the cleanup below for why.
+    const marker = `dismissable-${Date.now()}-${Math.random()}`;
+    window.history.pushState({ dismissable: true, marker }, '');
     consumedByPopRef.current = false;
 
     const handlePopState = () => {
@@ -30,7 +33,14 @@ export function useBackButtonDismiss(isOpen: boolean, onClose: () => void): void
 
     return () => {
       window.removeEventListener('popstate', handlePopState);
-      if (!consumedByPopRef.current) {
+      // A <Link> (or a signOut()-style redirect) inside the overlay can close it by navigating to a
+      // real route, which pushes its own history entry on top of ours *before* this cleanup runs —
+      // history.state no longer matches our marker in that case. Blindly calling history.back() here
+      // would silently undo that fresh navigation (bouncing the user right back to where they
+      // started) instead of just dismissing the overlay. Only pop when our marker is still the
+      // current entry, i.e. nothing has navigated since the overlay opened.
+      const current = window.history.state as { marker?: string } | null;
+      if (!consumedByPopRef.current && current?.marker === marker) {
         window.history.back();
       }
     };

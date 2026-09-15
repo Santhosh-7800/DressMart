@@ -1,6 +1,10 @@
+import { useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Package, Heart, MapPin, Ticket, Settings, History, HelpCircle, LifeBuoy, LogOut, ChevronRight } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { Package, Heart, MapPin, Ticket, Settings, History, HelpCircle, LifeBuoy, LogOut, ChevronRight, Camera } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
+import { useAvatar } from '@/hooks/useAvatar';
+import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 import type { Profile } from '@/types';
 
 interface ProfileMobileListProps {
@@ -24,10 +28,45 @@ const ROWS = [
  *  richer dashboard (order/wishlist previews, inline edit form, coupons/address cards) stays
  *  desktop-only in ProfilePage; this just links out to each of those existing dedicated pages. */
 export function ProfileMobileList({ user, avatarUrl, onSignOut }: ProfileMobileListProps) {
+  const { uploadAvatar, isUploading } = useAvatar();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePhotoChange = async (file: File) => {
+    try {
+      await uploadAvatar(file);
+      toast.success('Profile photo updated');
+    } catch (error) {
+      toast.error(getFriendlyErrorMessage(error, 'Photo upload failed'));
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-4 rounded-2xl bg-card p-4 dark:bg-card-dark">
-        <Avatar src={avatarUrl} name={user.full_name} size="lg" />
+        <div className="relative shrink-0">
+          <Avatar src={avatarUrl} name={user.full_name} size="lg" />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            className="tap-target-48 absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-card bg-acc-primary text-white shadow-sm disabled:opacity-60 dark:border-card-dark"
+            title="Change photo"
+            aria-label="Add or change profile photo"
+          >
+            <Camera size={13} />
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handlePhotoChange(file);
+              e.target.value = '';
+            }}
+          />
+        </div>
         <div className="min-w-0">
           <p className="truncate font-bold text-acc-text dark:text-white">{user.full_name}</p>
           <p className="truncate text-sm text-acc-text-secondary">{user.email}</p>

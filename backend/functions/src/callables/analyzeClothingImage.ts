@@ -16,7 +16,7 @@ const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 // compresses before sending (see visualSearchService.ts), so a request this large only happens if
 // something bypassed that step; better to reject clearly than let a huge payload hang the request.
 const MAX_BASE64_LENGTH = 6_000_000;
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_MODEL = 'gemini-3.6-flash';
 const REQUEST_TIMEOUT_MS = 25_000;
 
 interface AnalyzeClothingImageData {
@@ -83,9 +83,12 @@ async function callGemini(imageBase64: string, mimeType: string): Promise<RawClo
 
   let response: Response;
   try {
-    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiApiKey.value()}`, {
+    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      // Google's newer AI Studio keys (the "AQ...." format, replacing the legacy "AIzaSy..." keys)
+      // aren't accepted via the `?key=` query param — the API responds
+      // ACCESS_TOKEN_TYPE_UNSUPPORTED. The `x-goog-api-key` header works for both key formats.
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiApiKey.value() },
       signal: controller.signal,
       body: JSON.stringify({
         contents: [{ parts: [{ text: PROMPT }, { inline_data: { mime_type: mimeType, data: imageBase64 } }] }],

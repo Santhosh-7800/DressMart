@@ -267,7 +267,7 @@ export function AdminBannersPage() {
           <Input floating label="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
           <Input floating label="Subtitle (optional)" value={form.subtitle} onChange={(e) => setForm({ ...form, subtitle: e.target.value })} />
           <div className="flex gap-3">
-            <Input floating label="Button Text" value={form.cta_label} onChange={(e) => setForm({ ...form, cta_label: e.target.value })} placeholder="Shop Now" />
+            <Input floating label="Button Text" value={form.cta_label} onChange={(e) => setForm({ ...form, cta_label: e.target.value })} hint="e.g. Shop Now" />
             <Input floating label="Link" value={form.link} onChange={(e) => setForm({ ...form, link: e.target.value })} />
           </div>
           <div className="flex gap-3">

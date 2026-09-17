@@ -6,12 +6,12 @@ import type { Profile } from '../lib/types';
 const BATCH_CHUNK_SIZE = 400;
 
 /**
- * Buyer-only self-service account deletion. Scoped to the 'buyer' role deliberately — an admin,
- * staff, or delivery account owns/is referenced by products, inventory, staff rosters, or
- * in-progress deliveries, and staff/delivery already have their own dedicated removal flow
- * (removeStaff/removeDeliveryStaff) with the right cross-document cleanup for that role; this
- * function does not attempt to generalize to those (there is deliberately no self- or
- * admin-triggered deletion path for the single Admin account itself).
+ * Buyer-only self-service account deletion. Scoped to the 'buyer' role deliberately — an admin or
+ * staff account owns/is referenced by products, inventory, or staff rosters, and staff already has
+ * its own dedicated removal flow (removeStaff) with the right cross-document cleanup for that role;
+ * this function does not attempt to generalize to those (there is deliberately no self- or
+ * admin-triggered deletion path for the single Admin account itself). A 'delivery' account is now
+ * exclusively the standalone Delivery app's concern — DressMart no longer creates or removes them.
  *
  * Deliberately does NOT touch `orders` — an order is the business's own transaction/fulfillment
  * record (inventory movements, payment records, and the store's own accounting all reference it),

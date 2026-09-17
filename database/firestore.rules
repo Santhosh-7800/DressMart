@@ -6,7 +6,7 @@ rules_version = '2';
 //   their uid, stamped at creation — kept as a data field even though there's only ever one admin,
 //   since products/orders/returns/exchanges/inventory_movements/payouts already key off it and
 //   renaming it everywhere would touch live Firestore documents for no functional benefit), plus
-//   full read/write on coupons/banners/platform_settings/staff/delivery accounts.
+//   full read/write on coupons/banners/platform_settings/staff accounts.
 // - staff: an employee created by (and scoped to) the Admin's store. Product-management only by
 //   design — can touch products/inventory/reviews owned by that store ONLY to the extent
 //   staff_permissions/{uid} grants (add/edit/delete products, manage inventory, reply to
@@ -46,13 +46,6 @@ service cloud.firestore {
     function isActiveStaff() {
       return isStaff() && userData().staff_status == 'active';
     }
-    // Delivery personnel — a Admin-managed role distinct from product/inventory staff (see
-    // delivery_staff/{staffId} below). Every delivery status mutation goes through the
-    // assignDelivery/updateDeliveryStatus Cloud Functions (Admin SDK, bypasses these rules) — the
-    // isDelivery() checks here exist only to scope what a delivery account may READ.
-    function isDelivery() {
-      return isSignedIn() && role() == 'delivery';
-    }
     // The Admin's uid a staff account was created under (Profile.seller_id) — every
     // product/order/inventory/return a staff member may touch is scoped to this id, never their
     // own uid. Denormalized onto users/{uid} at creation (see functions/src/callables/addStaff)
@@ -84,8 +77,7 @@ service cloud.firestore {
         (from == 'placed' && (to == 'confirmed' || to == 'cancelled')) ||
         (from == 'confirmed' && (to == 'packed' || to == 'cancelled')) ||
         (from == 'packed' && (to == 'shipped' || to == 'cancelled')) ||
-        (from == 'shipped' && to == 'out_for_delivery') ||
-        (from == 'out_for_delivery' && to == 'delivered');
+        (from == 'shipped' && to == 'delivered');
     }
 
     // Singleton flag for the one-time Admin setup flow (see functions/src/callables/
@@ -116,16 +108,15 @@ service cloud.firestore {
       // Phase 20 P0 fix: this previously had NO field restrictions at all — any authenticated user
       // (a real Firebase Auth account, reached via ordinary email/password/Google/phone sign-up)
       // could bypass the app's own authService.ts entirely and call setDoc() directly with
-      // role: 'admin' (or 'staff'/'delivery', with a privileged status field, etc.) for their OWN
-      // uid, since isOwner(userId) was the only check. Every legitimate non-buyer account
-      // (admin/staff/delivery) is created exclusively by a Cloud Function via the Admin SDK
-      // (createAdmin/addStaff/addDeliveryStaff), which bypasses this rule entirely and never
-      // depends on it — so restricting direct client creation to a plain 'buyer' with no
-      // privileged status fields closes this without affecting any real flow.
+      // role: 'admin' (or 'staff', with a privileged status field, etc.) for their OWN uid, since
+      // isOwner(userId) was the only check. Every legitimate non-buyer account (admin/staff) is
+      // created exclusively by a Cloud Function via the Admin SDK (createAdmin/addStaff), which
+      // bypasses this rule entirely and never depends on it — so restricting direct client
+      // creation to a plain 'buyer' with no privileged status fields closes this without
+      // affecting any real flow.
       allow create: if isOwner(userId) &&
         request.resource.data.role == 'buyer' &&
-        !('staff_status' in request.resource.data) &&
-        !('delivery_staff_status' in request.resource.data);
+        !('staff_status' in request.resource.data);
       // Self-service profile edits (name/phone/avatar/fcm tokens/store settings). Role is never in
       // this allowlist — every role/status change is Admin- or Cloud-Function-only.
       allow update: if isOwner(userId) &&
@@ -136,15 +127,15 @@ service cloud.firestore {
           'bank_account_holder', 'bank_account_number', 'bank_ifsc',
           'shop_cod_available', 'shop_logo_url', 'shop_banner_url', 'updated_at'
         ]);
-      // Admin may disable/re-enable a staff or delivery account directly from the client (see
-      // staffAdminService.setStaffStatus / deliveryAdminService.setDeliveryStaffStatus) — restricted
-      // to exactly these fields. Every other cross-user change (role, ownership, etc.) must go
-      // through a Cloud Function (addStaff/removeStaff/addDeliveryStaff/removeDeliveryStaff/...),
-      // which runs with Admin privileges and bypasses these rules entirely — a plain client write
-      // must not be able to grant itself or anyone else an elevated role/status.
+      // Admin may disable/re-enable a staff account directly from the client (see
+      // staffAdminService.setStaffStatus) — restricted to exactly these fields. Every other
+      // cross-user change (role, ownership, etc.) must go through a Cloud Function
+      // (addStaff/removeStaff/...), which runs with Admin privileges and bypasses these rules
+      // entirely — a plain client write must not be able to grant itself or anyone else an
+      // elevated role/status.
       allow update: if isAdmin() &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(
-          ['staff_status', 'staff_status_reason', 'delivery_staff_status', 'delivery_staff_status_reason', 'updated_at']);
+          ['staff_status', 'staff_status_reason', 'updated_at']);
 
       // Cart is signed-in-only and lives under the owning user — see types/database.ts's CartItem.
       match /cart/{itemId} {
@@ -164,18 +155,13 @@ service cloud.firestore {
 
     match /products/{productId} {
       allow read: if true;
-      // Pricing is an owner-only decision (see the frontend form's staff-disabled price/MRP
-      // fields) — a staff-created product must start at price/mrp 0 for the owner to set later;
-      // enforced here too so a staff account can't set a real price by calling Firestore directly.
+      // Staff with add_products may set price/mrp/gst_percent on their store's own products, same
+      // as the Admin — pricing is no longer an Admin-only field (see AdminProductFormPage.tsx's
+      // price/MRP/GST inputs, no longer disabled for staff).
       allow create: if isAdmin() ||
-        (staffCan('add_products') && request.resource.data.seller_id == staffSellerId() &&
-          request.resource.data.price == 0 && request.resource.data.mrp == 0);
-      // Same reasoning for edits: staff with edit_products may change anything on their store's
-      // products EXCEPT price/mrp/gst_percent — those fields must be untouched (same value as
-      // before) for a staff-authored update to be accepted.
+        (staffCan('add_products') && request.resource.data.seller_id == staffSellerId());
       allow update: if isAdmin() ||
-        (staffCan('edit_products') && resource.data.seller_id == staffSellerId() &&
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['price', 'mrp', 'gst_percent']));
+        (staffCan('edit_products') && resource.data.seller_id == staffSellerId());
       allow delete: if isAdmin() ||
         (staffCan('delete_products') && resource.data.seller_id == staffSellerId());
     }
@@ -206,17 +192,8 @@ service cloud.firestore {
     }
 
     match /orders/{orderId} {
-      // Delivery staff may only read an order once it's actually assigned to them (Phase 11) — see
-      // the isDelivery() branch below. They never get a write branch here at all: every delivery
-      // status mutation (accept/pickup/out-for-delivery/delivered/failed/notes) goes exclusively
-      // through the assignDelivery/updateDeliveryStatus Cloud Functions, which run with Admin SDK
-      // privileges and validate assignment ownership + status-transition legality server-side. This
-      // is deliberately more restrictive than the admin update branch below — a client-writable
-      // delivery status would let a delivery account fabricate assignment/ownership (e.g.
-      // "delivery_staff_id = their own uid") just by being signed in.
       allow read: if isSignedIn() && (resource.data.buyer_id == uid() || isAdmin() ||
-        (isStaff() && resource.data.seller_id == staffSellerId()) ||
-        (isDelivery() && resource.data.delivery_staff_id == uid()));
+        (isStaff() && resource.data.seller_id == staffSellerId()));
       allow create: if isSignedIn() && request.resource.data.buyer_id == uid();
       // Buyers may only move their own order to 'cancelled', and only from a status the app itself
       // treats as cancellable (mirrors cancelOrder.ts's CANCELLABLE_STATUSES — the real cancel path
@@ -402,15 +379,6 @@ service cloud.firestore {
     }
 
     match /staff_permissions/{staffId} {
-      allow read: if isOwner(staffId) || isAdmin();
-      allow write: if isAdmin();
-    }
-
-    // Delivery Personnel Management (Phase 11) — account lifecycle (create/delete) goes through
-    // addDeliveryStaff/removeDeliveryStaff Cloud Functions (Admin SDK, bypasses these rules),
-    // exactly like staff/{staffId} above. Direct client writes here are limited to the Admin
-    // toggling active/inactive — never anything cross-document.
-    match /delivery_staff/{staffId} {
       allow read: if isOwner(staffId) || isAdmin();
       allow write: if isAdmin();
     }

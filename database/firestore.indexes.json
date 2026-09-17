@@ -32,14 +32,6 @@
       { "fieldPath": "placed_at", "order": "ASCENDING" }
     ] },
     { "collectionGroup": "orders", "queryScope": "COLLECTION", "fields": [
-      { "fieldPath": "delivery_staff_id", "order": "ASCENDING" },
-      { "fieldPath": "placed_at", "order": "DESCENDING" }
-    ] },
-    { "collectionGroup": "orders", "queryScope": "COLLECTION", "fields": [
-      { "fieldPath": "delivery_staff_id", "order": "ASCENDING" },
-      { "fieldPath": "delivery_status", "order": "ASCENDING" }
-    ] },
-    { "collectionGroup": "orders", "queryScope": "COLLECTION", "fields": [
       { "fieldPath": "status", "order": "ASCENDING" },
       { "fieldPath": "placed_at", "order": "DESCENDING" }
     ] },

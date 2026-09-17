@@ -3,13 +3,18 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { doc, updateDoc } from 'firebase/firestore';
-import { Store, Bell, LogOut, Image as ImageIcon, MapPin, CreditCard, Truck } from 'lucide-react';
+import { Store, Bell, LogOut, Image as ImageIcon, MapPin, CreditCard, Truck, Lock } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { Avatar } from '@/components/ui/Avatar';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAvatar } from '@/hooks/useAvatar';
+import { authService } from '@/services/authService';
 import { isAcceptedImageFile, uploadShopBanner, uploadShopLogo } from '@/services/storageService';
 import { resizeAndCompressImage, resizeAndCompressImageToWidth } from '@/lib/imageProcessing';
 import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
@@ -52,6 +57,7 @@ function AddressFields({ value, onChange }: { value: ShopAddress; onChange: (nex
 
 export function AdminSettingsPage() {
   const { user, signOut } = useAuth();
+  const { avatarUrl } = useAvatar();
   const navigate = useNavigate();
   const logoInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
@@ -75,6 +81,11 @@ export function AdminSettingsPage() {
   const [bankIfsc, setBankIfsc] = useState(user?.bank_ifsc ?? '');
 
   const [codAvailable, setCodAvailable] = useState(user?.shop_cod_available ?? true);
+
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isSavingPassword, setIsSavingPassword] = useState(false);
 
   const saveProfileMutation = useMutation({
     mutationFn: async () => {
@@ -181,6 +192,33 @@ export function AdminSettingsPage() {
     }
   };
 
+  const handleChangePassword = async () => {
+    if (!currentPassword) {
+      toast.error('Enter your current password');
+      return;
+    }
+    if (newPassword.length < 8) {
+      toast.error('Password must be at least 8 characters');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    setIsSavingPassword(true);
+    try {
+      await authService.changeOwnPassword(currentPassword, newPassword);
+      toast.success('Password updated');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error) {
+      toast.error(getFriendlyErrorMessage(error, 'Could not update password'));
+    } finally {
+      setIsSavingPassword(false);
+    }
+  };
+
   const handleSignOut = async () => {
     await signOut();
     navigate('/');
@@ -192,6 +230,17 @@ export function AdminSettingsPage() {
     <div className="space-y-6">
       <Seo title="Seller Settings" />
       <h1 className="text-2xl font-bold text-acc-text dark:text-white">Profile & Settings</h1>
+
+      <Card hover={false} className="flex items-center gap-4">
+        <Avatar src={avatarUrl} name={user.full_name} size="lg" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-base font-bold text-acc-text dark:text-white">{user.full_name}</p>
+          <p className="truncate text-sm text-acc-text-secondary">{user.email}</p>
+          <Badge tone="success" className="mt-1.5">
+            Admin
+          </Badge>
+        </div>
+      </Card>
 
       <Card hover={false}>
         <div className="mb-4 flex items-center gap-2">
@@ -330,6 +379,21 @@ export function AdminSettingsPage() {
               <input type="checkbox" checked={prefs[key]} onChange={() => togglePref(key)} className="h-4 w-4 accent-acc-primary" />
             </label>
           ))}
+        </div>
+      </Card>
+
+      <Card hover={false}>
+        <div className="mb-4 flex items-center gap-2">
+          <Lock size={17} className="text-acc-primary" />
+          <h2 className="text-base font-bold text-acc-text dark:text-white">Change Password</h2>
+        </div>
+        <div className="space-y-4">
+          <PasswordInput floating label="Current Password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
+          <PasswordInput floating label="New Password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+          <PasswordInput floating label="Confirm New Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+          <Button variant="account" onClick={handleChangePassword} isLoading={isSavingPassword}>
+            Update Password
+          </Button>
         </div>
       </Card>
 

@@ -102,8 +102,20 @@ export function SearchBar() {
           }}
           onFocus={() => setIsFocused(true)}
           onClick={() => setIsFocused(true)}
+          // The submit button below is hidden on mobile (sm:block) — Enter/Go is the only way to
+          // submit there, and relying on implicit HTML form-submission for that is inconsistent
+          // across Android WebView/keyboard combinations. Handling it explicitly here means the
+          // search action works the same way regardless of whether the WebView honors implicit
+          // submission for a form whose only submit button is CSS-hidden.
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && query.trim()) {
+              e.preventDefault();
+              runSearch(query);
+            }
+          }}
+          enterKeyHint="search"
           placeholder="Search for shirts, jeans, shoes and more"
-          className="w-full bg-transparent px-3 py-2.5 text-sm text-primary-900 outline-none placeholder:text-primary-300 dark:text-white"
+          className="w-full bg-transparent px-3 py-2.5 text-sm text-primary-900 outline-none placeholder:text-primary-300 focus-visible:ring-0 focus-visible:ring-offset-0 dark:text-white"
           aria-label="Search products"
         />
         {query && (

@@ -28,7 +28,6 @@ export const ORDER_STATUS_COLORS: Record<OrderStatus, string> = {
   confirmed: '#3B82F6',
   packed: '#8B5CF6',
   shipped: '#06B6D4',
-  out_for_delivery: '#EC4899',
   delivered: '#10B981',
   cancelled: '#EF4444',
   returned: '#DC2626',

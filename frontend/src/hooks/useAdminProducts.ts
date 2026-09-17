@@ -45,6 +45,10 @@ export function useCreateProduct() {
       queryClient.invalidateQueries({ queryKey: queryKeys.products.bySeller(sellerId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.products.bySeller(user?.id ?? '') });
       queryClient.invalidateQueries({ queryKey: ['products', 'all-sellers'] });
+      // Admin Dashboard's stat tiles (Total/Active Products, Out of Stock, Recently Added, ...)
+      // all key off ['admin', ...] — without this they'd keep showing pre-mutation numbers until
+      // their own staleTime lapses, even though the product list itself just refreshed above.
+      queryClient.invalidateQueries({ queryKey: ['admin'] });
       toast.success('Product created');
       if (user && isStaffRole(user.role)) {
         void staffService.logActivity({
@@ -84,6 +88,7 @@ export function useUpdateProduct() {
       queryClient.invalidateQueries({ queryKey: queryKeys.products.bySeller(user?.id ?? '') });
       queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
       queryClient.invalidateQueries({ queryKey: ['products', 'all-sellers'] });
+      queryClient.invalidateQueries({ queryKey: ['admin'] });
       toast.success('Product updated');
       if (user && isStaffRole(user.role)) {
         void staffService.logActivity({
@@ -120,6 +125,7 @@ export function useSetProductStatus() {
       queryClient.invalidateQueries({ queryKey: queryKeys.products.bySeller(user?.id ?? '') });
       queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
       queryClient.invalidateQueries({ queryKey: ['products', 'all-sellers'] });
+      queryClient.invalidateQueries({ queryKey: ['admin'] });
       toast.success(`Product ${STATUS_LABELS[status]}`);
     },
     onError: (error: Error) => toast.error(getFriendlyErrorMessage(error)),
@@ -134,6 +140,7 @@ export function useSetProductFeatured() {
     onSuccess: (_data, { featured }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
       queryClient.invalidateQueries({ queryKey: ['products', 'all-sellers'] });
+      queryClient.invalidateQueries({ queryKey: ['admin'] });
       toast.success(featured ? 'Product featured' : 'Product unfeatured');
     },
     onError: (error: Error) => toast.error(getFriendlyErrorMessage(error)),
@@ -158,6 +165,7 @@ export function useDeleteProduct() {
       queryClient.invalidateQueries({ queryKey: queryKeys.products.bySeller(sellerId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
       queryClient.invalidateQueries({ queryKey: ['products', 'all-sellers'] });
+      queryClient.invalidateQueries({ queryKey: ['admin'] });
       toast.success('Product deleted');
       if (user && isStaffRole(user.role)) {
         void staffService.logActivity({
@@ -186,6 +194,7 @@ export function useDuplicateProduct() {
       queryClient.invalidateQueries({ queryKey: queryKeys.products.bySeller(sellerId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.products.bySeller(user?.id ?? '') });
       queryClient.invalidateQueries({ queryKey: ['products', 'all-sellers'] });
+      queryClient.invalidateQueries({ queryKey: ['admin'] });
       toast.success('Product duplicated as a draft');
     },
     onError: (error: Error) => toast.error(getFriendlyErrorMessage(error)),
@@ -202,6 +211,7 @@ export function useSetProductDealOfDay() {
       queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
       queryClient.invalidateQueries({ queryKey: ['products', 'all-sellers'] });
       queryClient.invalidateQueries({ queryKey: ['products', 'deals'] });
+      queryClient.invalidateQueries({ queryKey: ['admin'] });
       toast.success(isDeal ? 'Product added to Deal of the Day' : 'Product removed from Deal of the Day');
     },
     onError: (error: Error) => toast.error(getFriendlyErrorMessage(error)),

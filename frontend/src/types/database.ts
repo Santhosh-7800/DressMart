@@ -8,7 +8,7 @@ export type Gender = 'men' | 'kids';
 /** Admin is the single store-owner account — see lib/roles.ts. Staff are employees created by the
  *  Admin to help run the store under granular, individually-assignable permissions — see
  *  StaffPermissions below. */
-export type UserRole = 'buyer' | 'admin' | 'staff' | 'delivery';
+export type UserRole = 'buyer' | 'admin' | 'staff';
 
 export type StaffStatus = 'active' | 'disabled';
 
@@ -31,10 +31,6 @@ export interface Profile {
   staff_status?: StaffStatus;
   /** Set when staff_status is 'disabled' — shown back to the staff member. */
   staff_status_reason?: string | null;
-  /** Present only when role is 'delivery' — denormalized from delivery_staff/{uid} for display
-   *  (e.g. roster badges) without a second read, same pattern as staff_status above. */
-  delivery_staff_status?: DeliveryStaffStatus;
-  delivery_staff_status_reason?: string | null;
   /** Web Push (FCM) registration tokens for this user's browsers — appended via arrayUnion by useFcmToken, one entry per opted-in browser/device. */
   fcm_tokens?: string[];
   /** Shop branding/logistics — present only for the Admin, same as store_name/gst_number. */
@@ -102,22 +98,6 @@ export interface StaffProfile {
   updated_at: string;
 }
 
-export type DeliveryStaffStatus = 'active' | 'inactive';
-
-/** `delivery_staff/{uid}` — an Admin-managed delivery-personnel account, distinct from
- *  StaffProfile (product/inventory staff) since delivery has its own, fixed capability set with no
- *  per-permission toggles. */
-export interface DeliveryStaffProfile {
-  id: string;
-  full_name: string;
-  phone: string;
-  status: DeliveryStaffStatus;
-  status_reason: string | null;
-  /** uid of the Admin who created this account. */
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-}
 
 export type StaffActivityAction =
   | 'login'
@@ -458,7 +438,6 @@ export type OrderStatus =
   | 'confirmed'
   | 'packed'
   | 'shipped'
-  | 'out_for_delivery'
   | 'delivered'
   | 'cancelled'
   | 'returned';
@@ -472,30 +451,6 @@ export interface OrderTimelineEvent {
   label: string;
   timestamp: string;
   note?: string;
-}
-
-/**
- * Independent of OrderStatus — tracks the internal fulfillment sub-workflow once an order has a
- * delivery person assigned. 'unassigned' is the implicit default for every order created before
- * Phase 11 or never assigned a delivery person; those orders simply have no delivery_status field.
- */
-export type DeliveryStatus = 'unassigned' | 'assigned' | 'accepted' | 'picked_up' | 'out_for_delivery' | 'delivered' | 'failed';
-
-export interface DeliveryNoteEvent {
-  note: string;
-  added_by: string;
-  added_by_name: string;
-  added_at: string;
-}
-
-/** One entry per assignment/reassignment — lets the owner see who handled an order over time. */
-export interface DeliveryAssignmentEvent {
-  delivery_staff_id: string;
-  delivery_staff_name: string;
-  assigned_by: string;
-  assigned_at: string;
-  unassigned_at?: string | null;
-  outcome?: 'reassigned' | 'failed' | 'delivered' | null;
 }
 
 export interface OrderItem {
@@ -555,22 +510,6 @@ export interface Order {
   tracking_number?: string;
   courier_name?: string;
   courier_phone?: string;
-  /** Present only once the Admin has assigned this order to a delivery person (Phase 11). All
-   *  writes to these fields go through the assignDelivery/updateDeliveryStatus Cloud Functions —
-   *  never a direct client write — see firestore.rules' orders match block. */
-  delivery_status?: DeliveryStatus;
-  delivery_staff_id?: string | null;
-  delivery_staff_name?: string | null;
-  delivery_assigned_at?: string | null;
-  delivery_assigned_by?: string | null;
-  delivery_accepted_at?: string | null;
-  delivery_picked_up_at?: string | null;
-  delivery_out_for_delivery_at?: string | null;
-  delivery_delivered_at?: string | null;
-  delivery_failed_at?: string | null;
-  delivery_failure_reason?: string | null;
-  delivery_notes?: DeliveryNoteEvent[];
-  delivery_history?: DeliveryAssignmentEvent[];
 }
 
 export type ReturnStatus = 'requested' | 'approved' | 'rejected' | 'pickup_scheduled' | 'received' | 'refunded';

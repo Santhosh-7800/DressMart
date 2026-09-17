@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { UploadCloud, X, Plus, GripVertical, Wand2, ShieldAlert } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
+import { UploadCloud, Camera as CameraIcon, X, Plus, GripVertical, Wand2, ShieldAlert } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -185,6 +186,26 @@ function ColorCard({
     onChange({ images: [...color.images, ...items] });
   };
 
+  /** Opens the device's real rear camera directly (native Android only) — a plain
+   *  <input type="file" capture> is at the mercy of the WebView's own file chooser, which on many
+   *  devices ignores the capture hint and opens the gallery picker instead (same reasoning as
+   *  VisualSearchModal's handleTakePhoto). Reuses handleFiles for validation/compression, so a
+   *  camera photo goes through the exact same size/type checks as a browsed one. */
+  const handleTakePhoto = async () => {
+    if (!Capacitor.isNativePlatform()) return;
+    try {
+      const { Camera: NativeCamera, CameraResultType, CameraSource } = await import('@capacitor/camera');
+      const photo = await NativeCamera.getPhoto({ source: CameraSource.Camera, resultType: CameraResultType.Uri, quality: 85 });
+      if (!photo.webPath) return;
+      const blob = await (await fetch(photo.webPath)).blob();
+      const file = new File([blob], `camera-${Date.now()}.jpg`, { type: blob.type || 'image/jpeg' });
+      await handleFiles([file]);
+    } catch {
+      // User cancelled the native camera or denied permission — same as backing out of the file
+      // picker, so no error toast.
+    }
+  };
+
   const removeImage = (imageId: string) => {
     const target = color.images.find((img) => img.id === imageId);
     if (target?.file) URL.revokeObjectURL(target.url);
@@ -261,39 +282,50 @@ function ColorCard({
 
       {/* Image gallery scoped to this color */}
       {canUploadImages ? (
-        <div
-          onDragOver={(e) => {
-            e.preventDefault();
-            setIsDraggingOver(true);
-          }}
-          onDragLeave={() => setIsDraggingOver(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setIsDraggingOver(false);
-            if (e.dataTransfer.files.length > 0) void handleFiles(e.dataTransfer.files);
-          }}
-          onClick={() => fileInputRef.current?.click()}
-          className={cn(
-            'flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed p-6 text-center transition-all duration-200',
-            isDraggingOver
-              ? 'scale-[1.01] border-accent bg-accent-50 shadow-card dark:bg-accent-900/20'
-              : 'border-primary-200 hover:border-primary-300 hover:bg-primary-50 dark:border-primary-600 dark:hover:bg-primary-800',
-          )}
-        >
-          <UploadCloud size={22} className="text-primary-400" />
-          <p className="text-xs text-primary-500">Drag &amp; drop images for this color, or click to browse</p>
-          <p className="text-[11px] text-primary-300">JPG, PNG, or WEBP · max 5MB each</p>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            multiple
-            className="hidden"
-            onChange={(e) => {
-              if (e.target.files) void handleFiles(e.target.files);
-              e.target.value = '';
+        <div className="space-y-2">
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDraggingOver(true);
             }}
-          />
+            onDragLeave={() => setIsDraggingOver(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDraggingOver(false);
+              if (e.dataTransfer.files.length > 0) void handleFiles(e.dataTransfer.files);
+            }}
+            onClick={() => fileInputRef.current?.click()}
+            className={cn(
+              'flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed p-6 text-center transition-all duration-200',
+              isDraggingOver
+                ? 'scale-[1.01] border-accent bg-accent-50 shadow-card dark:bg-accent-900/20'
+                : 'border-primary-200 hover:border-primary-300 hover:bg-primary-50 dark:border-primary-600 dark:hover:bg-primary-800',
+            )}
+          >
+            <UploadCloud size={22} className="text-primary-400" />
+            <p className="text-xs text-primary-500">Drag &amp; drop images for this color, or click to browse</p>
+            <p className="text-[11px] text-primary-300">JPG, PNG, or WEBP · max 5MB each</p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files) void handleFiles(e.target.files);
+                e.target.value = '';
+              }}
+            />
+          </div>
+          {Capacitor.isNativePlatform() && (
+            <button
+              type="button"
+              onClick={handleTakePhoto}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-primary-200 py-2.5 text-sm font-medium text-primary-600 hover:bg-primary-50 dark:border-primary-600 dark:text-primary-200 dark:hover:bg-primary-800"
+            >
+              <CameraIcon size={16} /> Take Photo
+            </button>
+          )}
         </div>
       ) : (
         <p className="rounded-xl border border-dashed border-primary-200 p-4 text-center text-xs text-primary-400 dark:border-primary-600">
@@ -728,18 +760,14 @@ export function AdminProductFormPage() {
             disabling these inputs. */}
         <section className="card-surface grid grid-cols-2 gap-4 p-5 sm:grid-cols-4">
           <h2 className="col-span-full font-semibold">Pricing</h2>
-          {isStaff && (
-            <p className="col-span-full -mt-1 text-xs text-primary-400">Pricing is set by the shop owner. {isEditing ? 'You can view it here but not change it.' : 'A new product starts at ₹0 until the owner sets a price.'}</p>
-          )}
           <Field label="Selling Price (₹)" required>
-            <Input type="number" min={0} value={form.price} disabled={isStaff} onChange={(e) => setForm({ ...form, price: Math.max(0, Number(e.target.value) || 0) })} />
+            <Input type="number" min={0} value={form.price} onChange={(e) => setForm({ ...form, price: Math.max(0, Number(e.target.value) || 0) })} />
           </Field>
           <Field label="MRP (₹)" required>
             <Input
               type="number"
               min={0}
               value={form.mrp}
-              disabled={isStaff}
               onChange={(e) => setForm({ ...form, mrp: Math.max(0, Number(e.target.value) || 0) })}
               error={mrpError}
             />
@@ -748,7 +776,7 @@ export function AdminProductFormPage() {
             <div className="input-field flex items-center bg-primary-50 text-primary-500 dark:bg-primary-800">{discountPercent}%</div>
           </Field>
           <Field label="GST (%)">
-            <Input type="number" min={0} value={form.gst_percent} disabled={isStaff} onChange={(e) => setForm({ ...form, gst_percent: Math.max(0, Number(e.target.value) || 0) })} />
+            <Input type="number" min={0} value={form.gst_percent} onChange={(e) => setForm({ ...form, gst_percent: Math.max(0, Number(e.target.value) || 0) })} />
           </Field>
           <div className="col-span-full flex items-center gap-4">
             <span className="text-sm font-medium text-primary-800 dark:text-primary-100">Cash on Delivery</span>

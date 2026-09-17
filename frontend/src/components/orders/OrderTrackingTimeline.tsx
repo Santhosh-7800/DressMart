@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Package, CheckCircle2, Box, Truck, MapPin, Home, XCircle, Copy, Check, Phone, Clock } from 'lucide-react';
+import { Package, CheckCircle2, Box, Truck, Home, XCircle, Copy, Check, Phone, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Order, OrderStatus } from '@/types';
 import { formatDate, formatDateTime, cn } from '@/lib/utils';
@@ -14,7 +14,6 @@ const HAPPY_PATH_STEPS: { status: OrderStatus; label: string; icon: typeof Packa
   { status: 'confirmed', label: 'Confirmed', icon: CheckCircle2 },
   { status: 'packed', label: 'Packed', icon: Box },
   { status: 'shipped', label: 'Shipped', icon: Truck },
-  { status: 'out_for_delivery', label: 'Out for Delivery', icon: MapPin },
   { status: 'delivered', label: 'Delivered', icon: Home },
 ];
 
@@ -69,13 +68,6 @@ export function OrderTrackingTimeline({ order }: OrderTrackingTimelineProps) {
   const progressPercent = (currentIndex / (HAPPY_PATH_STEPS.length - 1)) * 100;
   const isDelivered = order.status === 'delivered' || order.status === 'returned';
   const timestampFor = (status: OrderStatus) => order.timeline.find((e) => e.status === status)?.timestamp;
-  // Delivery assignment happens while order.status is still 'packed' (see assignDelivery.ts — it
-  // doesn't itself advance order.status; only a delivery person marking "picked up" does). There's
-  // no dedicated OrderStatus step for it, so it's surfaced as a sub-note under "Packed" instead of
-  // restructuring the whole stepper — Section 6's "Delivery Assigned" step, using the real
-  // delivery_assigned_at timestamp rather than a fabricated one.
-  const deliveryAssignedNote =
-    order.delivery_staff_name && order.delivery_assigned_at ? `Assigned to ${order.delivery_staff_name} · ${formatDate(order.delivery_assigned_at)}` : null;
 
   return (
     <div className="space-y-6">
@@ -89,9 +81,9 @@ export function OrderTrackingTimeline({ order }: OrderTrackingTimelineProps) {
         </div>
 
         <div className="rounded-xl bg-primary-50 p-4 dark:bg-primary-800">
-          <p className="text-xs font-medium uppercase tracking-wide text-primary-400">{order.delivery_staff_name ? 'Delivery Partner' : 'Courier'}</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-primary-400">Courier</p>
           <p className="mt-1 text-sm font-semibold">
-            {order.delivery_staff_name ?? order.courier_name ?? (order.status === 'delivered' || order.status === 'returned' ? '—' : 'Delivery will be assigned after your order is packed.')}
+            {order.courier_name ?? (order.status === 'delivered' || order.status === 'returned' ? '—' : 'Courier will be assigned after your order is packed.')}
           </p>
           {order.tracking_number && (
             <button onClick={handleCopyTracking} className="mt-1 flex items-center gap-1 text-xs text-accent-600 hover:underline">
@@ -99,25 +91,13 @@ export function OrderTrackingTimeline({ order }: OrderTrackingTimelineProps) {
               {order.tracking_number}
             </button>
           )}
-          {order.courier_phone && !order.delivery_staff_name && (
+          {order.courier_phone && (
             <p className="mt-1 flex items-center gap-1 text-xs text-primary-400">
               <Phone size={11} /> {order.courier_phone}
             </p>
           )}
         </div>
       </div>
-
-      {order.delivery_status === 'failed' && (
-        <div className="rounded-xl bg-amber-50 p-4 dark:bg-amber-900/20">
-          <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
-            <XCircle size={18} />
-            <p className="font-semibold">Delivery attempt unsuccessful</p>
-          </div>
-          <p className="mt-1 text-sm text-amber-600 dark:text-amber-400">
-            {order.delivery_failure_reason ?? 'Our delivery partner could not complete this delivery.'} We'll be in touch shortly to reschedule.
-          </p>
-        </div>
-      )}
 
       {/* Desktop / tablet: horizontal animated stepper */}
       <div className="hidden sm:block">
@@ -131,7 +111,7 @@ export function OrderTrackingTimeline({ order }: OrderTrackingTimelineProps) {
               transition={{ duration: 0.9, ease: 'easeOut' }}
             />
           </div>
-          <div className="relative grid grid-cols-6">
+          <div className="relative grid grid-cols-5">
             {HAPPY_PATH_STEPS.map((step, idx) => {
               const isComplete = idx <= currentIndex;
               const isCurrent = idx === currentIndex && !isDelivered;
@@ -153,7 +133,6 @@ export function OrderTrackingTimeline({ order }: OrderTrackingTimelineProps) {
                   </motion.div>
                   <p className={cn('mt-2 px-1 text-xs font-medium', isComplete ? 'text-primary-900 dark:text-white' : 'text-primary-300')}>{step.label}</p>
                   {ts && <p className="text-[10px] text-primary-400">{formatDate(ts)}</p>}
-                  {step.status === 'packed' && deliveryAssignedNote && <p className="text-[10px] text-accent-600">{deliveryAssignedNote}</p>}
                 </div>
               );
             })}
@@ -196,7 +175,6 @@ export function OrderTrackingTimeline({ order }: OrderTrackingTimelineProps) {
               <div className={cn('pb-7', isLast && 'pb-0')}>
                 <p className={cn('text-sm font-medium', isComplete ? 'text-primary-900 dark:text-white' : 'text-primary-300')}>{step.label}</p>
                 {ts && <p className="text-xs text-primary-400">{formatDateTime(ts)}</p>}
-                {step.status === 'packed' && deliveryAssignedNote && <p className="text-xs text-accent-600">{deliveryAssignedNote}</p>}
               </div>
             </div>
           );

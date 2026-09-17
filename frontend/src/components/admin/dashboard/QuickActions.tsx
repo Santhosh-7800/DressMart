@@ -1,17 +1,5 @@
 import { Link } from 'react-router-dom';
-import {
-  Plus,
-  Package,
-  Users,
-  UserCog,
-  ShoppingBag,
-  Boxes,
-  Ticket,
-  Zap,
-  MessageSquare,
-  FileBarChart,
-  type LucideIcon,
-} from 'lucide-react';
+import { Plus, Package, UserCog, ShoppingBag, Boxes, Ticket, Zap, MessageSquare, FileBarChart, type LucideIcon } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { isAdminRole } from '@/lib/roles';
 import type { UserRole } from '@/types';
@@ -26,7 +14,6 @@ interface QuickAction {
 const ACTIONS: QuickAction[] = [
   { to: '/admin/products/new', label: 'Add Product', icon: Plus },
   { to: '/admin/products', label: 'Manage Products', icon: Package },
-  { to: '/admin/sellers', label: 'Manage Sellers', icon: Users, headSellerOnly: true },
   { to: '/admin/staff', label: 'Manage Staff', icon: UserCog, headSellerOnly: true },
   { to: '/admin/orders', label: 'View Orders', icon: ShoppingBag },
   { to: '/admin/inventory', label: 'Inventory', icon: Boxes },

@@ -210,7 +210,7 @@ export const adminStatsService = {
   /** Standalone order-status breakdown (every OrderStatus, not just the 3 folded into
    *  getSellerOverview) — used by OrdersStatusSummary for the full per-status tile row. */
   async getOrderStatusBreakdown(sellerId: string, isHeadSeller: boolean): Promise<Record<OrderStatus, number>> {
-    const ALL_STATUSES: OrderStatus[] = ['placed', 'confirmed', 'packed', 'shipped', 'out_for_delivery', 'delivered', 'cancelled', 'returned'];
+    const ALL_STATUSES: OrderStatus[] = ['placed', 'confirmed', 'packed', 'shipped', 'delivered', 'cancelled', 'returned'];
     return orderStatusCounts(sellerId, isHeadSeller, ALL_STATUSES);
   },
 

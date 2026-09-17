@@ -13,20 +13,10 @@ interface CancelOrderData {
 
 const CANCELLABLE_STATUSES: OrderStatus[] = ['placed', 'confirmed', 'packed'];
 
-/**
- * Phase 17: the Admin may ALSO cancel an order — previously this callable was buyer-only, leaving
- * no way to act on Section 15's "Owner Review -> Reassign / Reschedule / Cancel" failed-delivery
- * workflow, or Section 7's general "Cancel order where permitted" owner capability. The Admin may
- * cancel under the same rule a buyer can (still `placed`/`confirmed`/`packed`), PLUS the one
- * additional case a buyer never sees: an order stuck `out_for_delivery` whose delivery has already
- * been marked `failed` — cancelling there is the "give up on this delivery attempt" resolution the
- * review workflow calls for, since no reschedule system exists to reuse (none was found anywhere in
- * the codebase) and this callable runs via the Admin SDK, which bypasses firestore.rules'
- * isValidOrderTransition entirely, so this transition being absent from that client-facing table
- * doesn't block it here.
- */
+/** The Admin may also cancel an order (not just the buyer), under the same rule a buyer can:
+ *  still `placed`/`confirmed`/`packed`. */
 function isCancellableByOwner(order: Order): boolean {
-  return CANCELLABLE_STATUSES.includes(order.status) || (order.status === 'out_for_delivery' && order.delivery_status === 'failed');
+  return CANCELLABLE_STATUSES.includes(order.status);
 }
 
 export const cancelOrder = onCall<CancelOrderData>(async (request) =>
@@ -161,17 +151,6 @@ export const cancelOrder = onCall<CancelOrderData>(async (request) =>
         type: 'order',
         link: `/orders/${orderId}`,
       }),
-      // Phase 11: a delivery person may already be assigned/accepted before the buyer's cancellable
-      // window closes (order.status is still 'packed' at that point) — let them know not to collect it.
-      order.delivery_staff_id
-        ? createNotification({
-            userId: order.delivery_staff_id,
-            title: 'Delivery cancelled',
-            message: `Order ${order.order_number} was cancelled and no longer needs to be delivered.`,
-            type: 'delivery',
-            link: '/delivery/dashboard',
-          })
-        : Promise.resolve(),
     ]);
 
     return { success: true };

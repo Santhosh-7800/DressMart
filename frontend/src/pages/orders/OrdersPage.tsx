@@ -30,7 +30,7 @@ const TABS: { key: TabKey; label: string }[] = [
 ];
 
 const PROCESSING_STATUSES: OrderStatus[] = ['placed', 'confirmed', 'packed'];
-const SHIPPED_STATUSES: OrderStatus[] = ['shipped', 'out_for_delivery'];
+const SHIPPED_STATUSES: OrderStatus[] = ['shipped'];
 
 const DATE_FILTER_DAYS: Record<Exclude<DateFilter, 'all'>, number> = { '30d': 30, '3m': 90, '6m': 180, year: 365 };
 

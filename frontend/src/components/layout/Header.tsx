@@ -15,6 +15,7 @@ import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useDefaultAddress } from '@/hooks/useDefaultAddress';
 import { useAvatar } from '@/hooks/useAvatar';
 import { getMobilePageTitle } from '@/lib/pageTitles';
+import { isAdminRole } from '@/lib/roles';
 
 export function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -212,7 +213,7 @@ export function Header() {
                     <Link to="/settings" onClick={() => setIsAccountOpen(false)} className="block rounded-lg px-3 py-2 text-sm hover:bg-primary-50 dark:hover:bg-primary-800">
                       Settings
                     </Link>
-                    {user?.role === 'admin' && (
+                    {isAdminRole(user?.role) && (
                       <Link to="/admin/dashboard" onClick={() => setIsAccountOpen(false)} className="block rounded-lg px-3 py-2 text-sm font-medium text-accent hover:bg-primary-50 dark:hover:bg-primary-800">
                         Admin Dashboard
                       </Link>

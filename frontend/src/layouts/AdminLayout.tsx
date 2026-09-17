@@ -26,7 +26,6 @@ import {
   FolderTree,
   Tags,
   Image,
-  Truck,
   LifeBuoy,
   HelpCircle,
   type LucideIcon,
@@ -73,12 +72,12 @@ function AdminTabLink({ to, label, icon: Icon, end }: NavItem) {
 }
 
 /** The 4 highest-frequency destinations, shown as direct tabs on the mobile bottom bar — everything
- *  else stays reachable via the "More" tab's drawer. */
+ *  else (Inventory included) stays reachable via the "More" tab's drawer. */
 const ADMIN_TABS: NavItem[] = [
-  { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/admin/products', label: 'Products', icon: Package },
+  { to: '/admin/dashboard', label: 'Home', icon: LayoutDashboard, end: true },
   { to: '/admin/orders', label: 'Orders', icon: ShoppingBag },
-  { to: '/admin/inventory', label: 'Inventory', icon: Boxes },
+  { to: '/admin/products', label: 'Products', icon: Package },
+  { to: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
 ];
 
 const ADMIN_NAV_ITEMS: NavItem[] = [
@@ -93,7 +92,6 @@ const ADMIN_NAV_ITEMS: NavItem[] = [
   { to: '/admin/settings', label: 'Profile & Settings', icon: Settings },
   { to: '/admin/customers', label: 'Customers', icon: Contact },
   { to: '/admin/staff', label: 'Staff Management', icon: UserCog },
-  { to: '/admin/delivery', label: 'Delivery Management', icon: Truck },
   { to: '/admin/support', label: 'Customer Support', icon: LifeBuoy },
   { to: '/admin/faq', label: 'FAQ Management', icon: HelpCircle },
   { to: '/admin/all-products', label: 'All Products', icon: Layers },

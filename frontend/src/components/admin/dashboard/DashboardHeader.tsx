@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Users, UserCog, ShoppingBag, Bell, Search } from 'lucide-react';
+import { Plus, UserCog, ShoppingBag, Bell, Search } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -87,11 +87,6 @@ export function DashboardHeader() {
         <Button size="sm" variant="accent" onClick={() => navigate('/admin/products/new')}>
           <Plus size={15} /> Add Product
         </Button>
-        {headSeller && (
-          <Button size="sm" variant="outline" onClick={() => navigate('/admin/sellers')}>
-            <Users size={15} /> Add Seller
-          </Button>
-        )}
         {headSeller && (
           <Button size="sm" variant="outline" onClick={() => navigate('/admin/staff')}>
             <UserCog size={15} /> Add Staff

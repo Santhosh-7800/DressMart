@@ -11,7 +11,6 @@ const STATUS_FILTER_OPTIONS: { value: OrderStatus | 'all'; label: string }[] = [
   { value: 'confirmed', label: 'Confirmed' },
   { value: 'packed', label: 'Packed' },
   { value: 'shipped', label: 'Shipped' },
-  { value: 'out_for_delivery', label: 'Out for Delivery' },
   { value: 'delivered', label: 'Delivered' },
   { value: 'cancelled', label: 'Cancelled' },
   { value: 'returned', label: 'Returned' },

@@ -420,43 +420,6 @@ export function summarizePayments(orders: Order[]): PaymentSummary {
   };
 }
 
-export interface DeliverySummary {
-  deliveredCount: number;
-  failedCount: number;
-  outForDeliveryCount: number;
-  pendingAssignmentCount: number;
-  averageCompletionHours: number | null;
-  successRatePercent: number | null;
-}
-
-/** Delivery success rate = delivered / (delivered + failed) among orders that reached a delivery
- *  outcome at all — orders never assigned a courier are excluded from the denominator (they were
- *  never a delivery attempt to succeed or fail). Average completion time only uses orders with BOTH
- *  real timestamps present, same "don't fabricate" rule Phase 17's SellerDeliveryManagementPage
- *  already established. */
-export function summarizeDelivery(orders: Order[]): DeliverySummary {
-  const delivered = orders.filter((o) => o.delivery_status === 'delivered');
-  const failed = orders.filter((o) => o.delivery_status === 'failed');
-  const outForDelivery = orders.filter((o) => o.delivery_status === 'out_for_delivery');
-  const pendingAssignment = orders.filter((o) => ['packed', 'shipped'].includes(o.status) && !o.delivery_staff_id);
-
-  const completionHours = delivered
-    .filter((o) => o.delivery_assigned_at && o.delivery_delivered_at)
-    .map((o) => (new Date(o.delivery_delivered_at!).getTime() - new Date(o.delivery_assigned_at!).getTime()) / 3_600_000)
-    .filter((h) => h >= 0);
-
-  const outcomeCount = delivered.length + failed.length;
-
-  return {
-    deliveredCount: delivered.length,
-    failedCount: failed.length,
-    outForDeliveryCount: outForDelivery.length,
-    pendingAssignmentCount: pendingAssignment.length,
-    averageCompletionHours: completionHours.length > 0 ? completionHours.reduce((s, h) => s + h, 0) / completionHours.length : null,
-    successRatePercent: outcomeCount > 0 ? (delivered.length / outcomeCount) * 100 : null,
-  };
-}
-
 // ---- Period comparison (Section 33) ----
 
 export interface MetricChange {

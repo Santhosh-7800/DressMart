@@ -28,7 +28,6 @@ const STATUS_LABELS: Record<OrderStatus, string> = {
   confirmed: 'Confirmed',
   packed: 'Packed',
   shipped: 'Shipped',
-  out_for_delivery: 'Out for Delivery',
   delivered: 'Delivered',
   cancelled: 'Cancelled',
   returned: 'Returned',

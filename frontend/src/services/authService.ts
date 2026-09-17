@@ -27,6 +27,7 @@ import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firest
 import { httpsCallable } from 'firebase/functions';
 import { auth, db, functions } from '@/lib/firebase';
 import { env } from '@/lib/env';
+import { normalizeRole } from '@/lib/roles';
 import type { Profile } from '@/types';
 
 export interface SignUpInput {
@@ -40,8 +41,13 @@ export type { ConfirmationResult };
 
 let recaptchaVerifier: RecaptchaVerifier | null = null;
 
-function docToProfile(id: string, data: Record<string, unknown>): Profile {
-  return { id, ...data } as Profile;
+/** Normalizes `role` (see roles.ts's normalizeRole — Firestore's role field is free-text, and a
+ *  manual Console edit can leave whitespace/casing that would otherwise silently defeat every
+ *  === 'staff'/'admin' check downstream) at the single point every Profile enters the app, so every
+ *  caller (here, AuthContext's realtime listener, anywhere else a users/{uid} doc is read) gets an
+ *  already-clean role without needing to normalize it themselves. */
+export function docToProfile(id: string, data: Record<string, unknown>): Profile {
+  return { id, ...data, role: normalizeRole(data.role) } as Profile;
 }
 
 /** Creates the `users/{uid}` profile doc on first sign-in (any provider); no-op if it already exists. */

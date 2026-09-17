@@ -8,9 +8,11 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ProductImage } from '@/components/ui/ProductImage';
 import { ImportProductsModal } from '@/components/staff/ImportProductsModal';
+import { StaffMobileHome } from '@/components/staff/StaffMobileHome';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAdminProducts } from '@/hooks/useAdminProducts';
 import { useStaffPermissions, useOwnStaffActivity } from '@/hooks/useStaff';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { inventoryService } from '@/services/inventoryService';
 import { ACTIVITY_ICON, ACTIVITY_LABEL } from '@/lib/staffActivity';
 import { formatDateTime, formatCurrency } from '@/lib/utils';
@@ -38,6 +40,10 @@ function StatCard({ icon: Icon, label, value, to, tone = 'default' }: { icon: ty
 
 export function StaffDashboardPage() {
   const { user } = useAuth();
+  // Real conditional MOUNT (not just CSS hidden) — same pattern as ProfilePage/AdminDashboardPage's
+  // desktop/mobile split, so the heavier desktop-only sections below never mount on a phone that's
+  // only ever going to show StaffMobileHome.
+  const isDesktop = useMediaQuery('(min-width: 768px)');
   const { data: permissions } = useStaffPermissions();
   const { data: products = [], isLoading: isLoadingProducts } = useAdminProducts();
   const { data: activity, isLoading: isLoadingActivity } = useOwnStaffActivity(8);
@@ -86,11 +92,13 @@ export function StaffDashboardPage() {
 
   const canAddProducts = Boolean(permissions?.add_products);
 
+  if (!isDesktop) return <StaffMobileHome />;
+
   return (
     <div>
       <Seo title="Staff Dashboard" />
       <h1 className="mb-1 text-2xl font-bold text-acc-text dark:text-white">Welcome, {user?.full_name?.split(' ')[0]}</h1>
-      <p className="mb-6 text-sm text-acc-text-secondary">{user?.store_name ? `Working for ${user.store_name}` : 'Your staff dashboard'}</p>
+      <p className="mb-6 hidden text-sm text-acc-text-secondary md:block">{user?.store_name ? `Working for ${user.store_name}` : 'Your staff dashboard'}</p>
 
       <section className="mb-6">
         <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-acc-text-secondary">Overview</h2>

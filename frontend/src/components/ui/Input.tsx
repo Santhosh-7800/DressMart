@@ -12,7 +12,7 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, label, error, hint, leftIcon, rightIcon, floating, id, ...props }, ref) => {
+  ({ className, label, error, hint, leftIcon, rightIcon, floating, id, placeholder, ...props }, ref) => {
     const inputId = id ?? props.name;
 
     if (floating && label) {
@@ -23,6 +23,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             <input
               ref={ref}
               id={inputId}
+              // Hardcoded to a single space regardless of a caller-supplied `placeholder` — the
+              // peer-placeholder-shown CSS trick above needs the input to always register as
+              // "showing its placeholder" while empty, and a real placeholder here would also
+              // render its own text stacked underneath the floating label. If a floating field
+              // needs example text, pass `hint` instead (shown below the field once unfocused).
               placeholder=" "
               className={cn(
                 'peer input-field pb-2 pt-6 focus:border-acc-primary focus:ring-4 focus:ring-acc-primary/10',
@@ -63,6 +68,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           <input
             ref={ref}
             id={inputId}
+            placeholder={placeholder}
             className={cn('input-field', leftIcon && 'pl-10', rightIcon && 'pr-10', error && 'border-red-500 focus:border-red-500', className)}
             aria-invalid={Boolean(error)}
             {...props}

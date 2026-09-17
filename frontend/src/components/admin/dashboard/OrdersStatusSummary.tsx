@@ -1,4 +1,4 @@
-import { Clock, CheckCircle, Package, Truck, Navigation, PackageCheck, XCircle, RotateCcw } from 'lucide-react';
+import { Clock, CheckCircle, Package, Truck, PackageCheck, XCircle, RotateCcw } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useOrderStatusBreakdown } from '@/hooks/useDashboardData';
 import { STATUS_LABELS } from '@/services/orderService';
@@ -11,7 +11,6 @@ const STATUS_ICONS: Record<OrderStatus, LucideIcon> = {
   confirmed: CheckCircle,
   packed: Package,
   shipped: Truck,
-  out_for_delivery: Navigation,
   delivered: PackageCheck,
   cancelled: XCircle,
   returned: RotateCcw,
@@ -22,13 +21,12 @@ const STATUS_TONES: Record<OrderStatus, StatTone> = {
   confirmed: 'default',
   packed: 'default',
   shipped: 'default',
-  out_for_delivery: 'default',
   delivered: 'success',
   cancelled: 'danger',
   returned: 'danger',
 };
 
-const ORDER = ['placed', 'confirmed', 'packed', 'shipped', 'out_for_delivery', 'delivered', 'cancelled', 'returned'] as const;
+const ORDER = ['placed', 'confirmed', 'packed', 'shipped', 'delivered', 'cancelled', 'returned'] as const;
 
 export function OrdersStatusSummary({ sellerId, isHeadSeller }: { sellerId: string; isHeadSeller: boolean }) {
   const breakdownQuery = useOrderStatusBreakdown(sellerId, isHeadSeller);

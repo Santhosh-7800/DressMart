@@ -2,28 +2,17 @@ import { useMemo, useState } from 'react';
 import { Package, Truck, Search, ChevronDown, ChevronUp, XCircle } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { useSellerOrdersPaged, useAdvanceOrderStatus, useCancelOrder } from '@/hooks/useOrders';
-import { useDeliveryStaffRoster } from '@/hooks/useDelivery';
 import { useDebounce } from '@/hooks/useDebounce';
-import { orderService, STATUS_LABELS, DELIVERY_STATUS_LABELS } from '@/services/orderService';
-import { AssignDeliveryModal } from '@/components/admin/AssignDeliveryModal';
+import { orderService, STATUS_LABELS } from '@/services/orderService';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
-import { useAuth } from '@/contexts/AuthContext';
-import { isAdminRole } from '@/lib/roles';
 import type { Order, OrderStatus } from '@/types';
 
-// Assignment is only meaningful once an order is ready to hand off, and before delivery is done —
-// see AssignDeliveryModal / assignDelivery.ts for the server-side transition guard.
-const DELIVERY_ASSIGNABLE_STATUSES: OrderStatus[] = ['packed', 'shipped', 'out_for_delivery'];
-
-// Mirrors cancelOrder.ts's CANCELLABLE_STATUSES for the buyer-equivalent case — an owner may also
-// cancel a failed-delivery order stuck at 'out_for_delivery' (Phase 17 Section 15's review
-// workflow), surfaced separately in SellerDeliveryManagementPage where that failure is visible,
-// not here (this page has no delivery_status column to explain why that one order is cancellable).
+// Mirrors cancelOrder.ts's CANCELLABLE_STATUSES for the buyer-equivalent case.
 const OWNER_CANCELLABLE_STATUSES: OrderStatus[] = ['placed', 'confirmed', 'packed'];
 
 const PAYMENT_METHOD_LABELS: Record<Order['payment_method'], string> = { cod: 'Cash on Delivery', razorpay: 'Razorpay' };
@@ -33,21 +22,17 @@ const STATUS_BADGE_CLASS: Record<OrderStatus, string> = {
   confirmed: 'badge-accent',
   packed: 'badge-accent',
   shipped: 'badge-accent',
-  out_for_delivery: 'badge-accent',
   delivered: 'badge-success',
   cancelled: 'badge-danger',
   returned: 'badge-danger',
 };
 
 export function AdminOrdersPage() {
-  const { user } = useAuth();
-  const canAssignDelivery = isAdminRole(user?.role);
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all');
   // Status filtering happens server-side (see useSellerOrdersPaged) — selecting a status only ever
   // reads orders in that status, never the whole collection. Search stays client-side over the
   // fetched window since Firestore can't substring-match order#/name/phone/product/SKU.
   const { data: orders, isLoading, hasMore, loadMore } = useSellerOrdersPaged(statusFilter);
-  const { data: deliveryRoster } = useDeliveryStaffRoster();
   const advanceStatus = useAdvanceOrderStatus();
   const cancelOrder = useCancelOrder();
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
@@ -59,7 +44,6 @@ export function AdminOrdersPage() {
   const [trackingNumber, setTrackingNumber] = useState('');
   const [courierName, setCourierName] = useState('');
   const [courierPhone, setCourierPhone] = useState('');
-  const [assignTarget, setAssignTarget] = useState<Order | null>(null);
 
   const visibleOrders = useMemo(() => {
     const all = orders ?? [];
@@ -172,14 +156,6 @@ export function AdminOrdersPage() {
                   </p>
                 )}
 
-                {order.delivery_staff_name && (
-                  <p className="mt-1 text-xs text-primary-400">
-                    Delivery: <span className="font-medium text-primary-700 dark:text-primary-200">{order.delivery_staff_name}</span>
-                    {' · '}
-                    {DELIVERY_STATUS_LABELS[order.delivery_status ?? 'unassigned']}
-                  </p>
-                )}
-
                 {expandedId === order.id && (
                   <div className="mt-3 space-y-3 rounded-xl bg-primary-50 p-3 text-sm dark:bg-primary-800/50">
                     <div>
@@ -230,11 +206,6 @@ export function AdminOrdersPage() {
                       <Truck size={13} /> Mark as {STATUS_LABELS[next as OrderStatus]}
                     </Button>
                   )}
-                  {canAssignDelivery && DELIVERY_ASSIGNABLE_STATUSES.includes(order.status) && (
-                    <Button variant="outline" size="sm" onClick={() => setAssignTarget(order)}>
-                      {order.delivery_staff_id ? 'Reassign Delivery' : 'Assign Delivery'}
-                    </Button>
-                  )}
                   {OWNER_CANCELLABLE_STATUSES.includes(order.status) && (
                     <Button variant="danger" size="sm" onClick={() => setCancelTarget(order)}>
                       <XCircle size={13} /> Cancel Order
@@ -271,8 +242,6 @@ export function AdminOrdersPage() {
           </Button>
         </div>
       </Modal>
-
-      <AssignDeliveryModal order={assignTarget} roster={deliveryRoster ?? []} onClose={() => setAssignTarget(null)} />
 
       <Modal isOpen={Boolean(cancelTarget)} onClose={() => setCancelTarget(null)} title="Cancel this order?">
         <p className="mb-4 text-sm text-primary-500">

@@ -3,7 +3,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import type { Profile } from '@/types';
-import { authService, type SignUpInput } from '@/services/authService';
+import { authService, docToProfile, type SignUpInput } from '@/services/authService';
 import { auth, db } from '@/lib/firebase';
 import { getGuestId } from '@/lib/guestId';
 
@@ -44,10 +44,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       // Realtime profile subscription — role/status changes (e.g. an Admin disabling a staff
       // account) take effect immediately, without the affected user needing to re-login.
-      unsubscribeProfile = onSnapshot(doc(db, 'users', fbUser.uid), (snap) => {
-        setUser(snap.exists() ? ({ id: fbUser.uid, ...snap.data() } as Profile) : null);
-        setIsLoading(false);
-      });
+      unsubscribeProfile = onSnapshot(
+        doc(db, 'users', fbUser.uid),
+        (snap) => {
+          setUser(snap.exists() ? docToProfile(fbUser.uid, snap.data()) : null);
+          setIsLoading(false);
+        },
+        (error) => {
+          // A stuck `isLoading: true` (e.g. from a rules/permission error) would otherwise leave
+          // every route guard showing its loading spinner forever instead of failing safely.
+          console.error('[AuthContext] profile listener error', error);
+          setUser(null);
+          setIsLoading(false);
+        },
+      );
     });
 
     return () => {

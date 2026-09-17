@@ -77,7 +77,7 @@ export function NotifyCustomersCard() {
             />
             <p className="mt-1 text-right text-xs text-primary-400">{message.length}/{MAX_MESSAGE}</p>
           </div>
-          <Input floating label="Link (optional)" value={link} onChange={(e) => setLink(e.target.value)} placeholder="/category/formal-shirts" />
+          <Input floating label="Link (optional)" value={link} onChange={(e) => setLink(e.target.value)} hint="e.g. /category/formal-shirts" />
           <p className="text-xs text-primary-400">This sends immediately to every customer account. Use it sparingly.</p>
           <Button
             variant="accent"

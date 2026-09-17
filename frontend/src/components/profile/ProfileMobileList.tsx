@@ -1,10 +1,11 @@
 import { useRef } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Package, Heart, MapPin, Ticket, Settings, History, HelpCircle, LifeBuoy, LogOut, ChevronRight, Camera } from 'lucide-react';
+import { Package, Heart, MapPin, Ticket, Settings, History, HelpCircle, LifeBuoy, LogOut, ChevronRight, Camera, LayoutDashboard } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { useAvatar } from '@/hooks/useAvatar';
 import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
+import { isAdminRole } from '@/lib/roles';
 import type { Profile } from '@/types';
 
 interface ProfileMobileListProps {
@@ -74,6 +75,16 @@ export function ProfileMobileList({ user, avatarUrl, onSignOut }: ProfileMobileL
       </div>
 
       <div className="rounded-2xl bg-card p-2 dark:bg-card-dark">
+        {isAdminRole(user.role) && (
+          <Link
+            to="/admin/dashboard"
+            className="flex min-h-12 items-center gap-3 rounded-xl px-3 font-medium text-accent transition-colors hover:bg-acc-primary/5"
+          >
+            <LayoutDashboard size={18} className="shrink-0" />
+            <span className="flex-1 text-sm">Admin Dashboard</span>
+            <ChevronRight size={16} className="shrink-0" />
+          </Link>
+        )}
         {ROWS.map(({ to, label, icon: Icon }) => (
           <Link key={to} to={to} className="flex min-h-12 items-center gap-3 rounded-xl px-3 transition-colors hover:bg-acc-primary/5">
             <Icon size={18} className="shrink-0 text-acc-text-secondary" />

@@ -1,7 +1,7 @@
 import { collection, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, updateDoc, where, type QueryConstraint, type Unsubscribe } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '@/lib/firebase';
-import type { DeliveryStatus, Order, OrderStatus, OrderTimelineEvent } from '@/types';
+import type { Order, OrderStatus, OrderTimelineEvent } from '@/types';
 
 const ORDERS_COLLECTION = 'orders';
 
@@ -10,24 +10,13 @@ export const STATUS_LABELS: Record<OrderStatus, string> = {
   confirmed: 'Order Confirmed',
   packed: 'Packed',
   shipped: 'Shipped',
-  out_for_delivery: 'Out for Delivery',
   delivered: 'Delivered',
   cancelled: 'Cancelled',
   returned: 'Returned',
 };
 
-export const DELIVERY_STATUS_LABELS: Record<DeliveryStatus, string> = {
-  unassigned: 'Not Assigned',
-  assigned: 'Assigned',
-  accepted: 'Accepted',
-  picked_up: 'Picked Up',
-  out_for_delivery: 'Out for Delivery',
-  delivered: 'Delivered',
-  failed: 'Failed Delivery',
-};
-
 /** Forward-only fulfillment progression a seller can advance an order through. */
-export const HAPPY_PATH: OrderStatus[] = ['placed', 'confirmed', 'packed', 'shipped', 'out_for_delivery', 'delivered'];
+export const HAPPY_PATH: OrderStatus[] = ['placed', 'confirmed', 'packed', 'shipped', 'delivered'];
 
 function toOrder(snap: { id: string; data: () => Record<string, unknown> }): Order {
   return { id: snap.id, ...snap.data() } as Order;
@@ -142,23 +131,6 @@ export const orderService = {
       ? query(collection(db, ORDERS_COLLECTION), orderBy('placed_at', 'desc'), limit(maxDocs))
       : query(collection(db, ORDERS_COLLECTION), where('seller_id', '==', sellerId), orderBy('placed_at', 'desc'), limit(maxDocs));
     return onSnapshot(q, (snap) => callback(snap.docs.map(toOrder)));
-  },
-
-  // ---- Delivery Staff (Phase 11) ----
-
-  /** Realtime — every order ever assigned to this delivery person (firestore.rules scopes reads to
-   *  delivery_staff_id == their own uid). The dashboard groups/filters this single list client-side
-   *  by delivery_status rather than running a separate query per bucket. `onError` (Phase 17) lets
-   *  the dashboard show a real error/retry state instead of silently hanging on a permission or
-   *  network failure — e.g. a delivery account whose active session gets reassigned away from an
-   *  order mid-listen would previously just stop updating with no visible explanation. */
-  subscribeForDeliveryStaff(deliveryStaffId: string, callback: (orders: Order[]) => void, onError?: (error: Error) => void): Unsubscribe {
-    const q = query(collection(db, ORDERS_COLLECTION), where('delivery_staff_id', '==', deliveryStaffId), orderBy('placed_at', 'desc'));
-    return onSnapshot(
-      q,
-      (snap) => callback(snap.docs.map(toOrder)),
-      (error) => onError?.(error),
-    );
   },
 
   /** Plain Firestore update — firestore.rules already allow the Admin to advance status/tracking

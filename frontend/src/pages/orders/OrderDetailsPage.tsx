@@ -144,15 +144,6 @@ export function OrderDetailsPage() {
         )}
       </div>
 
-      {(order.delivery_status === 'out_for_delivery' || order.delivery_status === 'failed') && (
-        <div className="card-surface mb-6 p-5">
-          <Link to={`/support/new?category=delivery&orderId=${order.id}`} className="flex items-center gap-2 text-sm font-medium text-accent-600">
-            <LifeBuoy size={15} />
-            {order.delivery_status === 'failed' ? 'Delivery attempt failed — need help?' : "Having trouble with today's delivery? Get help"}
-          </Link>
-        </div>
-      )}
-
       <div className="card-surface p-5">
         <h2 className="mb-3 font-semibold">Delivery Address</h2>
         <p className="text-sm text-primary-500">

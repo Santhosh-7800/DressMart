@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Ban, RotateCcw, UserCog, Clock, Plus, KeyRound, Trash2, LogIn, PackagePlus, PencilLine, Truck, Repeat, Boxes, AlertTriangle } from 'lucide-react';
+import { Ban, RotateCcw, UserCog, Clock, Plus, KeyRound, Trash2, LogIn, PackagePlus, PencilLine, Truck, Repeat, Boxes, AlertTriangle, Package } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -14,6 +14,7 @@ import { queryKeys } from '@/lib/queryClient';
 import { staffAdminService } from '@/services/staffAdminService';
 import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAdminProducts } from '@/hooks/useAdminProducts';
 import type { Profile, StaffActivityAction, StaffPermissionKey, StaffPermissions, StaffStatus } from '@/types';
 
 const PERMISSION_LABELS: Record<StaffPermissionKey, string> = {
@@ -142,6 +143,22 @@ function RosterSection({ sellerId, onEditPermissions }: { sellerId: string; onEd
     enabled: Boolean(sellerId),
   });
 
+  // Every product under this store (self-added or staff-added) is denormalized with a `staff_id` —
+  // grouping by it here gives each roster card "N added · M active" without a separate query per
+  // staff member.
+  const { data: allProducts = [] } = useAdminProducts();
+  const productCountsByStaff = useMemo(() => {
+    const map = new Map<string, { total: number; active: number }>();
+    for (const product of allProducts) {
+      if (!product.staff_id) continue;
+      const entry = map.get(product.staff_id) ?? { total: 0, active: 0 };
+      entry.total += 1;
+      if (product.status === 'active') entry.active += 1;
+      map.set(product.staff_id, entry);
+    }
+    return map;
+  }, [allProducts]);
+
   const invalidateRoster = () => {
     queryClient.invalidateQueries({ queryKey: queryKeys.staff.roster(sellerId) });
     queryClient.invalidateQueries({ queryKey: queryKeys.staff.activity(sellerId) });
@@ -227,6 +244,10 @@ function RosterSection({ sellerId, onEditPermissions }: { sellerId: string; onEd
                   <StaffStatusBadge status={member.staff_status} />
                 </div>
                 <p className="text-sm text-acc-text-secondary">{member.email}{member.phone ? ` · ${member.phone}` : ''}</p>
+                <p className="mt-1 flex items-center gap-1 text-xs text-acc-text-secondary">
+                  <Package size={13} className="shrink-0" />
+                  {productCountsByStaff.get(member.id)?.total ?? 0} products added · {productCountsByStaff.get(member.id)?.active ?? 0} active
+                </p>
                 {member.staff_status === 'disabled' && member.staff_status_reason && (
                   <p className="mt-1 text-xs text-red-600 dark:text-red-400">Reason: {member.staff_status_reason}</p>
                 )}
@@ -319,7 +340,7 @@ function AddStaffButton({ sellerId }: { sellerId: string }) {
         <div className="space-y-4">
           <Input floating label="Full Name" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
           <Input floating label="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-          <Input floating label="Designation" value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })} placeholder="e.g. Inventory Manager" />
+          <Input floating label="Designation" value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })} hint="e.g. Inventory Manager" />
           <Input floating label="Phone (optional)" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
           <div className="grid grid-cols-2 gap-3">
             <Input floating label="Employee ID (optional)" value={form.employeeId} onChange={(e) => setForm({ ...form, employeeId: e.target.value })} />

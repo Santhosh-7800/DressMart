@@ -20,11 +20,6 @@ const STATUS_COPY: Partial<
     message: (o) => `Your order ${o.order_number} is on its way.`,
     type: 'delivery',
   },
-  out_for_delivery: {
-    title: 'Out for delivery',
-    message: (o) => `Your order ${o.order_number} is out for delivery today.`,
-    type: 'delivery',
-  },
   delivered: {
     title: 'Order delivered',
     message: (o) => `Your order ${o.order_number} has been delivered. Enjoy!`,

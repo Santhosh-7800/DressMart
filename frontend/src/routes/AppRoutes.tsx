@@ -6,11 +6,9 @@ import { AuthLayout } from '@/layouts/AuthLayout';
 import { AccountLayout } from '@/layouts/AccountLayout';
 import { AdminLayout } from '@/layouts/AdminLayout';
 import { StaffLayout } from '@/layouts/StaffLayout';
-import { DeliveryLayout } from '@/layouts/DeliveryLayout';
 import { ProtectedRoute } from './ProtectedRoute';
 import { RequireAdmin } from './RequireAdmin';
 import { RequireStaff } from './RequireStaff';
-import { RequireDelivery } from './RequireDelivery';
 import { lazyWithRetry } from '@/lib/lazyWithRetry';
 import { DEEP_LINK_EVENT } from '@/lib/deepLinks';
 import { useAuth } from '@/contexts/AuthContext';
@@ -93,9 +91,6 @@ const AdminBannersPage = lazyWithRetry(() => import('@/pages/admin/AdminBannersP
 const AdminReviewsPage = lazyWithRetry(() => import('@/pages/admin/AdminReviewsPage').then((m) => ({ default: m.AdminReviewsPage })));
 const AdminNotificationsPage = lazyWithRetry(() => import('@/pages/admin/AdminNotificationsPage').then((m) => ({ default: m.AdminNotificationsPage })));
 const AdminStaffPage = lazyWithRetry(() => import('@/pages/admin/AdminStaffPage').then((m) => ({ default: m.AdminStaffPage })));
-const AdminDeliveryManagementPage = lazyWithRetry(() =>
-  import('@/pages/admin/AdminDeliveryManagementPage').then((m) => ({ default: m.AdminDeliveryManagementPage })),
-);
 const AdminFaqPage = lazyWithRetry(() => import('@/pages/admin/AdminFaqPage').then((m) => ({ default: m.AdminFaqPage })));
 const AdminSupportPage = lazyWithRetry(() => import('@/pages/admin/AdminSupportPage').then((m) => ({ default: m.AdminSupportPage })));
 const AdminSupportDetailPage = lazyWithRetry(() => import('@/pages/admin/AdminSupportDetailPage').then((m) => ({ default: m.AdminSupportDetailPage })));
@@ -106,10 +101,6 @@ const StaffDashboardPage = lazyWithRetry(() => import('@/pages/staff/StaffDashbo
 const StaffActivityPage = lazyWithRetry(() => import('@/pages/staff/StaffActivityPage').then((m) => ({ default: m.StaffActivityPage })));
 const StaffProfilePage = lazyWithRetry(() => import('@/pages/staff/StaffProfilePage').then((m) => ({ default: m.StaffProfilePage })));
 
-const DeliveryLoginPage = lazyWithRetry(() => import('@/pages/delivery/DeliveryLoginPage').then((m) => ({ default: m.DeliveryLoginPage })));
-const DeliveryDashboardPage = lazyWithRetry(() => import('@/pages/delivery/DeliveryDashboardPage').then((m) => ({ default: m.DeliveryDashboardPage })));
-const DeliveryProfilePage = lazyWithRetry(() => import('@/pages/delivery/DeliveryProfilePage').then((m) => ({ default: m.DeliveryProfilePage })));
-
 function RouteFallback() {
   return (
     <div className="flex min-h-[60vh] items-center justify-center">
@@ -119,7 +110,7 @@ function RouteFallback() {
 }
 
 /** Gates "/" itself: signed-out visitors are sent to /login instead of browsing Home. An
- *  authenticated admin/staff/delivery user is sent straight to their own dashboard instead of the
+ *  authenticated admin/staff user is sent straight to their own dashboard instead of the
  *  buyer Home — this matters most on mobile, where the app relaunching (backgrounded and killed
  *  by the OS, or just reopened) lands back on "/" far more often than a desktop browser tab ever
  *  does; without this, that non-buyer account would see the buyer storefront every time, even
@@ -219,7 +210,6 @@ export function AppRoutes() {
           <Route path="/admin/login" element={<AdminLoginPage />} />
           <Route path="/admin/setup" element={<AdminSetupPage />} />
           <Route path="/staff/login" element={<StaffLoginPage />} />
-          <Route path="/delivery/login" element={<DeliveryLoginPage />} />
         </Route>
 
         {/* Admin Dashboard Routes */}
@@ -238,7 +228,6 @@ export function AppRoutes() {
             <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
             <Route path="/admin/customers" element={<AdminCustomersPage />} />
             <Route path="/admin/staff" element={<AdminStaffPage />} />
-            <Route path="/admin/delivery" element={<AdminDeliveryManagementPage />} />
             <Route path="/admin/support" element={<AdminSupportPage />} />
             <Route path="/admin/support/:ticketId" element={<AdminSupportDetailPage />} />
             <Route path="/admin/faq" element={<AdminFaqPage />} />
@@ -268,16 +257,6 @@ export function AppRoutes() {
             <Route path="/staff/inventory" element={<AdminInventoryPage />} />
             <Route path="/staff/activity" element={<StaffActivityPage />} />
             <Route path="/staff/settings" element={<StaffProfilePage />} />
-          </Route>
-        </Route>
-
-        {/* Delivery Dashboard Routes — the Delivery role is fulfillment-only (see DeliveryLayout's
-            fixed nav): access to an order is scoped server-side to delivery_staff_id == their own
-            uid (see firestore.rules), never "every order" the way the Admin sees. */}
-        <Route element={<RequireDelivery />}>
-          <Route element={<DeliveryLayout />}>
-            <Route path="/delivery/dashboard" element={<DeliveryDashboardPage />} />
-            <Route path="/delivery/profile" element={<DeliveryProfilePage />} />
           </Route>
         </Route>
 

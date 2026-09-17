@@ -1,14 +1,12 @@
-import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
-import { LayoutDashboard, Package, Boxes, History, UserCog, LogOut, Menu, X, Briefcase, ShieldAlert, type LucideIcon } from 'lucide-react';
+import { LayoutDashboard, Package, Boxes, History, UserCog, LogOut, Briefcase, ShieldAlert, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAvatar } from '@/hooks/useAvatar';
-import { useBackButtonDismiss } from '@/hooks/useBackButtonDismiss';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { AnimatedOutlet } from '@/components/common/PageTransition';
+import { StaffBottomNavBar } from '@/components/staff/StaffBottomNavBar';
 
 interface NavItem {
   to: string;
@@ -18,10 +16,10 @@ interface NavItem {
 }
 
 /** The Staff role is product-management-only — this fixed list IS the full scope of what a staff
- *  account can reach (no Orders/Returns/Revenue/Seller-Management/Analytics/Payments). Individual
+ *  account can reach (no Orders/Returns/Revenue/Admin-Management/Analytics/Payments). Individual
  *  add/edit/delete/manage_inventory/upload_images actions inside Products/Inventory still respect
- *  the account's granted StaffPermissionKeys (see SellerProductsPage's canAdd/canEdit/canDelete and
- *  SellerProductFormPage's isBlockedByStaffPermission/canUploadImages/canManageInventory gates) —
+ *  the account's granted StaffPermissionKeys (see AdminProductsPage's canAdd/canEdit/canDelete and
+ *  AdminProductFormPage's isBlockedByStaffPermission/canUploadImages/canManageInventory gates) —
  *  this list only controls which destinations exist at all. */
 const STAFF_NAV_ITEMS: NavItem[] = [
   { to: '/staff/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -96,7 +94,7 @@ function StaffSummary() {
   );
 }
 
-/** Full-page takeover for a disabled staff account — mirrors SellerLayout's SuspendedBlock. */
+/** Full-page takeover for a disabled staff account — mirrors AdminLayout's equivalent block. */
 function DisabledBlock({ reason }: { reason: string | null | undefined }) {
   const navigate = useNavigate();
   const { signOut } = useAuth();
@@ -125,13 +123,11 @@ function DisabledBlock({ reason }: { reason: string | null | undefined }) {
   );
 }
 
-/** Shared shell for every Staff Dashboard page — deliberately separate from SellerLayout even
- *  though it reuses two seller pages under /staff/* (SellerProductsPage/SellerInventoryPage), since
- *  a staff member's nav is a fixed, product-management-only list rather than "everything a seller
+/** Shared shell for every Staff Dashboard page — deliberately separate from AdminLayout even
+ *  though it reuses two admin pages under /staff/* (AdminProductsPage/AdminInventoryPage), since
+ *  a staff member's nav is a fixed, product-management-only list rather than "everything an admin
  *  can do". */
 export function StaffLayout() {
-  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
-  useBackButtonDismiss(isMobileNavOpen, () => setIsMobileNavOpen(false));
   const { user } = useAuth();
   const { avatarUrl } = useAvatar();
   const items = STAFF_NAV_ITEMS;
@@ -142,6 +138,20 @@ export function StaffLayout() {
 
   return (
     <div className="min-h-screen bg-acc-bg dark:bg-surface-dark">
+      {/* Mobile-only identity strip — the persistent bottom tab bar below now owns navigation, so
+          this header is just "who am I / whose store", the same job Header.tsx does for buyers. */}
+      {user && (
+        <div className="pt-safe flex items-center gap-3 border-b border-acc-border bg-white px-4 py-3 md:hidden dark:border-primary-700 dark:bg-card-dark">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-bold text-acc-text dark:text-white">Welcome, {user.full_name.split(' ')[0]}</p>
+            <p className="truncate text-xs text-acc-text-secondary">{user.store_name ? `${user.store_name} • Staff` : 'Staff'}</p>
+          </div>
+          <NavLink to="/staff/settings" aria-label="Open profile">
+            <Avatar src={avatarUrl} name={user.full_name} size="md" />
+          </NavLink>
+        </div>
+      )}
+
       <div className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-6 lg:px-8">
         <div className="flex gap-6">
           <aside className="hidden shrink-0 lg:block lg:w-[260px]">
@@ -163,53 +173,12 @@ export function StaffLayout() {
           </aside>
 
           <div className="min-w-0 flex-1 pb-24 md:pb-0">
-            <div className="mb-4 flex items-center justify-between lg:hidden">
-              <h1 className="text-lg font-bold text-acc-text dark:text-white">Staff Dashboard</h1>
-              <button
-                onClick={() => setIsMobileNavOpen(true)}
-                className="rounded-full border border-acc-border p-2 dark:border-primary-700"
-                aria-label="Open menu"
-              >
-                <Menu size={18} />
-              </button>
-            </div>
             <AnimatedOutlet />
           </div>
         </div>
       </div>
 
-      <AnimatePresence>
-        {isMobileNavOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsMobileNavOpen(false)}
-              className="fixed inset-0 z-40 bg-primary-950/50 lg:hidden"
-            />
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 30, stiffness: 320 }}
-              className="fixed inset-x-0 bottom-0 z-50 max-h-[80vh] overflow-y-auto rounded-t-[24px] bg-white p-4 shadow-popover lg:hidden dark:bg-card-dark"
-            >
-              <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-primary-200 dark:bg-primary-700" />
-              <div className="mb-3 flex items-center justify-between px-1">
-                <h2 className="text-base font-bold text-acc-text dark:text-white">Staff Dashboard</h2>
-                <button onClick={() => setIsMobileNavOpen(false)} className="rounded-full p-1.5 hover:bg-primary-100 dark:hover:bg-primary-800" aria-label="Close menu">
-                  <X size={18} />
-                </button>
-              </div>
-              <StaffSummary />
-              <nav className="flex flex-col gap-1.5">
-                <NavItems items={items} onNavigate={() => setIsMobileNavOpen(false)} />
-              </nav>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+      <StaffBottomNavBar />
     </div>
   );
 }

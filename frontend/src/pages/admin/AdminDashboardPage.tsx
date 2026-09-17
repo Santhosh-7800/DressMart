@@ -20,10 +20,12 @@ import {
 } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { useAuth } from '@/contexts/AuthContext';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { isAdminRole, effectiveSellerId } from '@/lib/roles';
 import { formatCurrency } from '@/lib/utils';
 import { queryKeys } from '@/lib/queryClient';
 import { adminStatsService } from '@/services/adminStatsService';
+import { AdminMobileHome } from '@/components/admin/dashboard/AdminMobileHome';
 import { DashboardHeader } from '@/components/admin/dashboard/DashboardHeader';
 import { StatGrid } from '@/components/admin/dashboard/StatGrid';
 import { QuickActions } from '@/components/admin/dashboard/QuickActions';
@@ -51,6 +53,11 @@ export function AdminDashboardPage() {
   const { user } = useAuth();
   const isAdmin = isAdminRole(user?.role);
   const sellerId = effectiveSellerId(user);
+  // Real conditional MOUNT (not just CSS hidden) — same pattern as ProfilePage's
+  // ProfileMobileList/ProfileDesktopDashboard split, so the heavy desktop-only sections
+  // (SalesAnalyticsSection's 3x chart queries, PaymentsSummary, StaffManagementSummary, the full
+  // RecentActivityFeed) never mount on a phone that's only ever going to show AdminMobileHome.
+  const isDesktop = useMediaQuery('(min-width: 768px)');
 
   const overviewQuery = useQuery({
     queryKey: queryKeys.admin.overview(sellerId),
@@ -138,35 +145,42 @@ export function AdminDashboardPage() {
     : undefined;
 
   return (
-    <div className="space-y-8">
+    <div className={isDesktop ? 'space-y-8' : undefined}>
       <Seo title="Admin Dashboard" />
-      <DashboardHeader />
 
-      <StatGrid title="Your Store" cards={storeCards} isLoading={overviewQuery.isLoading} isError={overviewQuery.isError} skeletonCount={8} />
+      {!isDesktop && <AdminMobileHome />}
 
-      <StatGrid
-        title="Platform Overview"
-        cards={platformCards}
-        isLoading={platformQuery.isLoading}
-        isError={platformQuery.isError}
-        skeletonCount={7}
-      />
+      {isDesktop && (
+        <>
+          <DashboardHeader />
 
-      <QuickActions role={user?.role} />
+          <StatGrid title="Your Store" cards={storeCards} isLoading={overviewQuery.isLoading} isError={overviewQuery.isError} skeletonCount={8} />
 
-      <Suspense fallback={<AnalyticsSkeleton />}>
-        <SalesAnalyticsSection sellerId={sellerId} isHeadSeller={isAdmin} />
-      </Suspense>
+          <StatGrid
+            title="Platform Overview"
+            cards={platformCards}
+            isLoading={platformQuery.isLoading}
+            isError={platformQuery.isError}
+            skeletonCount={7}
+          />
 
-      <OrdersStatusSummary sellerId={sellerId} isHeadSeller={isAdmin} />
+          <QuickActions role={user?.role} />
 
-      <PaymentsSummary sellerId={sellerId} isHeadSeller={isAdmin} />
+          <Suspense fallback={<AnalyticsSkeleton />}>
+            <SalesAnalyticsSection sellerId={sellerId} isHeadSeller={isAdmin} />
+          </Suspense>
 
-      <InventorySummary sellerId={sellerId} isHeadSeller={isAdmin} />
+          <OrdersStatusSummary sellerId={sellerId} isHeadSeller={isAdmin} />
 
-      <StaffManagementSummary sellerId={sellerId} />
+          <PaymentsSummary sellerId={sellerId} isHeadSeller={isAdmin} />
 
-      <RecentActivityFeed />
+          <InventorySummary sellerId={sellerId} isHeadSeller={isAdmin} />
+
+          <StaffManagementSummary sellerId={sellerId} />
+
+          <RecentActivityFeed />
+        </>
+      )}
     </div>
   );
 }

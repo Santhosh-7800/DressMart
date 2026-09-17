@@ -123,7 +123,6 @@ export const queryKeys = {
   },
   delivery: {
     roster: () => ['delivery', 'roster'] as const,
-    profile: (deliveryStaffId: string) => ['delivery', 'profile', deliveryStaffId] as const,
   },
   faqs: {
     active: ['faqs', 'active'] as const,

@@ -10,7 +10,6 @@ const STATUS_STYLES: Record<string, string> = {
   confirmed: 'badge-accent',
   packed: 'badge-accent',
   shipped: 'badge-accent',
-  out_for_delivery: 'badge-accent',
   delivered: 'badge-success',
   cancelled: 'badge-danger',
   returned: 'badge-danger',

@@ -88,6 +88,9 @@ export function useUpdateStock() {
       // key prefix keyed by a freshly-computed product-id array each render, so an exact key match
       // never hits — invalidate the whole prefix instead.
       queryClient.invalidateQueries({ queryKey: ['seller', 'inventory', 'batch'] });
+      // Admin Dashboard's Out of Stock/Low Stock/Total Units tiles key off ['admin', ...] and don't
+      // otherwise know a stock edit happened here.
+      queryClient.invalidateQueries({ queryKey: ['admin'] });
       toast.success('Stock updated');
       if (user && isStaffRole(user.role) && sellerId) {
         void staffService.logActivity({
@@ -124,6 +127,7 @@ export function useAdjustStock() {
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.detail(productId) });
       queryClient.invalidateQueries({ queryKey: ['seller', 'inventory', 'batch'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.movements(productId) });
+      queryClient.invalidateQueries({ queryKey: ['admin'] });
       toast.success('Stock updated');
       if (user && isStaffRole(user.role) && sellerId) {
         void staffService.logActivity({

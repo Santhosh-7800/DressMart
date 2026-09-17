@@ -17,7 +17,6 @@ import {
   XCircle,
   Banknote,
   CreditCard,
-  Truck,
   AlertTriangle,
   FileText,
   FileSpreadsheet,
@@ -52,7 +51,6 @@ import {
   summarizeReturns,
   summarizeExchanges,
   summarizePayments,
-  summarizeDelivery,
   comparePeriods,
   generateBusinessSummary,
   RANGE_PRESET_LABELS,
@@ -192,7 +190,6 @@ export function AdminBusinessReportsPage() {
   const returnsSummary = useMemo(() => summarizeReturns(returnsInRange), [returnsInRange]);
   const exchangesSummary = useMemo(() => summarizeExchanges(exchangesInRange), [exchangesInRange]);
   const payments = useMemo(() => summarizePayments(currentOrders), [currentOrders]);
-  const delivery = useMemo(() => summarizeDelivery(currentOrders), [currentOrders]);
 
   const menRow = genderSummary.find((g) => g.gender === 'men');
   const kidsRow = genderSummary.find((g) => g.gender === 'kids');
@@ -226,8 +223,6 @@ export function AdminBusinessReportsPage() {
       { label: 'Cancellations', value: `${cancellations.count} (${formatCurrency(cancellations.value)})` },
       { label: 'COD Revenue', value: formatCurrency(payments.cod.revenue) },
       { label: 'Online Revenue', value: formatCurrency(payments.online.revenue) },
-      { label: 'Delivered', value: String(delivery.deliveredCount) },
-      { label: 'Failed Deliveries', value: String(delivery.failedCount) },
     ],
     tables: [
       {
@@ -472,38 +467,6 @@ export function AdminBusinessReportsPage() {
                   <p className="text-xs text-acc-text-secondary">Online (Razorpay)</p>
                   <p className="font-semibold text-acc-text dark:text-white">{payments.online.orders} orders · {formatCurrency(payments.online.revenue)}</p>
                   {payments.online.failedOrders > 0 && <p className="mt-1 text-xs text-red-500">{payments.online.failedOrders} failed payment(s)</p>}
-                </div>
-              </div>
-            </Card>
-
-            <Card hover={false}>
-              <h2 className="mb-4 flex items-center gap-2 text-base font-bold text-acc-text dark:text-white">
-                <Truck size={17} className="text-acc-primary" /> Delivery Performance
-              </h2>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <p className="text-xs text-acc-text-secondary">Delivered</p>
-                  <p className="font-semibold text-acc-text dark:text-white">{delivery.deliveredCount}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-acc-text-secondary">Failed</p>
-                  <p className="font-semibold text-acc-text dark:text-white">{delivery.failedCount}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-acc-text-secondary">Out for Delivery</p>
-                  <p className="font-semibold text-acc-text dark:text-white">{delivery.outForDeliveryCount}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-acc-text-secondary">Pending Assignment</p>
-                  <p className="font-semibold text-acc-text dark:text-white">{delivery.pendingAssignmentCount}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-acc-text-secondary">Avg. Completion Time</p>
-                  <p className="font-semibold text-acc-text dark:text-white">{delivery.averageCompletionHours === null ? '—' : `${delivery.averageCompletionHours.toFixed(1)}h`}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-acc-text-secondary">Success Rate</p>
-                  <p className="font-semibold text-acc-text dark:text-white">{delivery.successRatePercent === null ? '—' : `${delivery.successRatePercent.toFixed(1)}%`}</p>
                 </div>
               </div>
             </Card>

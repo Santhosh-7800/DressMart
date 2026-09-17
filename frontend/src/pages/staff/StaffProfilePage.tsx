@@ -1,16 +1,18 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Moon, Sun, Monitor, Lock, User, LogOut } from 'lucide-react';
+import { Moon, Sun, Monitor, Lock, User, LogOut, PencilLine } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { Card } from '@/components/ui/Card';
 import { Avatar } from '@/components/ui/Avatar';
+import { Input } from '@/components/ui/Input';
 import { PasswordInput } from '@/components/ui/PasswordInput';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAvatar } from '@/hooks/useAvatar';
 import { authService } from '@/services/authService';
+import { getFriendlyErrorMessage } from '@/lib/firebaseErrors';
 import { cn } from '@/lib/utils';
 
 /** A staff account's own profile — deliberately scoped to identity/appearance/password only.
@@ -27,7 +29,27 @@ export function StaffProfilePage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSavingPassword, setIsSavingPassword] = useState(false);
 
+  const [fullName, setFullName] = useState(user?.full_name ?? '');
+  const [phone, setPhone] = useState(user?.phone ?? '');
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
   if (!user) return null;
+
+  const handleSaveProfile = async () => {
+    if (!fullName.trim()) {
+      toast.error('Name cannot be empty');
+      return;
+    }
+    setIsSavingProfile(true);
+    try {
+      await authService.updateProfile(user.id, { full_name: fullName.trim(), phone: phone.trim() || null });
+      toast.success('Profile updated');
+    } catch (error) {
+      toast.error(getFriendlyErrorMessage(error, 'Could not update profile'));
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -99,6 +121,25 @@ export function StaffProfilePage() {
         <Button variant="outline" fullWidth className="mt-4" onClick={() => { void signOut(); navigate('/'); }}>
           <LogOut size={15} /> Logout
         </Button>
+      </Card>
+
+      <Card hover={false}>
+        <div className="mb-4 flex items-center gap-2">
+          <PencilLine size={17} className="text-acc-primary" />
+          <h2 className="text-base font-bold text-acc-text dark:text-white">Edit Profile</h2>
+        </div>
+        <div className="space-y-4">
+          <Input floating label="Full Name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+          <Input floating label="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <Input floating label="Email" value={user.email} disabled />
+          {/* Role is set by the Admin (Staff Management) and is not something a staff account can
+              change for itself — shown here for visibility only, matching the read-only Role row
+              in the card above. */}
+          <Input floating label="Role" value={user.store_name ? `Staff · ${user.store_name}` : 'Staff'} disabled />
+          <Button variant="account" onClick={handleSaveProfile} isLoading={isSavingProfile}>
+            Save Changes
+          </Button>
+        </div>
       </Card>
 
       <Card hover={false}>
